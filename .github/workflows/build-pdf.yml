@@ -58,6 +58,7 @@ jobs:
       run: |
         PATH=${PATH}:${BUNDLE_BIN}:$(npm bin) \
         make
+        working-directory: ./specification
     - name: Archive PDF result
       uses: actions/upload-artifact@v2
       with:
