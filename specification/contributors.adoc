@@ -1,6 +1,6 @@
 == Contributors
 
-This RISC-V specification has been contributed to directly or indirectly by:
+The proposed AP-TEE specifications (non-ratified, under discussion) have been contributed to directly or indirectly by:
 
 [%hardbreaks]
 * Ravi Sahita, Editor <ravi@rivosinc.com>
