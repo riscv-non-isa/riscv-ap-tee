@@ -1,0 +1,20 @@
+
+= AP-TEE: HW-Attested Scalable TEE for Confidential Computing on RISC-V
+
+Acting Chair: Ravi Sahita 
+
+The RISC-V Application Platform - Trusted Execution Environment Task Group (AP-TEE TG) will collaborate to define the reference architecture for confidential computing on RISC-V Application Processor-based platforms that support multi-tenant virtualized workloads. The TG will define the ABI required to enable systems software to manage confidential workloads on a multi-tenant platform, while keeping the OS/hypervisor and entities that develop the OS/VMM and/or operate/manage the platform outside the TCB. The TG will design the interfaces to comprehend existing (ratified) privileged ISA and ensure extensibility of the interfaces to new Architectural ISA extensions as required for security or performance of confidential workloads. In addition to the normative specifications mentioned, the TG will produce an AP-TEE-specific security architecture analysis per the confidential computing threat model agreed upon as a living (non-normative) document supporting security recommendations, implementation-specific guidelines and relevant standard protocols for attestation for implementers of the AP-TEE capability on RISC-V platforms. 
+
+The proposed RISC-V AP-TEE task group will collaborate to define these three specifications:
+
+a. AP-TEE reference architecture and SBI extension interface (non-ISA, normative) which specifies the TH-ABI and TG-ABI interfaces to enable the OS/Hypervisor to manage confidential workloads on a multi-tenant platform, while keeping the OS/hypervisor and entities that develop the OS/VMM and/or operate/manage the platform outside the TCB. 
+The interfaces are defined between:
+  1. A new RISC-V AP platform-specific security service called the Trusted Security Manager (TSM) operating in RISC-V HS-mode and a general-purpose OS/Hypervisor executing in S/HS-mode - called the TH-ABI. The TH-ABI should cover aspects of: TVM creation and tear down, TVM measurement and attestation, TVM memory management and protection, TVM virtual-hart state management and protection, TVM execution and IO.
+  2. A Trusted Security Manager (TSM) running in HS-mode and a general-purpose OS executing in VS-mode - called the TG-ABI. The TG-ABI should cover aspects the TVM is involved in: TVM measurement extension and attestation, TVM memory conversion, TVM IO and other services used from host
+
+b). AP-TEE architecture security analysis (non-normative living document) supporting recommendations and implementation guidelines for e.g. coverage of threat model, attestation protocols, crypto modes 
+
+c). AP-TEE ISA extensions (normative) to be proposed as needed for enforcing confidential workload security and performance requirements. The baseline ISA expected for AP-TEE is the RISC-V privileged ISA (M, S/HS, U, VS modes), including the Hypervisor Extension. The interfaces in item a. will be defined to be extensible to any such future ISA extensions. The TG will start with the definition of the programming interfaces and identify ISA gaps. ISA proposals made will be modeled via tools such as QEMU/Spike.
+
+The goal of the AP-TEE interface specification is to enable open-source reference implementations of the RISC-V AP-TEE interfaces for platform-specific TSM implementations that enable confidential compute and trusted execution for different use case scenarios (Server, Automotive, Embedded etc.). To support this goal, a POC is defined that consists of: An SBI extension implementation for AP-TEE will be used as a reference implementation. A TSM implementation will be developed by the community as part of the ratification of the interfaces. The required changes will be made to the Linux/KVM host and guest software to validate the interface specifications.
+

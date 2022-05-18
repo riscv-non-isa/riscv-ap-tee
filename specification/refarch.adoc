@@ -1,0 +1,385 @@
+[[refarch]]
+== Reference Architecture Details
+
+We describe the properties of the TSM, its instantiation, isolation and 
+operational model for the TVM lifecycle. The description refers to Figure 1.
+
+=== TSM initialization
+
+The AP-TEE architecture requires a hardware Root-of-trust for supporting 
+TCB measurement, reporting and storage <<R8>>. The Root-of-trust for 
+Measurement (RTM) is defined as the TCB component that performs a 
+measurement of an entity and protects it for subsequent reporting. The 
+Root-of-trust for Reporting (RTR) is typically a HW RoT that reliably 
+provides authenticity and non-repudiation services for the purposes of 
+attesting to the origin, integrity and security version of platform TCB 
+components. Each TCB layer should have associated security version numbers 
+(SVN) to allow for TCB recovery in the event of security vulnerabilities 
+discovered in a prior version of the TCB layer.
+
+During platform initialization, HW elements form the RTM that measure the 
+TSM-driver. The TSM-driver acts as the RTM for the TSM loaded on the 
+platform. The TSM-driver initializes the TSM-memory-region for the TSM - 
+this TSM-memory-region must be in TEE-capable memory. The TSM binary may be 
+provided by the OS/VMM which may independently authenticate the binary 
+before loading the binary into the TSM-memory-region via the TSM-driver. 
+Alternatively, the firmware may pre-load the TSM binary via the TSM-driver. 
+In both cases, the TSM binary loaded must be measured and may be 
+authenticated (per cryptographic signature mechanisms) by the TSM-driver 
+during the loading process, so that the TSM used is reflected in the 
+attestation rooted in a HW RoT. The authentication process provides 
+additional control to restrict TSM binaries that can be loaded on the 
+platform based on policies such as version, vendor etc.  In addition to the 
+measurements, a security version number (SVN) of the TSM should be recorded 
+by the TSM-driver into the firmware measurement registers accessible only 
+to the TSM-driver and higher privilege components. The measurements and 
+versions of the HW RoT, the TSM-driver and the TSM will subsequently be 
+provided as evidence of a specific TSM being loaded on a specific platform. 
+
+During initialization, the TSM-driver will initialize a TSM-data region 
+within the TSM-memory region. The TSM-data region may hold per-hart TSM 
+state, memory assignment tracking structures and additional global data for 
+TSM management. The TSM-data region is TEE-capable memory that is apriori 
+access-control-restricted by the TSM-driver to allow only the TSM to access 
+this memory. The per-hart TSM state is used to start TSM execution from a 
+known-good state for security routines invoked by the OS/VMM. The per-hart 
+TSM state should be stored in pages that form a TSM Hart Control Structure 
+(THCS - See Appendix A) which is initialized as part of the TSM memory 
+initialization. The THCS structure definition is part of the TEEI and may 
+be extended by an implementation, with the minimum state shown in the 
+structure. Isolating and establishing the execution state of the TSM is the 
+responsibility of the TSM-driver. Saving and restoring  of the execution 
+state of the TSM (for interrupted routines) is performed by the TSM. The 
+operating modes of the TSM are described in Section 5.2. Saving and 
+restoring of the TVM execution state in the TVM virtual-harts (called the 
+VHCS) is the responsibility of the TSM and is held in TEE-capable memory 
+assigned to the TVM by the VMM.
+
+=== TSM operation and properties
+
+The TSM implements security routines that are invoked by the OS/VMM or by 
+the TVMs, e.g. by the VMM to grant a TVM a TEE-capable memory page and 
+setup second-stage mapping, activate a TVM virtual hart on a physical hart 
+etc. The TSM security routines are invoked by the OS/VMM via an ECALL with 
+the service call specified via registers.  These service calls trap to the 
+TSM-driver.  The TSM-driver switches hart state to the TSM context by 
+loading the hart’s TSM execution state from the THCS.tssa and then returns 
+via an MRET to the TSM. The TSM executes the security routine requested 
+(where the TSM enforces the security properties) and may either return to 
+the OS/VMM via an ECALL to the TSM-driver (TEERET with reason), or may use 
+an SRET to return/enter into a TVM. On a subsequent TVM synchronous or 
+asynchronous trap (due to ECALLs or any exception/interrupt) from a TVM, 
+the TSM handles the cases delegated to it by the TSM-driver (via mideleg). 
+The TSM saves the TVM state and invokes the TSM-driver via an ECALL (TEERET 
+with reason) to initiate the return of execution control to the OS/VMM if 
+required. The TSM-driver restores the context for the OS/VMM via the 
+per-hart control sub-structure THCS.hssa (See Appendix A). This canonical 
+flow is shown in figure 3.
+
+Beyond the basic operation described above, the following different 
+operational models of the TSM may be supported by an implementation:
+
+* *Uninterruptible* *TSM* - In this model, the TSM security routines are 
+executed in an uninterruptible manner for S-mode interrupts (M-mode 
+interrupts are not inhibited). This implies that the TSM execution always 
+starts from a fixed initial state of the TSM harts and completes the 
+execution with either a TEERET to return control to the OS/VMM or via an 
+SRET to enter into a TVM (where the execution may be interruptible again).
+
+* *Interruptible TSM with no re-entrancy* - In this model, after the 
+initial entry to the TSM with S-mode interrupts disabled, the TSM enables 
+interrupts during execution of  the TSM security routines. The TSM may 
+install its interrupt handlers at this entry (or may be installed via the 
+TEECALL flow as shown below). On an S-mode interrupt, the TSM hart context 
+is saved by the TSM and keeps the interrupt pending. The TSM may then 
+TEERET to the host OS/VMM with explicit information about the interruption 
+provided via the pending interrupt to the OS/VMM. The TSM-driver supports a 
+TEERESUME ECALL which enables the TSM to enforce that the resumption of the 
+interrupted TSM security routine is initiated by the OS/VMM on the same 
+hart. The TSM hart context restore is enforced by the TSM to allow for the 
+resumed TSM security routine operation to complete. An example of an 
+interruptible flow is the conversion of a large 2MB page to confidential 
+memory, which may require a long latency encryption operation. Intermediate 
+state of the operation must be saved and restored by the TSM for such 
+flows. 
+
+**__This specification describes the operation of the TSM in this 
+mode of operation.__**
+
+* *Interruptible and re-entrant TSM* - In this model, similar to the 
+previous case, the TSM security routines are executed in an interruptible 
+manner, but are also allowed to be re-entrant. This requires support for 
+trusted thread contexts managed by the TSM. A TSM security routine invoked 
+by the OS/VMM is executed in the context of a specific TSM thread context 
+(a stack structure may also be used). On an interruption of that routine 
+using a TSM thread context, the TSM saves the TSM execution context for the 
+TSM thread and returns control to the OS/VMM via a TEERET. The OS/VMM can 
+handle the interrupt and may resume that TSM thread or may invoke another 
+TSM security routine on a different (non-busy) thread context (and on a 
+different hart). This model of TSM operation requires additional 
+concurrency controls on internal data structures and per-TVM global data 
+structures (such as the second stage page table structures).
+
+image:img_3.png[]  
+Figure 3: TSM operation - Interruptible and non-reentrant TSM model shown.
+
+A TSM entry triggered by an ECALL (with AP-TEE service type) by the OS/VMM 
+leads to the following context-switch to the TSM (performed by the 
+TSM-driver):
+
+The initial state of the TSM will be to start with a fixed reset value for 
+the registers that are restored on resumed security operations.
+
+*ECALL (* *TEECALL* */ TEERESUME* *)* *pseudocode - implemented by the 
+TSM-driver*
+
+* If trap is due to synchronous trap due to TEECALL/ TEERESUME then enable 
+AP-TEE mode = 1 for the hart via M-mode CSR (implementation-specific)
+* Locate the per-hart THCS (located within TSM-driver memory data region)
+* Save operating VMM csr context into the THCS.hssa (Hart Supervisor State 
+Area) fields : sstatus, stvec, scounteren, sscratch, satp (and other x 
+state other than a0, a1 - see <<9_appendix_a_thcs_and_vhcs>>). Note that 
+any v/f register state must be saved by the caller.
+* Save THCS.hssa.pc as mepc+4 to ensure that a subsequent resumption 
+happens from the pc past the TEECALL
+* Establish the TSM operating context from the THCS.tssa (TSM Supervisor 
+State Area) fields (See Appendix A)
+* Set scause to indicate TEECALL
+* Disable interrupts via sie=0. 
+  ** For a preemptable TSM, interrupts do not stay disabled - the TSM may 
+enable interrupts and so S/M-mode interrupts may occur while executing in 
+the TSM. S-mode interrupts will cause the TSM to save state and TEERET.
+* MRET to resume execution in TSM at THCS.tssa.stvec
+
+*ECALL (synchronous explicit TEERET) OR Asynchronous M-mode trap pseudocode 
+- implemented by TSM-driver*
+
+* Locate the per-hart THCS (located within TSM-driver memory data region)
+* If Asynchronous M-mode trap: 
+  ** Handle M-mode trap
+  ** If required, pend an S-mode interrupt to the TSM and SRET
+* _Implementation Note -_ _The TSM-driver does not need to keep state of 
+the TSM being interrupted as, on an interrupt the TSM can enforce:_
+  ** _If it was preemptible but not-reentrant that the next invocation on 
+that hart is a TEERESUME with identical parameters as the interrupted 
+security routine._
+  ** _If the TSM was preemptible and re-entrant then the TSM would accept 
+both TEERESUME and TEECALL as subsequent invocations (as long as TSM 
+threads are available)._
+* Restore the OS/VMM state saved on transition to the TSM: sstatus, stvec, 
+scounteren, sscratch, satp and x registers (other than a0, a1). Note that 
+any v/f register state must be restored by the caller.
+* TSM-driver passes TSM/TVM-specified register contents to the OS/VMM to 
+return status from TEERET (TSM sets a0, a1 registers always - other 
+registers may be selected by the TVM)
+* Clear AP-TEE-mode on hart (via implementation-specific M-mode CSR to 
+block non-TEE mode accesses to TEE-assigned memory.) 
+* MRET to resumes execution in OS/VMM at mepc set to THCS.hssa.pc 
+(THCS.hssa.pc adjusted to refer to opcode after the ECALL that triggered 
+the TEECALL / TEERESUME) 
+
+The TSM is stateless across TEECALL invocations, however a security routine 
+invoked in the TSM via a TEECALL may be interrupted and must be resumed via 
+a TEERESUME i.e. _the TSM is preemptable but non-reentrant_ . These 
+properties are enforced by the TSM-driver, and other models described above 
+may be implemented. The TSM does not perform any dynamic resource 
+management, scheduling, or interrupt handling of its own. Hence the TSM is 
+not expected to have a S-model interrupt file of its own, and so for 
+issuing IPIs the TSM must invoke the TSM-driver and use the M-mode 
+Interrupt file when the TSM issues IPIs.
+
+When the TSM is entered via the TSM-driver (as part of the ECALL [TEECALL] 
+- MRET), the TSM starts with sstatus.sie set to 0 i.e. interrupts disabled. 
+The sstatus.sie does not affect HS interrupts from being seen when mode = 
+U/VS/VU. The OS/VMM sip and sie will be saved by the TSM in the HSSA and 
+will retain the state as it existed when the host OS/VMM invoked the TSM. 
+The TSM may establish the execution context and re-enable interrupts 
+(sstatus.sie set to 1). 
+
+If an M-mode interrupt occurs while the hart is operating in the TSM or any 
+TVM, the control always goes to the TSM-driver handler, which can handle 
+it, or if the event must be reported to the untrusted OS/VMM, they are 
+pended as S-mode interrupts to the TSM which must save its execution 
+context and return control to the OS/VMM via a TEERET..
+
+If an S-mode interrupt occurs while the hart is operating in the TSM 
+(HS-mode), it should pre-empt out and return to the OS/VMM using TEERET. 
+The TSM may take certain actions on S-mode interrupts - for example, saving 
+status of a host security routine, and/or change the status of TVMs. The 
+TSM is however not expected to retire the S-mode interrupt but keep the 
+event pending so they are taken when control returns to the OS/VMM via the 
+TEERET.
+
+If a S-mode interrupt occurs in U, VU or VS - external, timer, or software 
+- then that causes the trap handler in TSM to be invoked. In response to 
+trap delivery, the TSM saves the TVM virtual-hart state and returns to the 
+OS/VMM via a TEERET ECALL. As part of return to the OS/VMM, the sstatus of 
+OS/VMM is restored and when the OS starts executing the pending interrupt - 
+external, timer, or software - may or may not be taken depending on the OS 
+sstatus.sie. Under these circumstances the saving of the TVM state is the 
+TSM responsibility. 
+
+When TVM is executing, hideleg will only delegate VS-mode external 
+interrupt, VS-mode SW interrupt, and VS-mode timer interrupts to the TVM. 
+S-mode SW/Timer/External interrupts are delegated to the TSM (with the 
+behavior described above). _All other interrupts_ , M-mode 
+SW/Timer/External, bus error, high temp, RAS etc. are not delegated and 
+delivered to M-mode/TSM-driver. Under these circumstances the saving of the 
+state is the TSM-driver responsibility. Also since scrubbing the TVM state 
+is the TSM responsibility, the TSM-driver may pend an S-mode interrupt to 
+the TSM to allow cleanup on such events. See Appendix B for a table of 
+interrupt causes and handling requirements.
+
+Any NMIs experienced during TSM/TVM execution are always handled by the 
+TSM-driver and must cause the TEEs to be destroyed (preventing any loss of 
+confidential info via clearing of machine state). The TSM and therefore all 
+TVMs are prevented from execution after that point.
+
+=== TSM and TVM Isolation
+
+TSM (and all TVMs) memory is granted by the host OS/VMM but is isolated 
+(via access-control and/or confidentiality-protection)  by the HW and TCB 
+elements. The TSM, TVM and HW isolation methods used must be evident in the 
+attestation evidence provided for the TVM since it identifies the hardware 
+and the TSM-driver.
+
+There are two facets of TVM and TSM memory isolation that are 
+implementation-specific:
+
+*a)* *Isolation from host software* *access* -  The CPU may enforce a 
+hardware-based access-control of TSM memory to prevent access from host 
+software (VMM and host OS) V=0, HS-mode untrusted code. TEE and TVM address 
+spaces are identified by an additional (implementation-defined) *AP-TEE 
+mode qualifier* to maintain the isolation during access and in internal 
+caches, e.g. Hart TLB lookup may be extended with the AP-TEE mode 
+qualifier. TVM memory isolation must support sparse memory management 
+models and architectural page-sizes of 4KB, 64K, 2MB, 1GB (and optionally 
+512GB). For example, The hardware may provide a memory ownership tracking 
+table where there is an entry per physical page. The memory ownership 
+tracking table may be a radix tree or a flat table. The memory ownership 
+tracking table may allow memory ownership at multiple granularities such as 
+4K, 64K, 2M, 1G, etc. The memory ownership table may be enforced at the 
+memory controller, or in a page table walker.
+
+*b)* *Isolation against physical/out-of-band access* - The platform TCB may 
+provide confidentiality, integrity and replay-protection. This may be 
+achieved via a Memory Encryption Engine (MEE) to prevent TEE state being 
+exposed in volatile memory during execution. The use of an MEE and the 
+number of encryption domains supported is implementation-specific. For 
+example, The hardware may use the *AP-TEE mode qualifier* during execution 
+(and memory access) to cryptographically isolate memory associated with a 
+TEE which may be encrypted and additionally cryptographically 
+integrity-protected using a MAC on the memory contents. The MAC may be 
+maintained at various granularity - e.g. cache block size or in multiples 
+of cache blocks.
+
+*TVM isolation* is the responsibility of the TSM via the second stage 
+address translation table (hgatp). The TSM must track memory assignment of 
+TVMs (by the untrusted VMM/OS) to ensure memory assignment is 
+non-overlapping, along with additional security requirements. The following 
+are the security requirements/invariants for enforcement of the memory 
+access-control for memory assigned to the TVMs. These rules are enforced by 
+the TSM and the HW:
+
+. Contents of a TVM page assigned (statically measured or lazy-initialized) 
+to the TVM is bound to the Guest PA assigned to the TVM during TVM operation.
+. A TVM page can only be assigned to a single TVM, and mapped via a single 
+GPA unless aliases are allowed in which case, such aliases must be tracked 
+by the TSM). Aliases in the virtual address space are under the purview of 
+the TVM OS.
+. 1st stage address translation - A TVM page mapping must be translated 
+only via first stage translation structures which are contained in pages 
+assigned to the same TVM. 
+. 2nd stage address translation:
+  .. A TVM page guest physical address mapping must be translated only via 
+the TSM-managed second stage translation structures for that TVM. 
+  .. 2nd stage structures may not be shared between TVMs, and must not 
+refer to any other TVMs pages.
+  .. The OS/VMM has no access to TVM second stage paging structures
+  .. The OS/VMM may install shared page mappings (via TSM oversight) to 
+non-confidential pages that are not assigned to any TVM or the TSM - this 
+is for example for untrusted IO.
+  .. Circular mappings in the second stage paging structures are disallowed.
+. Access to shared memory pages must be explicitly signaled by the TVM via 
+the GPA and enforced for memory ownership for the TVM by the HW.
+
+=== TVM Execution
+
+TVMs can access two classes of memory - “confidential memory” - which has 
+confidentiality and access-control properties for memory exclusive to the 
+TVM, and "non-confidential memory" which is memory accessible to the host 
+OS/VMM and is used for untrusted operations (e.g. virt-io, grpc 
+communication with/via the host). If the confidential memory is 
+access-controlled only, the TSM and TSM-driver are the authority over the 
+access-control enforcement. If the confidential memory is using memory 
+encryption, the encryption keys used for confidential memory must be 
+different from non-confidential memory. 
+
+All TVM memory is mapped in the second-stage page tables controlled by the 
+TSM explicitly - the allocation of memory for the second stage paging 
+structures pages used for the second stage mapping is also performed by the 
+OS/VMM but the security properties of the second stage mapping are enforced 
+by the TSM. By default any memory mapped to a TVM is confidential. A TVM 
+may then explicitly request that confidential memory be converted to 
+non-confidential memory regions using services provided by the TSM. More 
+information about TVM Execution and the lifecycle of a TVM is described in 
+the <<7_tvm_lifecycle>> section of this document.
+
+=== Debug and Performance Monitoring
+
+The following additional considerations are noted for debug and performance 
+monitoring:
+
+*Debug mode considerations*
+
+In order to support probe-mode debugging of the TSM, the RoT must support 
+an authorized debug of the platform. The authentication mechanism used for 
+debug authorization is implementation-specific, but must support the 
+security properties described in the Section 3.12 of the RISC-V Debug 
+Support specification version 1.0.0-STABLE <<R6>>. The RoT may support 
+multiple levels of debug authorization depending on access granted. For 
+probe-based debugging of the hardware, the RoT  performing debug 
+authentication must ensure that separate attestation keys are used for TCB 
+reporting when probe-debug is authorized vs when the platform is not under 
+probe-debug mode.The probe-mode debug authorization process must invalidate 
+sealed keys to disallow sealed data access when in probe-debug modes. 
+
+When a TVM is under self-hosted debugging - on a transition to TVM 
+execution, the TSM-driver must set up the trigger CSRs for the TVM. For TVM 
+debugging, the TSM-driver may inhibit M and S/HS modes in the triggers. On 
+transitions back to the OS/VMM, the TSM-driver will save the trigger CSRs 
+and associated debug states, thus not leaking any information to non-TEE 
+workloads. TVM self-hosted debug may be enabled from TVM creation time or 
+may be explicitly opted-into during execution of the TVM. The TSM may 
+invoke the TSM-driver to set up a TVM-specific trigger CSR state (per the 
+configuration of the TVM).
+
+*Performance Monitoring considerations*
+
+By default the TSM and all TVMs run with performance monitoring suppressed. 
+If a TVM runs in this default mode (opted out of performance monitoring), 
+on a transition to the TVM, the TSM-driver enforces this via inhibiting the 
+counters (using mcountinhibit). 
+
+If the TVM has opted-in to performance monitoring, the TSM must invoke the 
+TSM-driver to establish a TVM-specific performance monitoring controls 
+(triggers, event selectors). For any counters that the TVM will use, the 
+TSM will assign those to the TVM via the TSM-driver and inhibit counting in 
+HS/M mode - with Sscofpmf and future RISC-V extensions these controls could 
+be delegated to the TVM (VS mode) by the TSM. The TSM is free to use any 
+counters that are not delegated. If the TSM is not using any counters and 
+any of the TVMs opt-in to use hpm then the TSM may delegate the LCOFI 
+interrupt (via hideleg[13]=1) for that TVM. The delegated TVM counters 
+naturally inhibit counting in S/HS and M. The TSM-driver must save and 
+clear counter/event selector values as control transitions to the VMM or a 
+different TVM that is using hpm. On a transition back to the host OS/VMM, 
+the TSM-driver must restore the saved hardware performance monitoring event 
+triggers and counter enables. 
+
+The TVM may opt-in to use performance monitoring either at initialization 
+or post-init. For TVMs that have performance monitoring enabled, the 
+TSM-driver may implement a service for the TSM to allow dynamically saving 
+and restoring performance monitoring controls when a TVM is executing - 
+this can reduce the performance overhead for the TSM-driver to only perform 
+the save/restore of the controls when required by the TVM.
+

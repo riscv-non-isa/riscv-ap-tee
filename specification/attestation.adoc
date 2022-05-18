@@ -1,0 +1,306 @@
+[[attestation]]
+== TVM Attestation
+
+=== TCB Elements
+
+Elements considered to be in the TCB for AP-TEE workloads are summarized 
+below:
+
+Hardware/firmware 
+
+* CPU: All hardware logic, including MMU, caches 
+* SOC: All hardware subsystems including memory confidentiality, integrity 
+and replay-protection for volatile memory
+* RoT for TCB measurement, evidence reporting, attestation, sealing
+* IOMMU
+* (optional) Devices may be included in the TCB if the devices support 
+reporting evidence of their security posture.
+
+Software/firmware
+
+* TSM-driver that hosts a TEEI (with TH-ABI and TG-ABI security routines). 
+Note that since the TSM-driver operates in M-mode, all M-mode firmware is 
+included in the TCB for AP-TEE workloads.
+* TEE Security Manager (TSM) and user-mode TSM components
+* For confidential application/VM workloads, an AP-TEE-compatible 
+Runtime/guest OS may be included for portability (but is not required).
+
+=== Attestation
+
+The TCB described above is reported to relying parties via an attestation 
+mechanism and protocol.
+
+*Framework*
+
+The IETF RATS [x] describes the following reference model for attestation. 
+In Remote Attestation, the Attester produces information about itself 
+(Evidence) to enable a remote peer (the Relying Party) to decide whether to 
+consider that Attester a trustworthy peer or not. The Verifier appraises 
+evidence via appraisal policies and creates the Attestation Results to 
+support Relying Parties in their decision process.
+
+image:img_4.png[]
+Figure 4: Remote Attestation Framework (IETF RATS)
+
+This TEE proposal uses the layered attestation model <<R1>> where the RoT 
+is the initial Attesting Environment. Claims are collected from or about 
+each layer.  The corresponding Claims can be structured in a nested fashion 
+that reflects the nesting of the Attester's layers.  The previous layer 
+acts as the Attesting Environment for the next layer.  Claims about a RoT 
+typically are asserted by an Endorser.
+
+The following are the key requirements for attestation mapped to this 
+AP-TEE architecture:
+
+In order for the TCB (described above) to be enforced by the architecture, 
+the TSM driver measures the untrusted-host-supplied TSM binary and records 
+its measurements, vendor and version into measurement registers which can 
+be attested to via the HW RoT-rooted keys. 
+
+The TSM must then provide an implementation of a TEE-Guest ABI (TG-ABI) 
+operation (teecall_tg_get_evidence)  to enable a TVM to generate 
+attestation evidence that a relying party can verify using the certificate 
+chain. 
+
+The TCB extension and evidence collection for a TVM attestation is shown 
+below:
+
+image:img_5.png[]
+Figure 5: Layered Attestation architecture for TVMs
+
+It is expected that an implementation will provide implementation-specific 
+intrinsics to record measurements of the TSM into the firmware RoT for 
+measurement to support the layered RTMs and attestation of AP-TEE workloads. 
+
+*Attestation Evidence*
+
+Suitable evidence formats may be used by the Attester to present the 
+evidence that the TVM is executing as a TEE. The evidence should attest to 
+the above layered trust chain. The TSM must allow for attestation operation 
+(certifying TVM measurements) to be executed in an interruptible manner. 
+Once such evidence format is specified in the TCG DICE Attestation 
+Architecture which describes evidence as X.509 Certificate with an 
+extension for *TCB Info Evidence <<R2>>. 
+
+The following key fields are present in that DiceTcbInfo (See OID in spec 
+[2]). The fields are listed here with the usage described specific to the 
+AP-TEE reference architecture.
+
+|=== 
+| *Field*      | *Type*       |  *Description*
+| Vendor       | UTF8String   | The entity that created the TCB component.
+| Model        | UTF8String   | The product name associated with the TCB 
+component.
+| Version      | UTF8String   | The revision string associated with the TCB 
+component.
+| SVN          | Integer      | The security version number associated with 
+the TCB component - the SVN makes parsing of the TCB simpler to 
+differentiate updates that affect security from non-security related 
+updates.
+| Layer        | Integer      | The DICE layer associated with this 
+measurement of the TCB component.
+| Index        | Integer      | A value that enumerates measurement of 
+assets within the TCB component and DICE layer.
+| FWIDs        | List of FWID | A list of FWID values resulting from 
+applying the hashAlg function over the object being measured (recommended 
+components should cover: code, config, static data of a specific TCB binary 
+component). FWIDs are computed by the DICE layer that is the Attesting 
+Environment and certificate Issuer. Each FWID consists of:* HashAlg (OID) – 
+an algorithm identifier for the hash algorithm used to produce a digest 
+value.* Digest – a digest of the firmware, initialization values, or other 
+settings of the TCB component.
+| Flags        | Uint8        | Enumerates potentially simultaneous 
+operational states of the TCB component: (i) notConfigured, (ii) notSecure, 
+(iii) recovery, (iv) debug. A value of 1 (TRUE) means the operational mode 
+is active. A value of 0 (FALSE) means the operational state is not active. 
+If the flags field is omitted, all flags are assumed to be 0 
+(FALSE).
+| VendorInfo   | Octet String | Vendor supplied values that encode vendor, 
+model, or device specific state
+| Type         | Octet String | A machine readable description of the 
+measurement                                                                  
+|===
+
+This extension defines attestation evidence about the DICE layer that is 
+associated with the Subject key. The certificate Subject and 
+SubjectPublicKey identify the entity to which the DiceTcbInfo extension 
+applies. When this extension is used, the measurements in the evidence 
+usually describe the software/firmware (and configuration) which will 
+execute within the TCB. The AuthorityKeyIdentifier extension [2] MUST be 
+supplied when the DiceTcbInfo extension is supplied. This allows the 
+Verifier to locate the signer’s certificate. The DiceTcbInfo extension 
+should be included with CRL entries that revoke the certificate that 
+originally included the said DiceTcbInfo extension. 
+
+For TVM attestation, the following TCB Evidence Info will be sequenced 
+using the above DiceTcbInfo structure. Multiple evidences may be provided 
+via the *MultiDiceTcbInfo* extension:
+
+* Cryptographic hash of the RoT FW binary and configuration, along with its 
+SVN and other fields; 
+* Cryptographic hash of the TSM-driver binary and configuration, along with 
+its SVN and other fields ; 
+* Cryptographic hash of the TSM binary and configuration, with its SVN and 
+other fields; 
+* Cryptographic hash of the OSAM (described below) binary and 
+configuration, with its SVN and other fields - this is applicable for 
+remote attestation only;
+  ** If OSAM is a 3rd party - the certifying entity will need a separate 
+evidence entry. 
+* Cryptographic hash of the TVM static binaries and configuration, along 
+with its SVN and other fields.
+* The TVM may additionally extend cryptographic measurements for other 
+workload binaries and configuration loaded dynamically subsequent to boot 
+via the TG-ABI.
+
+The TVM TCB Evidence Info is managed by the TSM and is combined with the 
+TSM’s TCB Evidence info that is in turn managed by the TSM-driver. The 
+TSM-driver provides a TEEI security routine to enable the TSM and 
+transitively the TVM to generate an Attestation CDI (Composite Device 
+Identifier) and key to participate in an Attestation certificate-based 
+protocol for remote (and local) attestation.
+
+We recommend at least the following CDIs to be supported for AP-TEE 
+workloads:
+
+. Attestation CDI - This CDI is derived from the combination of the input 
+values listed above and is expected to change across software updates or 
+configuration changes of these components. This CDI is meant for remote 
+attestation and is mandatory for AP-TEE implementations.
+. Versioned Sealing CDI - This CDI is also derived from the combination of 
+the input values listed above seeded with a component security version 
+number. This Versioned Sealing CDI allows for the sealing key to be bound 
+to a version chain of the TCB components. This CDI is appropriate for 
+sealing and is recommended for AP-TEE implementations.
+
+For remote attestation of a TVM, an X.509 Attestation certificate 
+(structure shown below) is provisioned or generated on-demand for the TVM 
+via the TSM. This process requires the generation of a CDI certificate 
+where the subject key pair is derived from the Attestation CDI value for 
+any layer (e.g. TSM-driver). The authority key pair which signs the 
+certificate (e.g. RoT) is derived from the UDS (for the RoT) or, after the 
+initial hardware to software transition, from the Attestation CDI value for 
+the current layer (e.g. TSM-driver). The DICE flow outputs the CDI values 
+and the generated certificate; the private key associated with the 
+certificate may be optionally passed along with the CDI values to avoid the 
+need for re-derivation by the target layer. The UDS-derived public key is 
+certified by an external authority during manufacturing to root the 
+certificate chain in a HW RoT. 
+
+As a tangible example, the CDI private key for the TSM were used to sign a 
+leaf certificate for an attestation key for the TVM, the certificate chain 
+may look like this:
+
+image:img_6.png[]
+Figure 6: Attestation Certificate generation
+
+This attestation certificate can be used in a challenge/response protocol 
+to a remote relying party which must verify the certificate chain for the 
+attestation key used to sign the relying party challenge. 
+
+The Attestation key and certificate generation for TVMs may be performed 
+with a U-mode TSM component called the Owner Signing Authority Module 
+(OSAM) to enable a extension of the TCB to support interruptible signing 
+operations. The OSAM may execute as part of the TSM or may be executed in 
+the TSM U-mode to allow for the interruptibility models discussed in the 
+TSM operation section of this document.
+
+*TVM* *Attestation:*
+
+X.509 CDI Certificates are used to enable Attestation certificates derived 
+from the TSM CDI for each TVM hosted on the platform. All standard fields 
+of a CDI certificate are described in the following table. This certificate 
+can be generated given a CDI_Public key and the DICE input values.
+
+|===
+| *Field*  | *Description* 
+| signatureAlgorithm | id-ecdsa-with-SHA256 per RFC 5758 recommended. 
+Other signatureAlgorithms may be used.
+| signatureValue | 64 byte ECDSA signature, using UDS_Private or a previous 
+CDI_Private as the signing key
+| version | v3
+| serialNumber | CDI_ID in ASN.1 INTEGER form
+| signature | id-ecdsa-with-SHA256 per RFC 5758
+| issuer | “<UDS_ID> or <CDI_ID>” UDS_ID, CD_ID are hex encoded lower case
+| validity | The validity values are populated as follows: notBefore can be 
+any time known to be in the past, and notAfter is set to the standard 
+value used to indicate no well-known expiry date, “99991231235959Z” per 
+RFC 5280.  
+| subject | “<CDI_ID>” where CDI_ID is hex encoded lower case
+| subjectPublicKeyInfo | When using ECDSA, per RFC 5480 (id-ecPublicKey)
+| issuerUniqueID | Not used
+| subjectUniqueID | Not used
+| extensions | Standard extensions are included as well as a custom TCG 
+extension which holds information about the measurements used to derive 
+CDI values. Both are described 
+below.                                                  
+|===
+
+*CDI Standard Extensions*
+
+|===
+| *Extension* | *Critical* | *Description*
+| authorityKeyIdentifier | non-critical | Contains only keyIdentifier set 
+to UDS_ID or previous CDI_ID
+| subjectKeyIdentifier | non-critical | Set to CDI_ID
+| keyUsage | critical | Contains only keyCertSign. Other CDI certificates 
+may be generated for other purposes for the TVM.
+| basicConstraints | critical | The cA field is set to TRUE. The 
+pathLenConstraint field is normally not included, but may be included 
+and set to zero if it is known that no additional DICE layers exist. 
+For example, for TVMs, this field may be set to zero.  
+|===
+
+*CDI Custom Extension Fields*
+
+|===
+| *Field*                          | *Value*                           
+| extnID                           | OID from [2] for TcbEvidenceInfo  
+| critical                         | TRUE                              
+| extnValue                        | A TcbEvidenceInfo (See above)     
+|===
+
+The TSM can issue an Attestation certificate to the TVM which includes the 
+TVM TcbInfo, and can transfer that certificate to the TVM during 
+initialization via a guest firmware mechanism (e.g. device tree or UEFI HOB). 
+Alternately, the TSM can provide an interface to sign TVM TcBInfo and 
+additional data (such as DRTM measurements done by the TVM) at runtime via 
+the teecall_tg_gen_cert interface to generate additional TVM Attestation 
+certificates.
+
+ECALL ( *teecall_tg_gen_cert* ): invoked by TVM - this TEEI operation is 
+serviced by the TSM.
+
+Inputs/outputs
+
+* Input: virtual address to 4KB buffer containing a CSR (Certificate 
+Signing Request) and additional parameters (nonce)
+* Input/output:virtual address to 4KB aligned buffer where TSM certificate 
+will be returned
+
+Validation
+
+* Set result register to indicate failure
+* Verify VA where TVM Attestation certificate will be returned is 4KB 
+aligned and read/write else fault
+* Verify TVM provided CSR <size TBD> is contained within a 4KB page and 
+read accessible else fault
+
+Setup
+
+* Create TVM attestation structure in a temporary buffer in per-hart 
+confidential memory
+* Populate TVM TcbEvidenceInfo per the TVM measurements recorded by the TSM
+* Copy additional data from CSR <TBD>
+
+Process
+
+* Compute attestation certificate (per certificate fields and extensions 
+described above) using TSM as the DICE for TVM
+
+Outputs
+
+* Copy out attestation structure to TSM verified memory region
+* Set result register to indicate success
+
+

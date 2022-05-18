@@ -1,0 +1,122 @@
+[[threatmodel]]
+=== Adversary Model
+
+_Unprivileged Software adversary -_ This includes software executing in 
+U-mode managed by S/HS/M-mode system software. This adversary can access 
+U-mode CSRs, process/task memory, CPU registers in the process context 
+managed by system software.
+
+_System Software adversary_ - This includes system software executing in 
+S/HS/VS modes. Such an adversary can access S/HS/VS privileged CSRs, 
+assigned system memory, CPU registers and IO devices.
+
+_Startup Software adversary_ - This includes system software executing in 
+early/boot phases of the system (in M-mode), including BIOS, memory 
+configuration code, device option ROM/firmware that can access system 
+memory, CPU registers, IO devices and IOMMU etc.
+
+_Simple Hardware_ _adversary_ __ - This includes adversaries that can use 
+hardware attacks such as bus interposers to snoop on memory/device 
+interfaces, voltage/clock glitching, observe electromagnetic and other 
+radiation, analyze power usage through instrumentation/tapping of power 
+rails, etc. which may give the adversary the ability to tamper with data in 
+memory.
+
+_Advanced Hardware adversary_ - This includes adversaries that can use 
+advanced hardware attacks, with unlimited physical access to the devices, 
+and use mechanisms to tamper-with/reverse-engineer the hardware TCB e.g., 
+extract keys from hardware, using capabilities such as scanning electron 
+microscopes, fib attacks etc. 
+
+_Side/Covert Channel Adversary_ - This includes adversaries that may 
+leverage any explicit/implicit shared state (architectural or 
+micro-architectural) to leak information across privilege boundaries via 
+inference of characteristics from the shared resources (e.g. caches, branch 
+prediction state, internal micro-architectural buffers, queues). Some 
+attacks may require use of high-precision timers to leak information. A 
+combination of system software and hardware adversarial approaches may be 
+utilized by this adversary.
+
+=== Threat Model
+
+T1: Loss of confidentiality of TVMs and TSM memory via in-scope adversaries 
+that may read TSM/TVM memory via CPU accesses
+
+T2: Tamper/content-injection to TVM and TSM memory from in-scope 
+adversaries that may modify TSM/TVM memory via CPU side accesses
+
+T3: Tamper of TVM/TSM memory from in-scope adversaries via software-induced 
+row-hammer attacks on memory
+
+T4: Malicious injection of content into TSM/TVM execution context using 
+physical memory aliasing attacks via system firmware adversary
+
+T5: Information leakage of workload data via CPU registers, CSRs via 
+in-scope adversaries
+
+T6: Incorrect execution of workload via runtime modification of CPU 
+registers, CSRs, mode switches via in-scope adversaries
+
+T7: Invalid code execution or data injection/replacement via second stagel 
+paging remap attacks via system software adversary
+
+T8: Malicious asynchronous interrupt injection or dropped leading to 
+information leakage or incorrect execution of the TEE
+
+T9: Malicious manipulation of time read from the virtualized time CSRs 
+causing invalid execution of TVM workload
+
+T10: Loss of Confidentiality via DMA access from devices under adversary 
+control e.g. via manipulation of IOMMU programming
+
+T11: Loss of Confidentiality from devices assigned to a TVM. Devices bound 
+to a TVM must enforce similar properties as the TEE hosted on the platform.
+
+T12: Content injection, exfiltration or replay (within and across TEE 
+memory) via hardware approaches, including via exposed interface/links to 
+other CPU sockets, memory and/or devices assigned to a TVM
+
+T13: Downgrading TEE TCB elements (example TSM-driver, TSM) to older 
+versions or loading Invalid TEE TCB elements on the platform to enable 
+confidentiality, integrity attacks
+
+T14: Leveraging transient execution side-channel attacks in TSM-driver, 
+TSM, TVM, host OS/VMM or non-confidential workloads to leak confidential 
+data e.g. via shared caches, branch predictor poisoning, page-faults.
+
+T15: Leveraging architectural side-channel attacks due to shared cache and 
+other shared resources e.g. via prime/probe, flush/reload approaches
+
+T16: Malicious access to ciphertext with known plaintext to launch a 
+dictionary attack on TVMs or TSM or trusted firmware to extract 
+confidential data.
+
+T17: Tamper of TVM state during migration of a TEE workload assets within 
+the platform or from one platform to another. 
+
+T18: Forging of attestation evidence and sealed data associated with a TVM.
+
+T19: Stale TLB translations (for U/HS mode or for VU/VS) created during TSM 
+or TVM operations are used to execute malicious code in the TVM (or consume 
+stale/invalid data)
+
+T20: Isolation of performance monitoring and/or debug state for a TVM 
+leading to information loss via performance monitoring events/counters and 
+debug mode accessible information.
+
+T21: A TVM causes a denial of service on the platform
+
+[NOTE]
+====
+This is not an exhaustive list and will be updated on a regular basis as attacks evolve._
+====
+
+=== Scope
+
+This specification does not prescribe the scope of mitigation and focusses 
+on the TEEI interface and use-of/impact-on the RISC-V ISA. It is 
+recommended that implementations of this reference architecture address 
+threats from system software adversaries. Implementations may choose to 
+mitigate threats from additional adversaries. For all cases, denial of 
+service by TVMs must be prevented. At the same time, denial of service by 
+host software is considered out of scope.

@@ -1,0 +1,84 @@
+[[appendix_a]]
+== Appendix A: THCS and VHCS
+
+The TSM Hart Control Structure (THCS) is divided into two sections - the 
+Hart Supervisor State Area (HSSA) and the TSM Supervisor State Area (TSSA). 
+This structure is specified as part of the TEEI as the recommended minimum 
+that the TSM-driver should support to isolate TSM state.
+
+VMM-managed hart f/v registers* are expected to be saved/restored by the 
+VMM before a TEECALL, and restored (similar to v/f register management 
+performed by the VMM for ordinary guest VMs). The TSM-driver saves OS/VMM 
+S/HS-mode CSRs and x registers on ECALLs into the HSSA on a TEECALL (per 
+the RISC-V SBI [5] convention). The TSM-driver initializesTSM S/HS-mode 
+CSRs from the TSSA on entry into the TSM (via TEECALL). Per-Hart TSM f/v 
+registers* state is managed (saved/restored) by the TSM in reserved memory 
+for the TSM (hence not shown below). 
+
+|===
+| *HSSA (* **__TBD - specify initial values of TSSA state__** *)*   |
+| *CSR*           | *Description*
+| sstatus         | Saved/Restored by TSM-driver
+| stvec           | Saved/Restored by TSM-driver
+| sip             | Saved/Restored by TSM-driver
+| sie             | Saved/Restored by TSM-driver
+| scounteren      | Saved/Restored by TSM-driver
+| sscratch        | Saved/Restored by TSM-driver
+| satp            | Saved/Restored by TSM-driver
+| senvcfg         | Saved/Restored by TSM-driver
+| scontext        | Saved/Restored by TSM-driver
+| mepc            | Saved/Restored by TSM-driver. Value of the mepc 
+saved during TEECALL in order to restore during TEERET flow
+| *TSSA*          |
+| CSR             | Description
+| sstatus         | Initialized/Restored by TSM-driver
+| stvec           | Initialized/Restored by TSM-driver
+| sip             | Initialized/Restored by TSM-driver
+| sie             | Initialized/Restored by TSM-driver
+| scounteren      | Initialized/Restored by TSM-driver
+| sscratch        | Initialized/Restored by TSM-driver
+| satp            | Initialized/Restored by TSM-driver
+| senvcfg         | Initialized/Restored by TSM-driver
+| scontext        | Initialized/Restored by TSM-driver
+| mepc            | Initialized/Saved/Restored by TSM-driver to specify 
+TSM entrypoint during TEECALL/TEERESUME
+| interrupted     | Set/Cleared by TSM-driver. Boolean flag
+|===
+
+*TVM per-hart state x/v/f is saved/restored by the TSM* (prior to SRET and 
+post delegated-trap into the TSM from the TVM) and uses the dynamic memory 
+assigned to the TEE VM. The control structure for the TVM virtual hart is 
+shown as the VHCS below. These guest control CSRs are restored by the TSM 
+when a TVM virtual hart is being entered and is configured on the required 
+state of that TVM.
+
+Virtual Hart Control Structure (VHCS)
+
+|===
+| CSR         | Description 
+| hstatus     | Initialized by TSM
+| hedeleg     | Initialized by TSM to enforce events that are to always be 
+handled by the TSM (default all)
+| hideleg     | Initialized by TSM to enforce events that are to 
+always be handled by the TSM (default all)
+| hvip        | Initialized (cleared) by the TSM
+| hip         | Initialized (cleared) by the TSM
+| hie         | Initialized by TSM to enforce events that are to always be 
+handled by the TSM (default all)
+| hgeip       | Initialized (cleared) by the TSM
+| hgeie       | Initialized (cleared) by the TSM
+| henvcfg     | Initialized by TSM
+| hvenvcfg    | Initialized by TSM
+| hcounteren  | Initialized by TSM per TVM configuration
+| htimedelta  | Initialized by TSM per TVM configuration
+| htimedeltah | Initialized by TSM per TVM configuration
+| hgatp       | TVM enforces page remap protection via this second stage 
+translation. Hart register is programmed by TSM to activate at TVM entry 
+via SRET
+| The values htval and htinst are cleared by TSM on TEECALL and masked (to 
+clear page offset) by the TSM on a TEERET when reporting a guest page 
+fault_The vs* and x/v/f registers are not listed here but are maintained by 
+the TSM per virtual hart for TVMs._ |                                                                            
+|===
+
+

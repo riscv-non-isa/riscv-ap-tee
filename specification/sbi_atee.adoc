@@ -1,0 +1,254 @@
+[[sbi_atee]]
+=== TEEI - TH-ABI runtime interface 
+
+ECALL invocation from VS (guest OS) causes traps that are handled by the 
+TSM module (enforced via mdeleg configuration). The TSM then may provide 
+intrinsics via the TG-ABI (TEE-Guest ABI) to the TVM to provide attestation 
+and other trusted services. The TSM may allow the TEE (application or VM) 
+to request host (untrusted) services via the TH-ABI (TEE host-ABI). As 
+shown in the figure above, the TEE Runtime (operating in VS-mode) supports 
+applications as TEEs when the host environment is a baremetal OS (not 
+running a VMM).
+
+The following operations must be implemented by the TSM ( _Formal input 
+parameters and return codes are TBD_ ).
+
+|===
+| *TSM load and initialization operations* | 
+
+| teecall_tsm_info                              | Used by the OS/VMM to 
+discover if a TSM is loaded and initialized else returns an error. If a TSM 
+is loaded and initialized, this operation is used to enumerate TSM 
+information such as: TEE-capable memory regions, Size of static memory to 
+allocate per TVM, Size of memory to allocate per TVM Virtual Hart and so on. 
+
+| teecall_tsm_load                              | Used by the OS/VMM to load 
+a TSM binary image into TSM-memory region. Pages used for TSM will be 
+declared as part of this function to load the TSM. Loading and updates 
+to the TSM should be done via the TSM-driver teecall_tsm_update interface. 
+
+| teecall_tsm_init_global                       | Perform a global state 
+initialization of the TSM after a load or update. This operation and the 
+following should succeed before the TSM is considered ready to service 
+other TVM operations.
+
+| teecall_tsm_init_local                        | Perform a local 
+(per-hart) initialization of TSM after the global init has been 
+performed.This operation and the above should succeed before the TSM is 
+considered ready to service other TVM 
+operations.                                                                  
+
+| teecall_tsm_update                            | Update TSM binary and/or 
+configuration. Ideally this operation should be performed without shutting 
+down the TVMs, however all TVMs have to be paused before an update can be 
+issued. The TSM update process description is 
+TBD.                                                                         
+
+| teecall_tsm_shutdown                          | Shuts down the TSM.All 
+TVMs must be shutdown and all TVM memory must be reclaimed before this 
+operation can 
+succeed.                                                                     
+    
+| *TVM global operations*  |
+
+| teecall_tvm_create_init                       | TVM creation (static) 
+process where a set of TEE pages are assigned for a TVM to hold a TVM’s 
+global state. This routine also configures the global configuration that 
+applies to the TVM and affects all TVM hart settings. For example, features 
+enabled for this TVM, perfmon enabled, debug enabled 
+etc.                                                                         
+
+| teecall_tvm_shutdown                          | TVM shutdown verifies VMM 
+has stopped all virtual hart execution for the TVM. The TVM virtual hart 
+may not be entered after this point. The VMM may start reclaiming TVM 
+memory after this 
+point.                                                                       
+  
+| teecall_tvm_destroy                           | Verifies that the VMM has 
+reclaimed all memory for the TVM and destroys the TVM - this operation 
+returns the last allocated global structure page for the TVM - note that 
+the page remains a page tracked by the TSM for TEE usage (for another 
+TVM).                                                                        
+
+| *TVM memory management* *operations* |
+
+| teecall_tvm_page_convert_range                | Convert a memory region 
+from non-confidential to confidential for a set of TVM pages.This operation 
+initiates TSM tracking of these pages and also changes the encryption 
+properties of these pages. These pages can then be selected by the VMM to 
+allocate for TVM control structure pages, second stage page table pages, 
+and TVM 
+pages.                                                                       
+
+| teecall_tvm_page_map_add_range                | Add one or more page 
+mappings to the second stage translation structure for a TVM. The pages to 
+be used for the second stage page table structures must have been converted 
+(and tracked) by the TSM as TEE pages; otherwise this operation will not 
+succeed.                                                                     
+
+| teecall_tvm_page_map_remove                   | Remove a page mapping for 
+a TVM page. The page mappings to be removed must be blocked before the 
+remove operation will 
+succeed.                                                                     
+
+| teecall_tvm_page_add_pre_init                 | Add a page for an 
+existing mapping for a TVM page - this add_pre must be performed before 
+finalization of the TVM measurement via teecall_tvm_msmt_commit. For this 
+operation, the VMM must provide the page contents that get copied into 
+confidential memory pages for the TVM (and get tracked, encrypted etc). The 
+contents of these pages are also measured via the teecall_tvm_msmt_extend, 
+including the GPA at which the page is mapped. After the TVM msmt is 
+finalized via teecall_tvm_msmt_commit, no more pre-add pages are allowed by 
+the TSM for that TVM.                      
+
+| teecall_tvm_page_add_post_init                | Add a zero page for an 
+existing mapping for a TVM page (post initialization). This operation adds 
+a zero page into a mapping and keeps the mapping as pending (i.e. access 
+from the TVM will fault until the TVM accepts that 
+GPA                                                                          
+
+| teecall_tvm_page_range_block                  | Blocks a set of page 
+mappings for an existing mapping for a TVM page. This operation prevents 
+new TLB mappings from being created for a particular TVM page mapping. Note 
+that stale TLB mappings may exist and those are invalidated by the TSM. The 
+TSM enforces that mappings are blocked by the VMM before allowing any page 
+relocation and/or page fragmentation 
+operations.                                                                  
+
+| teecall_tvm_page_range_unblock                | Unblock a set of page 
+mappings for an existing mapping for a TVM page. Allows new TLB entries to 
+be created - the VMM may perform this operation after it has invalidated 
+the last set of mappings it had blocked via the teecall_tvm_fence 
+operation.                                                                   
+
+| teecall_tvm_page_relocate                     | Relocate a page for an 
+existing mapping for a TVM page. This operation allows the VMM to reassign 
+a new SPA for an existing TVM page mapping. The page mapping must be 
+blocked and fenced before the page mapping can be 
+relocated.                                                                   
+
+| teecall_tvm_page_promote                      | Promote a set of small 
+page mappings (existing mappings) for a set of TVM pages to a large page 
+mapping. The affected mappings must be blocked before the promote operation 
+can succeed. The VMM may reclaim the freed second stage page table page if 
+the operation 
+succeeds.                                                                    
+
+| teecall_tvm_page_demote                       | Demote a large page 
+mapping for an existing mapping to a set of TVM pages and corresponding 
+small page mappings. The affected mapping must be blocked before the 
+operation can succeed. The VMM must provide a free TEE-capable page to the 
+TSM to use as a new second stage page table in the fragmented 
+mapping.                                                                     
+
+| teecall_tvm_page_reclaim                      | Reclaim a page (TVM page 
+or second stage page table page). If the page being reclaimed is for an 
+existing mapping, the mapping must be blocked (and invalidate mapping). The 
+pages for a second stage page table structure may only be reclaimed after 
+all mappings at that page table level have been 
+reclaimed.                                                                   
+
+| teecall_tvm_fence                             | Issue a TVM TLB 
+invalidation (for the relevant harts) after a set of changes to the TVM 
+mappings for confidential pages. The TSM enforces a hfence.gvma for the 
+affected TVM vmid/asid to enforce stale tlb mappings are flushed. For 
+implementations using memory tracking, this operation should also 
+invalidate additional caching structures for page 
+meta-data.
+
+| *TVM virtual hart management operations* |
+
+| teecall_tvm_vhart_add_init                    | This operation allows the 
+VMM to assign TEE pages for a virtual hart context structure (VHCS) for a 
+specific TVM. This routine also initializes the hart-specific fields of 
+this structure.Note that a virtual hart context structure may consist of 
+more than 1 4KB page. The number of pages are enumerated via the tsm_info 
+call.                                                                        
+
+| *TVM measurement operations*  |
+| teecall_tvm_msmt_extend                       | This operation is used to 
+extend the static measurement for a TVM for added page contents.The 
+operation performs a SHA384 hash extend to the measurement register managed 
+by the TSM on a 256 byte block of the page. The page must be added to a 
+valid GPA mapping via the add_pre_init operation. The GPA of the page 
+mapped is part of the measurement operation.The measurement process is a 
+state machine that must be faithfully reproduced by the VMM otherwise the 
+attestation evidence verification by the relying party will fail and the 
+TVM will not be considered trustworthy.   
+
+| teecall_tvm_msmt_commit                      | This operation enables a 
+VMM to finalize the measurement of a TVM (static). The TSM enforces that a 
+TVM virtual harts cannot be entered unless the TVM measurement is committed 
+via this operation.
+
+| *TVM runtime operations* |
+| teecall_tvm_enter                             | Enter or resume a TVM 
+virtual hart (on any physical hart). A resume operation is performed via a 
+flag passed to this operation. This operation activates a virtual-hart on a 
+physical hart, and may be performed only on a TVM virtual hart structure 
+that is assigned to the TVM and one that is not already active. The TSM 
+verifies if the operation is performed in the right state for that 
+virtual hart.
+
+| *TSM runtime operations* |
+| teecall_ *tsm* _teeret                        | This operation is used by 
+a TSM to return control to the OS/VMM via the TSM-driver TEERET flow.This 
+operation may be used by the TSM in various scenarios - in response to a 
+teecall_tg_* operation for requests to the VMM, or due to an S-mode 
+interrupt that the TSM must report to the OS/VMM. It is also used to 
+communicate faults in the second stage page table for a TVM etc.
+
+|===
+
+
+=== TEEI - TG-ABI runtime interface
+
+|===
+| teecall_tg_drtm_extend       | This intrinsic is used by a TVM component 
+to act as a dynamic root of trust of measurement (DRTM) for the TVM to 
+extend runtime measurements. These measurements are managed by the TSM in 
+the TVM global structure (To be specified TBD). These measurements are used 
+in the TcbEvidenceInfo when the TVM attestation certificate is generated 
+via teecall_tg_get_evidence.                                                 
+
+| teecall_tg_get_evidence      | This intrinsic is used by a TVM to get 
+attestation evidence to report to a (remote) relying party.It is supported 
+by the TSM to provide HW-key-signed measurements of the TVM and the TSM. 
+The attestation key used to sign the evidence is provisioned into the TVM 
+by the TSM. The TSM certificate is provisioned by the FW TCB (TSM-driver 
+and HW 
+RoT).                                                                   
+
+| teecall_tg_page_share        | This intrinsic is used by the TVM to 
+request the conversion of the specified GPA to non-confidential (from 
+confidential).The GPA must be mapped to the TVM in a present state, and 
+must be scrubbed by the TVM before it is yielded. The TSM enforces that the 
+page is not-present in the second stage page table and not tracked as a TEE 
+page. The VMM owns the process of reclaiming the 
+page.                            
+
+| teecall_tg_page_accept       | Intrinsic used by the TVM to accept pages 
+as part of initial (pre-init) load or post-init add/conversion of memory 
+from non-confidential to confidential.The page mapping stays in a pending 
+state (where TLB entries cannot be created) until this operation succeeds. 
+The TSM enforces the page is zero-cleared during the page_post_add 
+performed by the VMM when the page is (re)added back as a confidential TVM 
+page.  
+
+| teecall_tg_host_req          | This intrinsic is supported by the TSM to 
+provide the TVM the ability to request host services e.g. para-virt IO.The 
+TVM indicates to the TSM during this operation which x/v/f registers should 
+be passed to the OS/VMM without clearing.
+
+| teecall_tg_enable_debug      | This intrinsic is supported by the TSM to 
+enable the TVM to request for debugging to be enabled for the TVM (TSM 
+invokes TSM-driver to enable debugging if the TVM was created with debug 
+opt-in; TSM enforces state save and restore of debug state for TVM hart).
+
+| teecall_tg_enable_pmon       | This intrinsic is supported by the TSM to 
+enable the TVM to request performance monitoring (where the TSM enforces 
+state save and restore of the performance monitoring inhibit and trigger 
+controls).
+
+|===
+

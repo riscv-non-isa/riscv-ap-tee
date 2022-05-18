@@ -1,0 +1,157 @@
+[[swlifecycle]]
+== TVM Lifecycle
+
+This section describes the TEEI operations for the lifecycle of a TVM 
+including the OS/VMM interactions with the TSM.
+
+=== TVM build and initialization
+
+The host OS/VMM must be capable of hosting many TVMs on a AP-TEE-capable 
+platform (limited only by the practical limits of the number of cpus and 
+the amount of memory available on the system). To that end, the TVM should 
+be able to use all of the system memory as TEE-capable memory, as long as 
+the platform access-control mechanisms are applicable to all the available 
+memory on the system. The TSM allows the OS/VMM to manage TEE-capable 
+memory assignment by providing a two stage TEE memory management model. 1. 
+Creation of confidential memory regions - this process converts memory 
+pages from non-confidential to confidential memory (and in that process 
+brings TEE-capable memory under TSM-managed memory tracking and encryption 
+controls described earlier). 2. Allocation/Assignment of TEE-capable memory 
+pages from the converted confidential memory regions for various purposes 
+like creating TVM workloads etc.
+
+The host OS/VMM may create a new TVM by allocating and initializing a TVM 
+using the teecall_tvm_create function. As inputs to this TEECALL, the 
+OS/VMM must assign the TVM with a unique identifier. For example, a 
+physical address for a TVM global control structure may be used as a 
+platform unique identifier or handle. An initial set of memory pages are 
+granted to the TSM and tracked as TEE pages associated with that TVM from 
+that point onwards until the TVM is destroyed via the teecall_tvm_destroy 
+function. 
+
+A TVM context may be created and initialized by using the 
+teecall_tvm_create_init function – this global init function allocates a 
+set of pages for the TVM global control structure and resets the control 
+fields that are immutable for the lifetime of the tvm e.g. configuration of 
+which RISC-V CPU extensions the TVM is allowed to use, debug and pmon 
+capabilities enabled etc. 
+
+The VMM may assign memory to the TVM via a sequence of 
+teecall_tvm_page_map_add and teecall_tvm_page_add – the former grants 
+memory pages that are to contain second-stage paging structures entries 
+that translate a TVM guest physical address to the system physical address, 
+while the latter is used to hold tvm data and is referenced by the hgatp 
+leaf page table entries. For pages added to the TVM, the VMM must invoke 
+teecall_tvm_msmt_extend which extends the static measurement hash of the 
+TVM which will be used by the TSM to generate the attestation report 
+(evidence) when requested by a challenger (relying party). Note that if the 
+measurement steps are executed by the VMM in an incorrect order the final 
+measurements will be different and flagged during attestation. In the 
+initial set of measured TVM pages, the VMM would typically provide the 
+guest firmware, boot loader and boot kernel as well as memory needed for 
+the boot stack, heap and memory tracking structures. During 
+teecall_tvm_page_add, the memory granted is tracked by the TSM to ensure 
+that pages assigned to a TVM may not be assigned to a non-confidential VM 
+or another TVM. Memory may be lazily added to the TVM subsequent to the TVM 
+being executed using the teecall_tvm_page_add_post.  
+
+Lastly, the VMM can assign memory to the TVM to hold virtual hart state via 
+teecall_tvm_vhart_add and teecall_tvm_vhart_init. Before the VMM can start 
+executing the TVM virtual harts, the VMM must finalize the static 
+measurement of the TVM via teecall_tvm_msmt_commit. The TSM prevents any 
+TVM virtual harts from being entered until the TVM initialization is 
+finalized. 
+
+=== TVM execution 
+
+The VMM uses teecall_tvm_enter to (re)activate a virtual hart for a 
+specific TVM (identified by the unique identifier). This TEECALL traps into 
+the TSM-driver which affects the context switch to the TSM – The TSM then 
+manages the activation of the virtual hart on the physical hart selected by 
+the VMM. During this activation the TCB trusted firmware can enforce that 
+stale TLB entries that govern guest physical to system physical page access 
+have been evicted across all hart TLBs. There may also be TLB flushes for 
+the virtual-harts due to first stage translation changes (guest virtual to 
+guest physical) performed by the TVM OS - these are initiated by the TVM OS 
+to cause IPIs to the virtual-harts managed by the TVM OS (and verified by 
+the TVM OS to ensure the IPIs are received by the TVM OS to invalidate the 
+TLB lazily). This reference architecture requires use of AiA IMSIC <<R9>> 
+to ensure these IPIs are delivered through the IMSIC associated with the 
+guest TVM. Each TVM is allocated a guest interrupt file during TVM 
+initialization.
+
+During TVM execution, the HW enforces TSM-driven policies for memory 
+isolation for confidential memory accessed by the TVM software – the 
+following hardware enforcement is recommended to address the 
+<<4_architecture_overview_and_threat_model>>:
+
+* TVM instruction fetches and page walks (both VS/second-stage and 
+G/first-stage) are implicitly enforced to be in confidential memory. This 
+requires that the TVM supervisor code should not locate first stage page 
+tables in non-confidential memory. The TSM enforces that second stage page 
+tables are in confidential memory.
+* TVM access to confidential or non-confidential memory is subject to 
+VS-stage address translation (this is existing); G-stage address 
+translation is enforced via the TSM-managed hgatp with the listed 
+recommendations in Section <<5_3_tsm_and_tvm_isolation>>. 
+
+For virtual-IO operations, the TVM code must first explicitly request TVM 
+memory to become non-confidential (via teecall_tg_page_share) and then 
+explicitly copy data from confidential to non-confidential memory, and 
+lastly signal service requests to the host VMM (via teecall_tvm_host_req). 
+When direct device assignment is supported (which is expected to require 
+IOMMU changes for AP-TEE), trusted devices may DMA directly into TVM 
+confidential memory. 
+
+TVM memory may be lazily granted to the TVM by the host VMM, the TVM kernel 
+must explicitly accept such un-measured initialized pages via 
+teecall_tg_page_accept, and update its internal memory database to indicate 
+those guest physical page frames are trusted for mapping into VS-stage 
+mappings. There are at least two scenarios here - first, late add of memory 
+to enable TVM boot with the minimal measured state, and second, if some 
+memory pages were converted to non-confidential by the TVM, and at a later 
+point they are converted back to confidential, the TVM must accept those 
+GPAs (else a VMM can sneak in an unmeasured page late for example).
+
+During execution and typically during TVM initialization, the TVM code can 
+extend the runtime measurement registers by invoking the 
+teecall_tvm_drtm_extend – this allows the TVM to measure the next stage of 
+kernel or application modules that are loaded in the TVM.  
+
+Also during execution, a remote relying party may challenge the TVM to 
+provide attestation evidence that the TVM is executing as a HW-rooted TEE. 
+The TVM code may in response request a TSM-signed (hence HW-measurement 
+rooted) attestation evidence via teecall_tg_get_evidence - this evidence 
+structure contains signed hash of the TVM measurements (including the 
+run-time and static measurements) and is replay-protected via a TVM 
+(challenger) provided nonce as part of the signed evidence. 
+
+The TSM enforces specific security checkpoints during TVM execution – it 
+tracks when TLB flushes are required by the VMM to ensure stale TLB entries 
+are not utilized by the TVM. To enforce this property, the TSM requires 
+second-stage-page-table-mapped confidential TVM memory to be blocked 
+(effectively ensuring new TLB entries cannot be created) before the pages 
+mapped by the mapping can be relocated, fragmented (for page promotion or 
+demotion) or reclaimed back by the VMM. Then, before the the new mappings 
+may be activated, the TSM enforces that the VMM invokes teecall_tvm_fence 
+and causes invalidation of the TLB on all virtual harts of the TVM via 
+interprocessor interrupts which causes the TSM to execute HFENCE.GVMA for 
+the TVM VMID. 
+
+=== TVM shutdown 
+
+The VMM may stop a TVM virtual hart at any point (same as legacy operation 
+for the VMM but in this case via the TSM). If the TVM being shutdown is 
+executing, the VMM stops TVM execution by issuing an asynchronous interrupt 
+that yields the virtual hart and taking control back into the VMM (without 
+any TVM state leakage as that is context saved by the TSM on the trap due to 
+the interrupt). Once the TVM virtual harts are stopped, the VMM must issue a 
+teecall_tvm_shutdown that can verify that no TVM harts are executing and 
+then 
+may reclaim all memory granted to the TVM via teecall_tvm_page_reclaim which 
+will verify the TSM hgatp mapping and tracking for the page and restore it 
+as a VMM-available page to grant to another TVM or non-confidential VM. The 
+VMM should revoke the TVM global control page as the last page via 
+teecall_tvm_destroy. 
+
+
