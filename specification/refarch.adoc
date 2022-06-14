@@ -1,3 +1,5 @@
+:imagesdir: ./images
+
 [[refarch]]
 == Reference Architecture Details
 
@@ -120,7 +122,7 @@ different hart). This model of TSM operation requires additional
 concurrency controls on internal data structures and per-TVM global data 
 structures (such as the second stage page table structures).
 
-image:images/img_3.png[]  
+image:img_3.png[]  
 Figure 3: TSM operation - Interruptible and non-reentrant TSM model shown.
 
 A TSM entry triggered by an ECALL (with AP-TEE service type) by the OS/VMM 
