@@ -1,6 +1,35 @@
-[[sbi_atee]]
-=== TEEI - TH-ABI runtime interface 
+[[sbi_tee]]
+== Introduction
+This describes a scalable Trusted Execution Environment (TEE) SBI extension proposal. 
+It enables application workloads that require confidentiality to minimize the Trusted Computing 
+Base (TCB). Specifically, the host OS/VMM and other software are outside the TCB. It supports
+an architecture that can be used for Application and Virtual Machine workloads, while minimizing
+changes to the RISC-V ISA and privilege modes. The proposal introduces three new extensions that
+will be described later: TEE Host Extension (EXT_TEE_HOST), TEE Interrupt Extension (EXT_TEE_INTERRUPT),
+and TEE Guest Extension (EXT_TEE_GUEST).
 
+== Terms and Abbreviations
+This specification uses the following terms and abbreviations:
+[#table_terms_and_abbreviations]
+.Terms And Abbreviations
+[%header,%autowidth]
+|===
+| Term  | Meaning
+
+| AIA   | Advanced Interrupt Architecture
+| IMSIC | Incoming Message Signaled Interrupt Controller
+| MMIO  | Memory Mapped IO
+| ROT   | Root of Trust
+| TEE   | Trusted Execution Environment
+| TSM   | TEE Security Manager
+| TCB   | Trusted Computing Base
+| VM    | Virtual Machine
+| VCPU  | Virtual CPU
+| VMM   | Virtual Machine Manager (hypervisor)
+| TVM   | Trusted VM (a VM running a TEE-workload)
+|===
+
+=== TEEI - TH-ABI runtime interface 
 ECALL invocation from VS (guest OS) causes traps that are handled by the 
 TSM module (enforced via mdeleg configuration). The TSM then may provide 
 intrinsics via the TG-ABI (TEE-Guest ABI) to the TVM to provide attestation 
@@ -10,8 +39,1296 @@ shown in the figure above, the TEE Runtime (operating in VS-mode) supports
 applications as TEEs when the host environment is a baremetal OS (not 
 running a VMM).
 
-The following operations must be implemented by the TSM ( _Formal input 
-parameters and return codes are TBD_ ).
+== Background
+Virtualization platforms are typically comprised of several components including
+platform firmware, host OS, VMM, and the actual payloads that run on them (typically
+in a VM). This model is well established, but the downside is that most platform
+components are in the TCB. This aspect is ill-suited for confidential compute workloads
+that rely on Trusted Execution Environments, and strive to minimize the TCB footprint.
+
+We seek to alleviate this concern by introducing the notion of the a trusted broker for
+TEEs known as the TEE Security Manger (TSM). The idea is that the TSM has a minimal possible
+footprint, and acts as a trusted intermediary between the the untrusted platform components,
+and the TEE workloads that run on it. The TCB (which includes the TSM and HW) enforces strict confidentiality
+and integrity security properties for code execution and data integrity for confidential workloads.
+It also isolates confidential workloads from all other platform components (non-confidential and confidential).
+The exact hardware and software mechanisms used to guarantee the isolation are platform dependent, but confidential
+workloads have execution, data integrity, and confidentiality protections from any other platform component. The
+responsibility of the TSM is to enforce the guarantees accorded to TEE workloads. Specifically, security invariants for
+confidential workloads are enforced by the TSM. The VMM manages security for non-confidential workloads, and resource and
+scheduling management functions for all workloads (confidential and non-confidential).
+
+In this scheme, compute resources like memory start off as traditional untrusted resources
+in the non-confidential world, and are transtioned to their confidential analogue via the TSM.
+Once the conversion process is complete, it can be assigned to a TVM via the TSM. A converted confidential-resource
+can be freely assigned to another TVM when it's no longer in use. However, an unused confidential-resource must be
+explicitly reclaimed for use in the non-confidential world (this is tracked and enforced by the TSM).
+
+The TEE address space can be comprised of confidential and non-confidential regions. The former includes
+both measured pages (that are part of the initial TVM payload), and confidential zero-pages that can be
+mapped-in on demand by the VMM following runtime access by the TVM. The non-confidential TVM-defined regions
+include those for shared-pages and MMIO.
+
+== Operational model for the TEE Host Extension
+Executing confidential workloads in a TEE requires a sequence of one or more of the steps detailed below.
+We'll assume that these steps are performed by an untrusted entity like the OS/VMM (host) in conjunction
+with the TSM.
+
+. Platform TSM detection and capability enumeration
+. Conversion of non-confidential memory to confidential memory
+. Trusted VM (TVM) creation
+. Donating confidential memory to the TSM for TVM page management
+. Defining TVM confidential memory regions
+. Mapping TVM code and data payload to confidential-memory regions
+. Creating TVM VCPUs
+. Finalizing TVM creation
+. Scheduling TVM execution
+. Management of TVM secure interrupts
+. Handling and servicing TVM faults and exits
+. Mapping TVM demand-zero confidential memory regions
+. Mapping TVM non-confidential shared pages on demand
+. Processing TVM-access to MMIO regions
+. Tearing down TVMs
+. Reassignment of confidential memory for other TVMs
+. Reclaiming confidential memory for non-confidential VMs
+
+=== Platform TSM detection and capability enumeration
+Platform support for the TSM can be detected by probing for the EXT_TEE_HOST extension, and then
+calling `sbi_tee_host_get_tsm_info() to get information about the current status of the TSM. The
+TSM must be be in `TSM_READY` in order to process further ECALLs.
+
+=== TVM creation
+TVMs are created using the sbi_tee_host_create_tvm(). This creates a TVM with state set to `TVM_INITIALIZING`.
+The host must assign confidential memory for page tables, payload mapping, and VCPUs before it can be
+transitioned into a `TVM_RUNNABLE` state.
+
+=== TVM memory management
+The host is responsible for the following memory management functions:
+
+. Converting non-confidential memory to confidential memory
+. Donating confidential memory for the TVM page-table pool
+. Defining confidential memory regions
+. Mapping TVM code and data payload to confidential TVM-pages
+. Mapping zero-page confidential pages to the TVM regions 
+. Mapping non-confidential pages TVM-defined regions for shared-pages / MMIO
+
+=== Converting non-confidential memory to confidential memory
+Platform memory is non-confidential by default, and must be converted to confidential memory
+before use with TVMs. The conversion process is initiated by designating the host physical
+pages that to be converted, and then issuing fence operations to ensure that all outstanding
+TLB entries to the non-confidential memory are flushed across all CPUs/harts on the platform. This
+ensures that there's no overlapping mapping between the confidential and non-confidential memory
+regions on the platform.
+
+This requires the host to make three separate ECALLs to the TSM:
+
+. sbi_tee_host_convert_pages()
+. sbi_tee_host_global_fence()
+. sbi_tee_host_local_fence()
+
+The memory conversion process is complete when sbi_tee_host_local_fence() is successfully completed
+on the CPU/hart on the platform.
+
+Converted memory can be assigned to TVMs, but cannot be repurposed for non-confidential operations
+unless it's reclaimed. If the host assigns converted memory to non-confidential VMs, or uses it for
+page-table mappings, access to the converted memory from inside the non-confidential VM will cause
+an access fault.
+
+=== Defining confidential memory regions
+The host can declare the TVM physical address ranges for mapping of confidential memory. There can be multiples ranges,
+but no two regions can overlap. The region can be sparsely mapped; however, any sparsely mapped confidential page that's
+demand-paged following an access fault by the TVM can only be a demand-zero page.
+
+All ranges must be defined by calling `sbi_tee_host_finalize_tvm()`.
+
+=== Donating confidential pages for the TVM page-table pool
+The host must ensure that the TSM has sufficient confidential memory for mapping and managing TVM page-tables
+for the code and data payloads by calling `sbi_tee_host_add_tvm_page_table_pages()`.
+
+=== Mapping TVM code and data payload to confidential TVM-pages
+The host can create a confidential page region by calling `sbi_tee_host_add_tvm_memory_region()` with `CONFIDENTIAL_REGION`.
+The region can be sparsely populated, and since the host cannot directly access  confidential memory, it must copy the TVM
+code and data payload from non-confidential memory to confidential memory by calling `sbi_tee_host_add_tvm_measured_pages()`.
+This operation requires the host to convert a sufficient number of non-confidential pages to confidential (by calling
+`sbi_tee_host_convert_pages()`, or by using converted page that aren't currently assigned to a TVM. The TSM copies the 
+payload for the TVM from non-confidential pages to confidential pages, and extends the corresponding measurements for the
+TVM.
+
+=== VCPU shared state enumeration
+The TSM communicates additional information about TVM exits from `sbi_tee_host_run_tvm_vcpu()` using a non-confidential
+shared memory region that's configured on a per-VCPU basis by the host. The host can also use this shared memory
+region to control and configure TVM parameters like the initial-entry point (SEPC), initial parameter, etc., and
+to respond to TVM exits.
+
+The layout of the shared-memory region can vary by TSM version. The host can determine the size and offset of the
+regions enumerated in `vcpu_register_set_id` by calling `sbi_tee_host_get_tvm_vcpu_num_register_sets()` to get the
+number of enumerated sets, and then `sbi_tee_host_get_tvm_vcpu_num_register_sets()` to determine the offset.
+
+=== VCPU creation
+The host must register CPUs/harts with the TSM before they can be used for TVM execution by calling
+`sbi_tee_host_create_tvm_vcpu()`. The host must also configure the the the non-confidential shared memory
+that's set-up by the host while creating the VCPU. The shared memory is used both the host and the
+TSM for when processing TVM exits from `sbi_tee_run_vcpu()`.
+
+=== TVM execution
+Following assignment of memory and VCPU resources, the host can transition the guest into a `TVM_RUNNABLE`
+state by calling `sbi_tee_host_finalize_tvm()`. Note that some TEE calls are no longer permissible after this
+transition.
+
+The host can use the aforementioned shared-memory to set up TVM execution parameters like the
+entrypoint (`ENTRY_PC`) / boot argument (`ENTRY_ARG`), then `sbi_tee_host_finalize_tvm()`, followed by
+sbi_tee_host_run_tvm_vcpu()` to begin execution. TVM execution continues until there an event like an
+interrupt, or fault that cannot be serviced by the TSM. Some interrupts and exceptions are resumable,
+and the host can determine reason specific reason by examining the `scause` field in the `tvm_vcpu_supervisor_csrs`
+previously setup by the call to `sbi_tee_host_create_tvm_vcpu()`. The host can then examine the shared-memory region
+if needed to determine further course of action. This may involve servicing exits caused by TVM-ECALLs that require
+host action(like adding of MMIO and shared-memory regions), TVM page-faults, virtual instructions, etc.
+
+=== Mapping confidential demand-zero pages and non-confidential shared pages
+The host can handle TVM page-faults by determining whether it was caused by access to a confidential or
+non-confidential region. In the former case, it can call use `sbi_tee_host_add_tvm_zero_pages()` to 
+populate the region with a previously converted confidential page. The TSM verifies that the confidential
+page isn't currently in use, and zeroes it out before assigning it the TVM. Demand-zero pages have no bearing
+on the TVM measurement, and can be added at any point of time.
+
+The host can process non-confidential pages by calling `sbi_tee_host_add_shared_pages()`. Non-confidential
+shared memory regions are defined by the TVM using the EXT_TEE_GUEST extension.
+
+=== Handling MMIO faults
+TVMs can define MMIO regions using the EXT_TEE_GUEST extension, and a rutime access to such a region causes
+a resumable exit from the TVM. The host can examine the exit code and `scause`, update the per-VCPU
+shared-memory region as appropriate, and resume TVM execution. This may involve instruction decoding
+using the information from the shared-memory region.
+
+=== Handling virtual instructions
+The host can handle exits caused by virtual instruction by examining and decoding the contents of the
+shared-memory region.
+
+=== Management of secure interrupts
+The host can use the Tee Interrupt Extension (EXT_TEE_INTERRUPT) to manage secure TVM interrupts on
+platforms with AIA-support. 
+
+=== TVM teardown
+The host can teardown a TVM by calling `sbi_tee_host_destroy_tvm()`. This automatically releases all
+confidential memory assigned to the TVM, and it can be repurposed for use with other TVMs. However,
+reclaiming the memory for use by non-confidential workloads requires an explicit call to
+`sbi_tee_host_reclaim_pages()`.
+
+== Operational model for the TEE Guest Extension
+This interface is used by TVMs to communicate with TSM. Presently, this extension only allows guests
+to define memory regions for shared-pages and MMIO regions.
+
+=== TVM-defined memory regions
+TVMs can determine the physical address location for mapping of non-confidential regions at runtime,
+and communicate the decision host about TVM-established shared-pages and MMIO regions by calling
+`sbi_tee_guest_add_memory_region()`. This results in an exit to the host, and it can retrieve the
+information by checking the exit code from the TVM and examining the shared-memory region for the
+TVM VCPU. The expectation is that the host will service a subsequent page-fault that results from
+a TVM-access to the non-confidential region.
+
+== TEE Host Extension (EID #0x54454548)
+
+=== Listing of common enums
+The following enums are referenced by several functions described below.
+
+[source, C]
+-------------------
+enum tsm_page_type {
+    /* 4KiB */
+    PAGE_4K = 0,
+    /* 2 MiB */
+    PAGE_2MB = 1,
+    /* 1 GiB */
+    PAGE_1GB = 2,
+    /* 512 GiB */
+    PAGE_512GB = 3,
+}
+-------------------
+
+[source, C]
+-------------------
+enum tvm_state {
+    /* The TVM has been created, but isn't yet ready to run */
+    TVM_INITIALIZING = 0,
+    /* The TVM is in a runnable state */
+    TVM_RUNNABLE = 1,
+};
+-------------------
+
+[source, C]
+-------------------
+enum vcpu_register_set_id {
+    /* General purpose registers */
+    GPRS = 0,
+    /* Supervisor CSRs */
+    SUPERVISOR_CSRS = 1,
+    /* Hypervisor (HS-level) CSRs */
+    HYPERVISOR_CSRS = 2,
+};
+-------------------
+
+[source, C]
+-------------------
+/* 
+ * General purpose registers for he TVM VCPU.
+ * Corresponds to `GPRS` in `vcpu_register_set_id`.
+ */
+struct tvm_vcpu_supervisor_gprs {
+    /*
+     * Indexed VCPU GPRs from X0 - X31.
+     *
+     * The TSM will always read or write the minimum number of registers in this set to
+     * complete the requested action, in order to avoid leaking information from the TVM.
+     *
+     * The TSM will write to these registers upon return from `TvmCpuRun` when:
+     * 1) The VCPU takes a store guest page fault in an emulated MMIO region.
+     * 2) The VCPU makes an ECALL that is to be forwarded to the host.
+     *
+     * The TSM will read from these registers when:
+     * 1) The VCPU takes a load guest page fault in an emulated MMIO region.
+     * 2) The host calls `sbi_tee_host_finalize_tvm()`, latching the entry point argument
+     * (stored in 'A1') for the boot VCPU.
+     *
+     */
+    unsigned long gprs[32];
+};
+-------------------
+
+[source, C]
+-------------------
+/* 
+ * Hypervisor [HS-level] CSRs.
+ * Corresponds to `HYPERVISOR_CSRS` in `vcpu_register_set_id`.
+ */
+struct tvm_vcpu_hypervisor_csrs {
+    /*
+     *
+     * HTVAL value for guest page faults taken by the TVM vCPU. Written by the TSM upon return
+     * `sbi_tee_host_run_tvm_vcpu()`.
+     *
+     */
+    unsigned long htval;
+    /*
+     *
+     * HTINST value for guest page faults or virtual instruction exceptions taken by the TVM vCPU.
+     *
+     * The TSM will only write `htinst` in the following cases:
+     *
+     * MMIO load page faults. The value written to the register in `gprs` corresponding to the
+     * 'rd' register in the instruction will be used to complete the load upon the next call to
+     * `sbi_tee_host_run_tvm_vcpu()` for this vCPU.
+     *
+     * MMIO store page faults. The TSM will write the value to be stored by the vCPU to the
+     * register in `gprs` corresponding to the 'rs2' register in the instruction upon return
+     * from `sbi_tee_host_run_tvm_vcpu()`.
+     *
+     */
+    unsigned long htinst;
+};
+-------------------
+
+[source, C]
+-------------------
+/* 
+ * Supervisor-level CSRs.
+ * Corresponds to `SUPERVISOR_CSRS` in `vcpu_register_set_id`.
+ */
+struct tvm_vcpu_supervisor_csrs {
+    /*
+     * Initial SEPC value (entry point) of a TVM vCPU. Latched for the TVM's boot VCPU when
+     * sbi_tee_host_finalize_tvm() is called; ignored for all other VCPUs.
+     */
+    unsigned long sepc;
+    /*
+     * SCAUSE value for the trap taken by the TVM vCPU. Written by the TSM upon return from
+     * `sbi_tee_host_run_tvm_vcpu()`
+     */
+    unsigned long scause;
+    /*
+     * STVAL value for guest page faults or virtual instruction exceptions taken by the TVM VCPU.
+     * Written by the TSM upon return from sbi_tee_host_run_tvm_vcpu()
+     *
+     * Note that guest virtual addresses are not exposed by the TSM, so only the 2 LSBs will
+     * ever be non-zero for guest page fault exceptions.
+     */
+    unsigned long stval;
+};
+-------------------
+
+[source, C]
+-----------------
+struct tvm_vcpu_register_set_location {
+    /*
+     * A value of enum type `vcpu_register_set_id`.
+     */
+    uint16_t id;
+    /*
+     * The offset of the register set from the start of the VCPU's shared-memory state area.
+     */
+    uint16_t offset;
+};
+-----------------
+
+
+=== Function: TEE Host Get TSM Info (FID #0)
+[source, C]
+-----
+struct sbiret sbi_tee_host_get_tsm_info(unsigned long tsm_info_address,
+                                        unsigned long tsm_info_len);
+-----
+Writes up to `tsm_info_len` bytes of information at the physical memory address
+specified by `tsm_info_address`. `tsm_info_len` should be the size of the the
+`tsm_info` struct below. The information returned by the call can be used to determine
+the current state of the TSM, and configure parameters for other TVM-related calls.
+
+*Returns* the number of bytes written to `tsm_info_address` on success.
+
+[source, C]
+------
+enum tsm_state {
+    /* TSM has not been loaded on this platform. */
+    TSM_NOT_LOADED = 0,
+    /* TSM has been loaded, but has not yet been initialized. */
+    TSM_LOADED = 1,
+    /* TSM has been loaded & initialized, and is ready to accept ECALLs.*/
+    TSM_READY = 2
+};
+
+struct tsm_info {
+    /* 
+     * The current state of the TSM (see tsm_state enum above). If the state is not TSM_READY,
+     * the remaining fields are invalid and will be initialized to 0.
+     */
+    uint32_t tsm_state;
+    /* Version number of the running TSM. */
+    uint32_t tsm_version;
+    /*
+     * The number of 4KiB pages which must be donated to the TSM for storing TVM
+     * state in sbi_tee_host_create_tvm_vcpu().
+     */
+    unsigned long tvm_state_pages;
+    /* The maximum number of VCPUs a TVM can support. */
+    unsigned long tvm_max_vcpus;
+    /*
+     * The number of 4kB pages which must be donated to the TSM when
+     * creating a new VCPU.
+     */
+    unsigned long tvm_vcpu_state_pages;
+};
+------
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_get_tsm_info_errors]
+.TEE Host Get TSM Info
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `tsm_info_address` was invalid.
+| SBI_ERR_INVALID_PARAM   | tsm_info_len was insufficient.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+A list of possible TSM states and the associated semantics appears below (TBD: States for TSM update).
+
+[#table_tsm_states]
+.TSM States
+[%header,%autowidth]
+|===
+| TSM State          | Meaning
+
+| TSM_NOT_LOADED     | TSM has not been loaded on this platform.
+| TSM_LOADED         | TSM has been loaded, but has not yet been initialized.
+| TSM_READY          | TSM has been loaded & initialized, and is ready to accept ECALLs.
+|===
+
+=== Function: TEE Host Convert Pages (FID #1)
+[source, C]
+-----
+struct sbiret sbi_tee_host_convert_pages(unsigned long base_page_address,
+                                         unsigned long num_pages);
+
+-----
+
+Begins the process of converting `num_pages` of non-confidential memory starting
+at `base_page_address` to confidential-memory. On success, pages can be assigned
+to TVMs only following subsequent calls to `sbi_tee_host_global_fence()` and
+`sbi_tee_host_local_fence()` that complete the conversion process. The implied
+page size is 4KiB.
+
+The `base_page_address` must be page-aligned.
+
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_convert_pages_errors]
+.TEE Host Convert Pages
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `base_page_address` was invalid.
+| SBI_ERR_INVALID_PARAM   | `num_pages` was invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+
+=== Function: TEE Host Reclaim Pages (FID #2)
+[source, C]
+-------
+struct sbiret sbi_tee_host_reclaim_pages(unsigned long base_page_address,
+                                         unsigned long num_pages);
+
+-------
+Reclaims `num_pages` of confidential memory starting at `base_page_address`.
+The pages must not be currently assigned to an active TVM. The implied page
+size is 4KiB.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_tee_tsm_reclaim_pages_errors]
+.TEE Host Reclaim Pages
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `base_page_address` was invalid.
+| SBI_ERR_INVALID_PARAM   | `num_pages` was invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Host Initiate Global Fence (FID #3)
+[source, C]
+-----
+struct sbiret sbi_tee_host_global_fence(void);
+-----
+Initiates a TLB invalidation sequence for all pages marked for conversion via
+calls to `sbi_tee_host_convert_pages()`. The TLB invalidation sequence is completed
+when `sbi_tee_host_local_fence()` has been invoked on all other CPUs. An error is
+returned if a TLB invalidation sequence is already in progress.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_global_fence_errors]
+.TEE Host Initiate Fence
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_ALREADY_STARTED | A fence operation is already in progress.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Host Local Fence (FID #4)
+[source, C]
+-----
+struct sbiret sbi_tee_host_local_fence(void);
+-----
+Invalidates TLB entries for all pages pending conversion by an in-progress TLB
+invalidation operation on the local CPU.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_local_fence_errors]
+.TEE Host Local Fence
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code            | Description
+| SBI_SUCCESS           | The operation completed successfully.
+| SBI_ERR_FAILED        | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Host Create TVM (FID #5)
+[source, C]
+-----
+struct sbiret sbi_tee_host_create_tvm(unsigned long tvm_create_params_addr,
+                                      unsigned long tvm_create_params_len);
+-----
+Creates a confidential TVM using the specified parameters. The `tvm_create_params_addr`
+is the physical address of the buffer containing the `tvm_create_params` structure
+described below, and `tvm_create_params_len` is the size of the structure in bytes. 
+
+Callers of this API should first invoke `sbi_tee_host_get_tsm_info()` to obtain information
+about the parameters that should be used to populate `tvm_create_params`.
+
+[source, C]
+----
+struct tvm_create_params {
+    /* 
+     * The base physical address of the 16KiB confidential memory region
+     * that should be used for the TVM’s page directory. Must be 16KiB-aligned.
+     */
+    unsigned long tvm_page_directory_addr;
+    /* 
+     * The base physical address of the confidential memory region to be used
+     * to hold the TVM’s state. Must be page-aligned and the number of
+     * pages must be at least the value returned in tsm_info.vm_state_pages
+     * returned by the call to sbi_tee_host_get_tsm_info().
+     */
+    unsigned long tvm_state_addr;
+    /*
+     * The vcpuid for the VCPU that will be designated as the boot VCPU.
+     * The host must add create a VCPU with this vcpuid by calling `sbi_tee_host_create_tvm_vcpu`
+     * before calling `sbi_tee_host_finalize_tvm().
+     */
+    unsigned long tvm_boot_vcpuid;
+};
+----
+
+*Returns* the *`tvm_guest_id`* in sbiret.value on success. The *`tvm_guest_id`* can be used
+to uniquely reference the TVM in invocations of the other functions that appear below. On
+success, the TVM will be in the "TVM_INITIALIZING" state, until a subsequent call to 
+`sbi_tee_host_finalize_tvm()` to transition to it a `TVM_RUNNABLE` state.
+
+The list of possible TVM states appears below.
+
+[#table_sbi_tvm_states]
+.TEE TVM States
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| State              | Description
+|===
+| TVM_INITIALZING    | The TVM has been created, but isn't yet ready to run.
+| TVM_RUNNABLE       | The TVM is in a runnable state, and can be executed by 
+                     | calling `sbi_tee_host_run_tvm_vcpu()`.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_create_tvm_errors]
+.TEE Host Create TVM Errors
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `tvm_create_params_addr` was invalid.
+| SBI_ERR_INVALID_PARAM   | `tvm_create_params_len` was invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Host Finalize TVM (FID #6)
+[source, C]
+------
+struct sbiret sbi_tee_host_finalize_tvm(unsigned long tvm_guest_id);
+------
+Transitions the TVM specified by `tvm_guest_id` from the "TVM_INITIALIZING" state to a "TVM_RUNNABLE"
+state. The host must finalize TVM shared-memory execution parameters like the entry point (`ENTRY_PC`)
+and boot argument (`ENTRY_ARG`) on the boot VCPU configured by `sbi_tee_host_create_tvm()` before making
+this call. 
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_finalize_tvm_errors]
+.TEE Host Finalize TVM Errors
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code            | Description
+| SBI_SUCCESS           | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM | `tvm_guest_id` was invalid, or the
+                          TVM wasn't in the `TVM_INITIALIZING` state.
+| SBI_ERR_FAILED        | The operation failed for unknown reasons.
+|===
+ 
+=== Function: TEE Host Destroy TVM (FID #7)
+[source, C]
+-------
+struct sbiret sbi_tee_host_destroy_tvm(unsigned long tvm_guest_id);
+-------
+
+Destroys a confidential TVM previously created using *`sbi_tee_host_create_tvm()`*.  
+
+Confidential TVM memory is automatically released following successful destruction, and it
+can be assigned to other TVMs. Repurposing confidential memory for use by non-confidential
+TVMs requires an explicit call to *`sbi_tee_reclaim_pages()`* (described below).
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_destroy_tvm_errors]
+.TEE Host Destroy TVM Errors
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code            | Description
+| SBI_SUCCESS           | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM | `tvm_guest_id` was invalid.
+| SBI_ERR_FAILED        | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Host Add TVM Memory Region (FID #8)
+[source, C]
+-----
+struct sbiret sbi_tee_host_add_tvm_memory_region(unsigned long tvm_guest_id,
+                                                 unsigned long tvm_memory_region_type,
+                                                 unsigned long tvm_gpa_addr,
+                                                 unsigned long region_len);
+-----
+Marks the range of TVM physical address space starting at `tvm_gpa_addr` as reserved
+for the mapping of memory. The type of memory is specified by `tvm_memory_region_type`
+and the length is specified by by `region_len`. `tvm_memory_region_type` must be a
+legal value for the `tvm_memory_region_type` enum type described below.
+
+Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned, and the region must not
+overlap with a previously defined region. This call must not be made after calling
+`sbi_tee_host_finalize_tvm()`.
+
+[source, C]
+----
+enum tvm_memory_region_type {
+    /*
+     * Reserved for mapping confidential pages. The region is initially unpopulated, and pages
+     * of confidential memory can be inserted by calling `sbi_tee_host_add_tvm_zero_pages()` and
+     * `sbi_tee_host_add_tvm_measured_pages().
+     */
+    CONFIDENTIAL_REGION = 0,
+    /*
+     * The region is initially unpopulated, and pages of shared memory may be inserted by calling
+     * `sbi_tee_host_add_tvm_shared_pages()`. Attempts by a TVM VCPU to access an unpopulated region
+     * will cause a `SHARED_PAGE_FAULT` exit from `sbi_tee_host_run_tvm_vcpu()`.
+     */
+    SHARED_MEMORY_REGION = 1,
+    /*
+     * The region is unpopulated; attempts by a TVM VCPU to access this region will cause a
+     * `MMIO_PAGE_FAULT` exit from `sbi_tee_host_run_tvm_vcpu()`.
+     */
+    EMULATED_MMIO_REGION = 2,
+};
+----
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_add_tvm_memory_region_errors]
+.TEE Host Add TVM Memory Region
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `tvm_gpa_addr` was invalid.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `region_len` were invalid, or the TVM wasn't
+                            in the correct state.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Host Add TVM Page Table Pages (FID #9)
+[source, C]
+-----
+struct sbiret sbi_tee_host_add_tvm_page_table_pages(unsigned long tvm_guest_id,
+                                                    unsigned long base_page_address,
+                                                    unsigned long num_pages);
+-----
+Adds `num_pages` confidential memory starting at `base_page_address` to the
+TVM's page-table page-pool. The implied page size is 4KiB.
+
+Page table pages may be added at any time, and a typical usecase is in response to a TVM page fault.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_add_tvm_page_table_pages_errors]
+.TEE Host Add TVM Page Table Pages
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `base_page_address` was invalid.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `num_pages` were invalid,
+                             or `tsm_page_type` is invalid.
+| SBI_ERR_NOT_SUPPORTED   | The `tsm_page_type` isn't supported by the TSM.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Host Add TVM Measured Pages (FID #10)
+[source, C]
+-----
+struct sbiret sbi_tee_host_add_tvm_measured_pages(unsigned long tvm_guest_id,
+                                                  unsigned long source_address,
+                                                  unsigned long dest_address,
+                                                  unsigned long tsm_page_type,
+                                                  unsigned long num_pages,
+                                                  unsigned long tvm_guest_gpa);
+
+-----
+Copies num_pages pages from non-confidential memory at `source_address` to confidential
+memory at `dest_addr`, then measures and maps the pages at `dest_addr` at the TVM physical
+address space at `tvm_guest_gpa. The mapping must lie within a region of confidential memory
+created with `sbi_tee_host_add_tvm_memory_region()`. The tsm_page_type parameter must
+be a legal value for enum type `tsm_page_type`.
+
+This call must not be made after calling `sbi_tee_host_finalize_tvm()`.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_add_tvm_measured_pages_errors]
+.TEE Host Add TVM Measured Pages
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `source_address` was invalid, or `dest_address` 
+                            wasn't in a confidential memory region.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id`, `tsm_page_type`, or `num_pages` were invalid,
+                            or the TVM wasn't in the the `TVM_INITIALIZING` state.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Host Add TVM Zero Pages (FID #11)
+[source, C]
+-----
+struct sbiret sbi_tee_host_add_tvm_zero_pages(unsigned long tvm_guest_id,
+                                              unsigned long base_page_address,
+                                              unsigned long tsm_page_type,
+                                              unsigned long num_pages,
+                                              unsigned long tvm_base_page_address);
+-----
+Maps num_pages zero-filled pages of confidential memory starting at `base_page_address`
+into the TVM's physical address space starting at `tvm_base_page_address`. 
+The `tvm_base_page_address` must lie within a region of confidential memory created with
+`sbi_tee_host_add_tvm_memory_region()`. The `tsm_page_type` parameter must be a
+legal value for the `tsm_page_type` enum.
+
+Zero pages for non-present TVM-specified GPA ranges may be added at any time, and are typically demand faulted on TVM access.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_add_tvm_zero_pages_errors]
+.TEE Host Add TVM Zero Pages Errors
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `base_page_address` or `tvm_base_page_address` were invalid.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id`, `tsm_page_type`, or `num_pages` were invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Host Add TVM Shared Pages (FID #12)
+[source, C]
+-----
+struct sbiret sbi_tee_host_add_tvm_shared_pages(unsigned long tvm_guest_id,
+                                                unsigned long base_page_address,
+                                                unsigned long tsm_page_type,
+                                                unsigned long num_pages,
+                                                unsigned long tvm_base_page_address);
+-----
+Maps num_pages of non-confidential memory starting at `base_page_address` into the TVM's physical
+address space starting at `tvm_base_page_address`. The `tvm_base_page_address` must lie within a
+region of non-confidential memory previously defined by the TVM via the guest interface to the TSM.
+The `tsm_page_type` parameter must be a legal value
+for the `tsm_page_type` enum.
+
+Shared pages can be added only after the TVM begins execution, and calls the TSM to define the 
+location of shared-memory regions. They are typically demand faulted on TVM access.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_add_tvm_shared_pages_errors]
+.TEE TEE Host Add TVM Shared Pages
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `base_page_address` or `tvm_base_page_address` were invalid.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id`, `tsm_page_type`, or `num_pages` were invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Host Get TVM VCPU Num Register Sets (FID #13)
+[source, C]
+-----
+struct sbiret sbi_tee_host_get_tvm_vcpu_num_register_sets(unsigned long tvm_guest_id);
+-----
+
+*Returns* the number of register sets in the VCPU shared-memory state area for vCPUs of `guest_id`
+in sbiret.value on success. The host can use this to the number of enumerate individual register
+sets in the vCPU shared-memory state area (also enumerated by the `vcpu_register_set_id` enum).
+The offsets for the state can vary across TSM versions, and they can be determined by calling
+`sbi_tee_host_get_tvm_vcpu_register_set()`.
+
+Note that the VCPU layout is likely to be common across all TVMs, in which case the host can enumerate
+it once. The interface is intended to provide future extensibility to accommodate heterogeneous TVMs
+that may choose to "opt-in" or "opt-out" of specific platform extensions.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_get_tvm_vcpu_num_register_sets_errors]
+.TEE Host Get TVM VCPU Num Register Sets
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code                    | Description
+| SBI_SUCCESS                   | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM         | `tvm_guest_id` was invalid.
+| SBI_ERR_FAILED                | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Host Get TVM VCPU Register Set (FID #14)
+[source, C]
+-----
+struct sbiret sbi_tee_host_get_tvm_vcpu_register_set(unsigned long tvm_guest_id,
+                                                     unsigned long vcpu_register_set_id);
+-----
+
+The host can use this this interface to discover the shared-memory offset of the VCPU state correspomding
+to the enum values in `vcpu_register_set_id` for `tvm_guest_id`. The `vcpu_register_set_id` parameter must
+be a legal value for the `vcpu_register_set_id` enum.
+
+*Returns* a 32-bit value with the same layout as the `tvm_vcpu_register_set_location` structure in sbiret.value
+on success.
+
+Note that the VCPU layout is likely to be common across all TVMs, in which case the host can enumerate
+it once. The interface is intended to provide future extensibility to accommodate heterogeneous TVMs
+that may choose to "opt-in" or "opt-out" of specific platform extensions.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_get_tvm_vcpu_register_set_errors]
+.TEE Host Get TVM VCPU Register Set
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code                    | Description
+| SBI_SUCCESS                   | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM         | `tvm_guest_id` or `vcpu_register_set_id` was invalid.
+| SBI_ERR_FAILED                | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Host Create TVM VCPU (FID #15)
+[source, C]
+-----
+struct sbiret sbi_tee_host_create_tvm_vcpu(unsigned long tvm_guest_id,
+                                           unsigned long tvm_vcpu_id,
+                                           unsigned long tvm_state_page_addr,
+                                           unsigned long tvm_vcpu_shared_page_addr);
+-----
+Adds a VCPU with ID `vcpu_id` to the TVM specified by `tvm_guest_id`. `tvm_state_page_addr`
+must be page-aligned and point to a confidential memory region used to hold the TVM's vCPU
+state, and must be `tsm_info::tvm_state_pages` pages in length.`tvm_vcpu_shared_page_addr` must
+be page-aligned and point to a sufficient number of non-confidential pages to hold a structure
+with the maximum offset enumerated by `sbi_tee_host_get_tvm_vcpu_register_set`. These pages are 
+"pinned" in the non-confidential state (i.e. cannot be converted to confidential) until the TVM
+is destroyed.This call must not be made after calling `sbi_tee_host_finalize_tvm()`. The host must
+configure a boot VCPU by adding a `tvm_vcpu_id` with a value that specified for `tvm_boot_vcpuid`
+in the `tvm_create_params` structure that was used with sbi_tee_tvm_create().
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_create_tvm_vcpu_errors]
+.TEE Host Create TVM VCPU Errors
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code            | Description
+| SBI_SUCCESS           | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM | `tvm_guest_id` or `tvm_vcpu_id` were invalid,
+                          or the TVM wasn't in `TVM_INITIALIZING` state.
+| SBI_ERR_FAILED        | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Host Run TVM VCPU (FID #16)
+[source, C]
+-----
+struct sbiret sbi_tee_host_run_tvm_vcpu(unsigned long tvm_guest_id,
+                                        unsigned long tvm_vcpu_id);
+-----
+Runs the VCPU specified by `tvm_vcpu_id` in the TVM specified by `tvm_guest_id`.
+The `tvm_guest_id` must be in a "runnable" state (requires a prior call 
+to `sbi_tee_host_finalize_tvm()`). The function does not return unless the TVM exits with
+a trap that cannot be handled by the TSM.
+
+*Returns* 0 on success in sbiret.value if the TVM exited with a resumable VCPU interrupt or exception,
+and non-zero otherwise. In the latter case, attempts to call `sbi_tee_host_run_tvm_vcpu()` with the
+same `tvm_vcpu_id` will fail.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_run_tvm_vcpu_errors]
+.TEE Host Run TVM VCPU Errors
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code            | Description
+| SBI_ERR_SUCCESS       | The TVM exited, and sbiret.value contains 0 if the
+                        | interrupt or exception is resumable. The host can
+                        | examine `scause` to determine details.
+| SBI_ERR_INVALID_PARAM | `tvm_guest_id` or `tvm_vcpu_id` were invalid, or the
+                          TVM wasn't in `TVM_RUNNABLE` state.
+| SBI_ERR_FAILED        | The operation failed for unknown reasons.
+|===
+
+The TSM updates the `scause` field in the `tvm_vcpu_supervisor_csrs` region in the
+shared-memory for the VCPU that was previously configured by the host. The host should
+use the `scause` field to determine whether the exit was caused by an interrupt or exception,
+and then use the additional information to in the shared-memory region to determine further
+course of action (if sbiret.value is 0).
+
+The TSM sets the most significant bit in `scause` to indicate that that the exit was caused
+by an interrupt, and if this bit is clear, the implication is that the the exit was caused
+by an exception. The remaining bits specific information about the interrupt or exception,
+and the specific reason can be determined using the enumeration detailed below.
+
+[source, C]
+-------
+enum tvm_interrupt_exit {
+    /* Refer to the privileged spec for details. */
+    USER_SOFT = 0,
+    SUPERVISOR_SOFT = 1,
+    VIRTUAL_SUPERVISOR_SOFT = 2,
+    MACHINE_SOFT = 3,
+    USER_TIMER = 4,
+    SUPERVISOR_TIMER = 5,
+    VIRTUAL_SUPERVISOR_TIMER = 6,
+    MACHINE_TIMER = 7,
+    USER_EXTERNAL = 8,
+    SUPERVISOR_EXTERNAL = 9,
+    VIRTUAL_SUPERVISOR_EXTERNAL = 10,
+    MACHINE_EXTERNAL = 11,
+    SUPERVISOR_GUEST_EXTERNAl = 12,
+};
+-------
+
+[source, C]
+-------
+enum Exception {
+    /* Refer to the privileged spec for details. */
+    INSTRUCTION_MISALIGNED = 0,
+    INSTRUCTION_FAULT = 1,
+    ILLEGAL_INSTRUCTION = 2,
+    BREAKPOINT = 3,
+    LOAD_MISALIGNED = 4,
+    LOAD_FAULT = 5,
+    STORE_MISALIGNED = 6,
+    STORE_FAULT = 7,
+    USER_ENVCALL = 8,
+    SUPERVISOR_ENVCALL = 9,
+    /*
+     * The TVM made an ECALL request directed at the host.
+     * The host should examine GPRs A0-A7 in the `tvm_vcpu_supervisor_gprs`
+     * area of the VCPU shared-memory region to process the ECALL.
+    */
+    VIRTUAL_SUPERVISOR_ENV_CALL = 10,
+    /* Refer to the privileged spec for details. */
+    MACHINE_ENVCALL = 11,
+    INSTRUCTION_PAGE_FAULT = 12,
+    LOAD_PAGE_FAULT = 13,
+    STORE_PAGE_FAULT = 15,
+    GUEST_INSTRUCTION_PAGE_FAULT = 20,
+    /*
+     * The TVM encountered a load fault in a confidential, MMIO, or shared-memory
+     * region. The host should determine the fault address by retrieving the
+     * `htval` from `tvm_vcpu_hypervisor_csrs` and `stval` from `tvm_vcpu_supervisor_csrs`
+     * and combining them as follows: "(htval << 2) | (stval & 0x3)". The fault address
+     * can then be used to determine the type of memory region, and making the appropriate
+     * call (example: sbi_tee_host_add_tvm_zero_pages() to add a demand-zero confidential
+     * page if applicable), and then calling sbi_tee_host_run_tvm_vcpu to resume execution at
+     * the following instruction. 
+    */
+    GUEST_LOAD_PAGE_FAULT = 21,
+    /* 
+     * The TVM executed an instruction that caused an exit. The host should decode the
+     * instruction by examining `stval` from `tvm_vcpu_supervisor_csrs`, and determine
+     * the further course of action, and calling then calling sbi_tee_host_run_tvm_vcpu
+     * if appropriate to resume execution at the following instruction.
+    */
+    VIRTUAL_INSTRUCTION = 22,
+    /* 
+     * The TVM encountered a store fault in a confidential, MMIO, or shared-memory
+     * region. The host should determine the fault address by retrieving the
+     * `htval` from `tvm_vcpu_hypervisor_csrs` and `stval` from `tvm_vcpu_supervisor_csrs`
+     * and combining them as follows: "(htval << 2) | (stval & 0x3)". The fault address
+     * can then be used to determine the type of memory region, and making the appropriate
+     * call (example: sbi_tee_host_add_tvm_zero_pages() to add a demand-zero confidential
+     * page if applicable), and then calling sbi_tee_host_run_tvm_vcpu to resume execution at
+     * the following instruction.
+     */
+    GUEST_STORE_PAGE_FAULT = 23,
+};
+-------
+
+== TEE Interrupt Extension (EID #0x54414949)
+The TEE Interrupt extension supplements the TEE Host extension with hardware-assisted interrupt
+virtualization using the RISC-V Advanced Interrupt Architecture (AIA) on platforms which
+support it.
+
+=== Function: TEE Interrupt Init TVM AIA (FID #0)
+[source, C]
+-------
+struct sbiret sbi_tee_interrupt_init_tvm_aia(unsigned long tvm_guest_id,
+                                             unsigned long tvm_aia_params_addr,
+                                             unsigned long tvm_aia_params_len);
+-------
+
+Configures AIA virtualization for the TVM identified by `tvm_guest_id` based on the
+parameters in the `tvm_aia_params` structure at the non-confidential physical address
+at `tvm_aia_params_addr`. The `tvm_aia_params_len` is the byte-length of the `tvm_aia_params` 
+structure.
+
+This cannot be called after `sbi_tee_host_finalize_tvm()`.
+
+The format and semantics of the `tvm_aia_params_addr` structure appears below.
+
+[source, C]
+-------
+struct tvm_aia_params {
+    /* 
+     * The base address of the virtualized IMSIC in TVM physical address space.
+     *
+     * IMSIC addresses follow the below pattern:
+     *
+     * XLEN-1 >=24 12 0 | | | |
+     *
+     * |xxxxxx|Group Index|xxxxxxxxxxx|Hart Index|Guest Index| 0 |
+     *
+     * The base address is the address of the IMSIC with group ID, hart ID, and guest ID of 0.
+     */
+    unsigned long imsic_base_addr;
+    /* The number of group index bits in an IMSIC address. */
+    uint32_t group_index_bits;
+    /* The location of the group index in an IMSIC address. Must be >= 24. */
+    uint32_t group_index_shift;
+    /* The number of hart index bits in an IMSIC address. */
+    uint32_t hart_index_bits;
+    /* The number of guest index bits in an IMSIC address. Must be >= log2(guests_per_hart + 1). */
+    uint32_t guest_index_bits;
+    /*
+     * The number of guest interrupt files to be implemented per VCPU. Implementations may reject
+     * configurations with guests_per_hart > 0 if nested IMSIC virtualization is not supported.
+     */
+    uint32_t guests_per_hart;
+};
+-------
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_interrupt_init_tvm_aia_errors]
+.TEE Interrupt Init TVM AIA
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `tvm_aia_params_addr` was invalid.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `tvm_aia_params_addr` were invalid,
+                            or the TVM wasn't in the `TVM_INITIALIZING` state.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Interrupt Set TVM AIA CPU IMSIC Addr (FID #1)
+[source, C]
+-------
+struct sbiret sbi_tee_interrupt_set_tvm_aia_cpu_imsic_addr(unsigned long tvm_guest_id,
+                                                           unsigned long tvm_vcpu_id,
+                                                           unsigned long tvm_vcpu_imsic_gpa);
+-------
+
+Sets the guest physical address of the specified VCPU’s virtualized IMSIC to `tvm_vcpu_imsic_gpa`.
+The `tvm_vcpu_imsic_gpa` must be valid for the AIA configuration that was set by 
+`sbi_tee_interrupt_init_tvm_aia()`. No two VCPUs may share the same `tvm_vcpu_imsic_gpa`.
+
+This can be called only after `sbi_tee_interrupt_init_tvm_aia()` and before `sbi_tee_host_finalize_tvm()`.
+All VCPUs in an AIA-enabled TVM must have their IMSIC configuration set prior to calling
+`sbi_tee_host_finalize_tvm()`.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_interrupt_set_tvm_aia_cpu_imsic_addr_errors]
+.TEE Interrupt Set TVM AIA CPU IMSIC Addr
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `tvm_vcpu_imsic_gpa` was invalid.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `tvm_vcpu_id` were invalid, or
+                            the TVM wasn't in the `TVM_INITIALIZING` state.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Interrupt Convert AIA IMSIC (FID #2)
+[source, C]
+-------
+struct sbiret sbi_tee_interrupt_convert_aia_imsic(unsigned long imsic_page_addr);
+-------
+
+Starts the process of converting the non-confidential guest interrupt file at
+`imsic_page_addr` for use with a TVM. This must be followed by calls to `sbi_tee_host_global_fence()`
+and `sbi_tee_host_local_fence()` before the interrupt file can be assigned to a TVM.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_aia_tvm_convert_imsic_errors]
+.TEE Interrupt Convert AIA IMSIC
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `imsic_page_addr` was invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Interrupt Reclaim TVM AIA IMSIC (FID #3)
+[source, C]
+-------
+struct sbiret sbi_tee_interrupt_reclaim_tvm_aia_imsic(unsigned long imsic_page_addr);
+-------
+
+Reclaims the confidential TVM interrupt file at `imsic_page_addr`. The interrupt file
+must not currently be assigned to a TVM.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_reclaim_tvm_aia_imsic_errors]
+.TEE Interrupt Reclaim TVM AIA IMSIC
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `imsic_page_addr` was invalid.
+| SBI_ERR_INVALID_PARAM   | The memory is still assigned to a TVM.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+== TEE Guest Extension (EID 0x54454547)
+The TEE Guest extension supplements the TEE Host extension, and TVMs to communicate with TSM. A typical
+usecase for this extension is to relay information to the host.
+
+=== Function: TEE Guest Add Memory Region (FID #0)
+[source, C]
+-------
+struct sbiret sbi_tee_guest_add_memory_region(unsigned long tvm_memory_region_type,
+                                              unsigned long tvm_gpa_addr,
+                                              unsigned long region_len);
+-------
+Marks the range of TVM physical address space starting at `tvm_gpa_addr` as reserved for the mapping of
+non-confidential memory. The type of memory is specified by `tvm_memory_region_type` and the length is
+specified by by `region_len`. `tvm_memory_region_type` must be of type `SHARED_MEMORY_REGION` or
+`EMULATED_MMIO_REGION`.
+
+Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned, and the region must not
+overlap with a previously defined region. This call will result in an exit to the
+host on success.
+
+[#table_sbi_tee_guest_add_memory_region_errors]
+.TEE TEE Guest Add Memory Region
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+                          | This implies an exit to the host, and a subsequent resume of execution.
+| SBI_ERR_INVALID_ADDRESS | `tvm_gpa_addr` was invalid.
+| SBI_ERR_INVALID_PARAM   | `tvm_memory_region_type` or `region_len` were invalid
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Guest Flush Pages (FID #1)
+[source, C]
+-------
+struct sbiret sbi_tee_guest_flush_pages(unsigned long tvm_gpa_addr,
+                                        unsigned long region_len);
+-------
+Begins the process of invalidating pages in the TVM physical address space range
+spanned by `region_len` starting with `tvm_gpa_addr`. All pages spanned by the range
+must be of the same type, i.e., either `SHARED_MEMORY_REGION` or `CONFIDENTIAL_MEMORY`.
+
+This must be must followed by a call to `sbi_tee_guest_global_fence()`, and then `sbi_tee_guest_local_fence()` on all TVM VCPUs to complete the invalidation.
+
+On success, the GPA range should be considered as unmapped, and attempts to access a page
+in the range will result in a fatal page fault.
+
+[#table_sbi_tee_guest_flush_pages_errors]
+.TEE Guest Flush Pages
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The invalidation operation was successfully started.
+                          | This implies an exit to the host, and a subsequent resume of execution.
+| SBI_ERR_INVALID_ADDRESS | `tvm_gpa_addr` was invalid.
+| SBI_ERR_INVALID_PARAM   | `region_len` was invalid, or the range spanned a region 
+                            of another type.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Guest Initiate Global Fence (FID #2)
+[source, C]
+-----
+struct sbiret sbi_tee_guest_global_fence(void);
+-----
+Initiates a TLB invalidation sequence for all pages marked for conversion via
+calls to `sbi_tee_host_convert_pages()`. The TLB invalidation sequence is completed
+when `sbi_guest_host_local_fence()` has been invoked on all other CPUs. An error is
+returned if a TLB invalidation sequence is already in progress.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_sbi_tee_guest_global_fence_errors]
+.TEE Host Initiate Fence
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_ALREADY_STARTED | A fence operation is already in progress.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Guest Local Fence (FID #3)
+[source, C]
+-----
+struct sbiret sbi_tee_guest_local_fence(void);
+-----
+Invalidates TLB entries for all pages pending conversion by an in-progress TLB
+invalidation operation on the local CPU.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_guest_local_fence_errors]
+.TEE Guest Local Fence
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code            | Description
+| SBI_SUCCESS           | The operation completed successfully.
+| SBI_ERR_FAILED        | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Guest Share Memory Region (FID #4)
+[source, C]
+-------
+struct sbiret sbi_tee_guest_share_memory_region(unsigned long tvm_gpa_addr,
+                                                unsigned long region_len);
+-------
+Marks the range of TVM physical address space starting at `tvm_gpa_addr` as reserved for the mapping of non-confidential memory. The entire range must reside in a region of
+type `CONFIDENTIAL_REGION`, and all pages must have been previously unmapped and flushed (using `sbi_tee_guest_flush_pages()`, followed by a fence).
+
+Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned. This call will result in an exit to the
+host on success. Following successful completion, the TVM can access all any page in the range.
+
+[#table_sbi_tee_guest_share_memory_region_errors]
+.TEE Guest Share Memory Region
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+                          | This implies an exit to the host, and a subsequent resume of execution.
+| SBI_ERR_INVALID_ADDRESS | `tvm_gpa_addr` was invalid.
+| SBI_ERR_INVALID_PARAM   | `region_len` was invalid, or the entire range doesn't
+                            span a `CONFIDENTIAL_REGION`
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+=== Function: TEE Guest Unshare Memory Region (FID #5)
+[source, C]
+-------
+struct sbiret sbi_tee_guest_unshare_memory_region(unsigned long tvm_gpa_addr,
+                                                  unsigned long region_len);
+-------
+Marks the range of TVM physical address space starting at `tvm_gpa_addr` as reserved for the mapping of confidential memory (the contents will be guaranteed to be zeroes on the first
+access). The entire range must reside in a region of type `SHARED_MEMORY_REGION`, and all
+pages must have been previously unmapped and flushed (using `sbi_tee_guest_flush_pages()`, followed by a fence).
+
+Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned. This call will result in an exit to the
+host on success. Following successful completion, the TVM can access any page in the range.
+
+[#table_sbi_tee_guest_unshare_memory_region_errors]
+.TEE Guest Share Memory Region
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+                          | This implies an exit to the host, and a subsequent resume of execution.
+| SBI_ERR_INVALID_ADDRESS | `tvm_gpa_addr` was invalid.
+| SBI_ERR_INVALID_PARAM   | `region_len` was invalid, or the entire range doesn't
+                            span a `SHARED_MEMORY_REGION`
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
 
 |===
 | *TSM load and initialization operations* | 
@@ -226,14 +1543,6 @@ must be scrubbed by the TVM before it is yielded. The TSM enforces that the
 page is not-present in the second stage page table and not tracked as a TEE 
 page. The VMM owns the process of reclaiming the 
 page.                            
-
-| teecall_tg_page_accept       | Intrinsic used by the TVM to accept pages 
-as part of initial (pre-init) load or post-init add/conversion of memory 
-from non-confidential to confidential.The page mapping stays in a pending 
-state (where TLB entries cannot be created) until this operation succeeds. 
-The TSM enforces the page is zero-cleared during the page_post_add 
-performed by the VMM when the page is (re)added back as a confidential TVM 
-page.  
 
 | teecall_tg_host_req          | This intrinsic is supported by the TSM to 
 provide the TVM the ability to request host services e.g. para-virt IO.The 
