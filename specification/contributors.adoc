@@ -1,17 +1,6 @@
 == Contributors
 
-The proposed AP-TEE specifications (non-ratified, under discussion) have been contributed to directly or indirectly by:
+The proposed AP-TEE specifications (non-ratified, under discussion) have been contributed to directly or indirectly by (in alphabetical order):
 
 [%hardbreaks]
-* Ravi Sahita, Editor <ravi@rivosinc.com>
-* Andy Dellow
-* Manuel Offenberg
-* Nick Kossifidis
-* Dong Du
-* Dingji Li
-* Vedvyas Shanbhogue
-* Yann Loisel
-* Kailun Qin
-* Dylan Reid
-* Atish Patra
-* Andrew Bresticker
+Andrew Bresticker, Andy Dellow, Atish Patra, Atul Khare, Beeman Strong, Dingji Li, Dong Du, Dylan Reid, Guerney Hunt, Kailun Qin, Manuel Offenberg, Nick Kossifidis, Ravi Sahita (Editor <ravi@rivosinc.com>), Samuel Ortiz, Vedvyas Shanbhogue, Yann Loisel 
