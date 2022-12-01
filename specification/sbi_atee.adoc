@@ -1,45 +1,20 @@
 [[sbi_tee]]
-== Introduction
-This describes a scalable Trusted Execution Environment (TEE) SBI extension proposal. 
-It enables application workloads that require confidentiality to minimize the Trusted Computing 
-Base (TCB). Specifically, the host OS/VMM and other software are outside the TCB. It supports
-an architecture that can be used for Application and Virtual Machine workloads, while minimizing
-changes to the RISC-V ISA and privilege modes. The proposal introduces three new extensions that
-will be described later: TEE Host Extension (EXT_TEE_HOST), TEE Interrupt Extension (EXT_TEE_INTERRUPT),
-and TEE Guest Extension (EXT_TEE_GUEST).
+== Trusted Execution Environment (TEE) SBI extension proposal
+This section describes the normative Trusted Execution Environment (TEE) SBI extension proposal. 
+The proposal introduces three new extensions that will be described later:
 
-== Terms and Abbreviations
-This specification uses the following terms and abbreviations:
-[#table_terms_and_abbreviations]
-.Terms And Abbreviations
-[%header,%autowidth]
-|===
-| Term  | Meaning
-
-| AIA   | Advanced Interrupt Architecture
-| IMSIC | Incoming Message Signaled Interrupt Controller
-| MMIO  | Memory Mapped IO
-| ROT   | Root of Trust
-| TEE   | Trusted Execution Environment
-| TSM   | TEE Security Manager
-| TCB   | Trusted Computing Base
-| VM    | Virtual Machine
-| VCPU  | Virtual CPU
-| VMM   | Virtual Machine Manager (hypervisor)
-| TVM   | Trusted VM (a VM running a TEE-workload)
-|===
+* TEE Host Extension (EXT_TEE_HOST), 
+* TEE Interrupt Extension (EXT_TEE_INTERRUPT), and 
+* TEE Guest Extension (EXT_TEE_GUEST).
 
 === TEEI - TH-ABI runtime interface 
 ECALL invocation from VS (guest OS) causes traps that are handled by the 
 TSM module (enforced via mdeleg configuration). The TSM then may provide 
 intrinsics via the TG-ABI (TEE-Guest ABI) to the TVM to provide attestation 
 and other trusted services. The TSM may allow the TEE (application or VM) 
-to request host (untrusted) services via the TH-ABI (TEE host-ABI). As 
-shown in the figure above, the TEE Runtime (operating in VS-mode) supports 
-applications as TEEs when the host environment is a baremetal OS (not 
-running a VMM).
+to request host (untrusted) services via the TH-ABI (TEE host-ABI).
 
-== Background
+==== Background
 Virtualization platforms are typically comprised of several components including
 platform firmware, host OS, VMM, and the actual payloads that run on them (typically
 in a VM). This model is well established, but the downside is that most platform
@@ -70,7 +45,7 @@ mapped-in on demand by the VMM following runtime access by the TVM. The non-conf
 include those for shared-pages and MMIO. Without direct-IO support to TVMs, MMIO regions are non-confidential. 
 When direct IO is supported - MMIO page mappings will also be allowed to be in the confidential memory region.
 
-== Operational model for the TEE Host Extension
+==== Operational model for the TEE Host Extension
 Executing confidential workloads in a TEE requires a sequence of one or more of the steps detailed below.
 We'll assume that these steps are performed by an untrusted entity like the OS/VMM (host) in conjunction
 with the TSM.
@@ -93,17 +68,17 @@ with the TSM.
 . Reassignment of confidential memory for other TVMs
 . Reclaiming confidential memory for non-confidential VMs
 
-=== Platform TSM detection and capability enumeration
+===== Platform TSM detection and capability enumeration
 Platform support for the TSM can be detected by probing for the EXT_TEE_HOST extension, and then
-calling `sbi_tee_host_get_tsm_info() to get information about the current status of the TSM. The
+calling `sbi_tee_host_get_tsm_info()` to get information about the current status of the TSM. The
 TSM must be be in `TSM_READY` in order to process further ECALLs.
 
-=== TVM creation
+===== TVM creation
 TVMs are created using the sbi_tee_host_create_tvm(). This creates a TVM with state set to `TVM_INITIALIZING`.
 The host must assign confidential memory for page tables, payload mapping, and VCPUs before it can be
 transitioned into a `TVM_RUNNABLE` state.
 
-=== TVM memory management
+===== TVM memory management
 The host is responsible for the following memory management functions:
 
 . Converting non-confidential memory to confidential memory
@@ -113,7 +88,7 @@ The host is responsible for the following memory management functions:
 . Mapping zero-page confidential pages to the TVM regions 
 . Mapping non-confidential pages TVM-defined regions for shared-pages / MMIO
 
-=== Converting non-confidential memory to confidential memory
+===== Converting non-confidential memory to confidential memory
 Platform memory is non-confidential by default, and must be converted to confidential memory
 before use with TVMs. The conversion process is initiated by designating the host physical
 pages that to be converted, and then issuing fence operations to ensure that all outstanding
@@ -135,18 +110,18 @@ unless it's reclaimed. If the host assigns converted memory to non-confidential 
 page-table mappings, access to the converted memory from inside the non-confidential VM will cause
 an access fault.
 
-=== Defining confidential memory regions
+===== Defining confidential memory regions
 The host can declare the TVM physical address ranges for mapping of confidential memory. There can be multiples ranges,
 but no two regions can overlap. The region can be sparsely mapped; however, any sparsely mapped confidential page that's
 demand-paged following an access fault by the TVM can only be a demand-zero page.
 
 All ranges must be defined by calling `sbi_tee_host_finalize_tvm()`.
 
-=== Donating confidential pages for the TVM page-table pool
+===== Donating confidential pages for the TVM page-table pool
 The host must ensure that the TSM has sufficient confidential memory for mapping and managing TVM page-tables
 for the code and data payloads by calling `sbi_tee_host_add_tvm_page_table_pages()`.
 
-=== Mapping TVM code and data payload to confidential TVM-pages
+===== Mapping TVM code and data payload to confidential TVM-pages
 The host can create a confidential page region by calling `sbi_tee_host_add_tvm_memory_region()` with `CONFIDENTIAL_REGION`.
 The region can be sparsely populated, and since the host cannot directly access  confidential memory, it must copy the TVM
 code and data payload from non-confidential memory to confidential memory by calling `sbi_tee_host_add_tvm_measured_pages()`.
@@ -155,7 +130,7 @@ This operation requires the host to convert a sufficient number of non-confident
 payload for the TVM from non-confidential pages to confidential pages, and extends the corresponding measurements for the
 TVM.
 
-=== VCPU shared state enumeration
+===== VCPU shared state enumeration
 The TSM communicates additional information about TVM exits from `sbi_tee_host_run_tvm_vcpu()` using a non-confidential
 shared memory region that's configured on a per-VCPU basis by the host. The host can also use this shared memory
 region to control and configure TVM parameters like the initial-entry point (SEPC), initial parameter, etc., and
@@ -165,13 +140,13 @@ The layout of the shared-memory region can vary by TSM version. The host can det
 regions enumerated in `vcpu_register_set_id` by calling `sbi_tee_host_get_tvm_vcpu_num_register_sets()` to get the
 number of enumerated sets, and then `sbi_tee_host_get_tvm_vcpu_num_register_sets()` to determine the offset.
 
-=== VCPU creation
+===== VCPU creation
 The host must register CPUs/harts with the TSM before they can be used for TVM execution by calling
 `sbi_tee_host_create_tvm_vcpu()`. The host must also configure the the the non-confidential shared memory
 that's set-up by the host while creating the VCPU. The shared memory is used both the host and the
 TSM for when processing TVM exits from `sbi_tee_run_vcpu()`.
 
-=== TVM execution
+===== TVM execution
 Following assignment of memory and VCPU resources, the host can transition the guest into a `TVM_RUNNABLE`
 state by calling `sbi_tee_host_finalize_tvm()`. Note that some TEE calls are no longer permissible after this
 transition.
@@ -185,7 +160,7 @@ previously setup by the call to `sbi_tee_host_create_tvm_vcpu()`. The host can t
 if needed to determine further course of action. This may involve servicing exits caused by TVM-ECALLs that require
 host action(like adding of MMIO and shared-memory regions), TVM page-faults, virtual instructions, etc.
 
-=== Mapping confidential demand-zero pages and non-confidential shared pages
+===== Mapping confidential demand-zero pages and non-confidential shared pages
 The host can handle TVM page-faults by determining whether it was caused by access to a confidential or
 non-confidential region. In the former case, it can call use `sbi_tee_host_add_tvm_zero_pages()` to 
 populate the region with a previously converted confidential page. The TSM verifies that the confidential
@@ -195,37 +170,45 @@ on the TVM measurement, and can be added at any point of time.
 The host can process non-confidential pages by calling `sbi_tee_host_add_shared_pages()`. Non-confidential
 shared memory regions are defined by the TVM using the EXT_TEE_GUEST extension.
 
-=== Handling MMIO faults
+===== Handling MMIO faults
 TVMs can define MMIO regions using the EXT_TEE_GUEST extension, and a rutime access to such a region causes
 a resumable exit from the TVM. The host can examine the exit code and `scause`, update the per-VCPU
 shared-memory region as appropriate, and resume TVM execution. This may involve instruction decoding
 using the information from the shared-memory region.
 
-=== Handling virtual instructions
+===== Handling virtual instructions
 The host can handle exits caused by virtual instruction by examining and decoding the contents of the
 shared-memory region.
 
-=== Management of secure interrupts
+===== Management of secure interrupts
 The host can use the Tee Interrupt Extension (EXT_TEE_INTERRUPT) to manage secure TVM interrupts on
 platforms with AIA-support. 
 
-=== TVM teardown
+===== TVM teardown
 The host can teardown a TVM by calling `sbi_tee_host_destroy_tvm()`. This automatically releases all
 confidential memory assigned to the TVM, and it can be repurposed for use with other TVMs. However,
 reclaiming the memory for use by non-confidential workloads requires an explicit call to
 `sbi_tee_host_reclaim_pages()`.
 
-== Operational model for the TEE Guest Extension
+==== Operational model for the TEE Guest Extension
 This interface is used by TVMs to communicate with TSM. Presently, this extension only allows guests
 to define memory regions for shared-pages and MMIO regions.
 
-=== TVM-defined memory regions
+===== TVM-defined memory regions
 TVMs can determine the physical address location for mapping of non-confidential regions at runtime,
 and communicate the decision host about TVM-established shared-pages and MMIO regions by calling
 `sbi_tee_guest_add_memory_region()`. This results in an exit to the host, and it can retrieve the
 information by checking the exit code from the TVM and examining the shared-memory region for the
 TVM VCPU. The expectation is that the host will service a subsequent page-fault that results from
 a TVM-access to the non-confidential region.
+
+===== TVM-driven confidential/non-confidential memory conversion
+TVMs can choose to yield access to confidential memory at runtime and request shared (non-confidential) memory.
+The TVM must communicate it's request to the host to convert confidential to non-confidential and vice-versa 
+explicitly via the `sbi_tee_guest_(un)share_memory_region`. This request results in an exit to the TSM which 
+enforces the security properties on the mapping and exits to the VMM host to enforce TLB invalidation. 
+The expectation is that the host will service these requests and handle subsequent page-faults to allow the TVM 
+to access required confidential or non-confidential memory per the TVMs request.
 
 == TEE Host Extension (EID #0x54454548)
 
@@ -1271,6 +1254,10 @@ Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned.
                             span a `SHARED_MEMORY_REGION`
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
+
+
+
+== Summary Listing of TEEI
 
 |===
 | *Summary of TSM load and initialization operations* | 
