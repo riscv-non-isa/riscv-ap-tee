@@ -42,8 +42,7 @@ used as synonyms of AP-TEE in this document.
 | Confidential Computing | The protection of data in use by performing 
 computation in a Hardware-based TEE.
 
-| TVM or Confidential VM | A VM instantiation of an AP-TEE workload - 
-aka a TEE VM, TVM or a CVM.
+| TVM | TEE or Confidential VM - A VM instantiation of an AP-TEE workload
 
 | Confidential application or library | A user-mode application or 
 library instantiation in a TVM. The user-mode application may be supported 
@@ -87,6 +86,12 @@ software and firmware combination measured by the TCB elements transitively.
 A CDI is the output of a DICE [2] and is passed to the entity  which is 
 measured by the previous TCB layer. The CDI is a secret that may be 
 certified to use for attestation protocols. 
+
+| AIA | Advanced Interrupt Architecture
+
+| IMSIC | Incoming Message Signaled Interrupt Controller
+
+| MMIO | Memory Mapped I/O
 
 |===
 
