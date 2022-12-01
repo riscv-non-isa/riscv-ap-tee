@@ -28,7 +28,7 @@ jobs:
       NPM_PACKAGE_FOLDER: ${{ github.workspace }}/dependencies
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: 'true'
     - name: Install Ubuntu packages
@@ -42,16 +42,16 @@ jobs:
         ruby-version: "2.6"
         bundler-cache: true
     # Node.js for wavedrom
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ~/.npm
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-node-
     - name: Setup Node.js
-      uses: actions/setup-node@v2
+      uses: actions/setup-node@v3
       with:
-        node-version: '14'
+        node-version: '16'
     - name: Install Node.js dependencies
       run: npm install ${NPM_PACKAGE_FOLDER}
     - name: Generate PDF
@@ -60,30 +60,16 @@ jobs:
         make
       working-directory: ./specification
     - name: Archive PDF result
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: riscv-aptee-spec.pdf
         path: ./specification/riscv-aptee-spec.pdf
         retention-days: 7
     - name: Create Release
-      id: create_release
-      if: ${{ github.event.inputs.prerelease }}
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
+        files: ./specification/riscv-aptee-spec.pdf
         tag_name: ${{ github.ref_name }}
-        release_name: Release ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
         draft: false
         prerelease: true
-    - name: Upload Release Asset
-      id: upload-release-asset
-      if: ${{ github.event.inputs.prerelease }}
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./specification/riscv-aptee-spec.pdf
-        asset_name: riscv-aptee-spec.pdf
-        asset_content_type: application/pdf
