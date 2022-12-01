@@ -67,6 +67,8 @@ jobs:
         retention-days: 7
     - name: Create Release
       uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         files: ./specification/riscv-aptee-spec.pdf
         tag_name: ${{ github.ref_name }}
