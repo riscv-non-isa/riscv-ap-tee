@@ -26,8 +26,6 @@ jobs:
       BUNDLE_GEMFILE: ${{ github.workspace }}/dependencies/Gemfile
       BUNDLE_BIN: ${{ github.workspace }}/bin
       NPM_PACKAGE_FOLDER: ${{ github.workspace }}/dependencies
-  permissions:
-    contents: write
   steps:
     - name: Checkout repository
       uses: actions/checkout@v3
