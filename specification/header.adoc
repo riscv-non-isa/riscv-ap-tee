@@ -1,7 +1,7 @@
 [[header]]
 :description: RISC-V AP-TEE: HW-Attested Scalable TEE proposal for RISC-V 
 :company: RISC-V.org
-:revdate: 5/2022
+:revdate: 12/2022
 :revnumber: 1.0
 :revremark: This document is in development. Assume everything can change. See http://riscv.org/spec-state for details.
 :url-riscv: http://riscv.org
@@ -25,7 +25,7 @@
 :listing-caption: Listing
 :sectnums:
 :toc: left
-:toclevels: 4
+:toclevels: 5
 :source-highlighter: pygments
 ifdef::backend-pdf[]
 :source-highlighter: coderay

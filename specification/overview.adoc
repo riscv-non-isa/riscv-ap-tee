@@ -19,7 +19,7 @@ Figure 1: TEE TCB for VM workloads
 As shown in figure 1, the architecture comprises a HS-mode software module 
 called the " *TEE Security Manager* " *(TSM)* that acts as the trusted 
 intermediary between the VMM and the TVM. The TSM implements a set of TEE 
-“flows” that are accessed via a *Trusted Execution Environment Interface 
+"flows" that are accessed via a *Trusted Execution Environment Interface 
 (TEEI)* ABI hosted by a Trusted Security Manager Driver ( *TSM Driver* ) 
 component operating in the M-mode of the CPU. The TSM itself operates in 
 HS-mode (priv=01; V=0) of the CPU and enables the OS/VMM (also in HS-mode) to 
@@ -61,7 +61,7 @@ TSM code and data. This region must be access-controlled from all software
 outside the TCB, and may be additionally protected against physical access via 
 cryptographic mechanisms. Access to the TSM- memory-region and execution of 
 code from the TSM-memory-region (the TSM flows) is predicated in hardware via 
-an *AP-TEE mode bi* *t* maintained per hart. This mode is enabled per-hart via 
+an *AP-TEE mode bit* maintained per hart. This mode is enabled per-hart via 
 TEECALL and disabled via TEERET for operations described in the TEEI. Access 
 to TEE-assigned memory is allowed for the hart when the AP-TEE mode is set. 
 This per-hart AP-TEE mode bit is used by the processor to enforce 
@@ -96,5 +96,5 @@ Figure 2: TEE TCB for application workloads (hosted via a TVM)
 The detailed architecture is described in the Section 
 <<5_reference_architecture_details>>. Note that the architecture described 
 above may have various implementations, however the goal of this specification 
-is to propose a reference architecture and ratify the TEEI as a RISC-V non-ISA 
+is to propose a reference architecture and ratify a normative TEEI as a RISC-V non-ISA 
 specification.
