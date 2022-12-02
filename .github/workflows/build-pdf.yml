@@ -19,7 +19,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     env:
       APT_PACKAGES_FILE: ${{ github.workspace }}/dependencies/apt_packages.txt
@@ -28,7 +28,7 @@ jobs:
       NPM_PACKAGE_FOLDER: ${{ github.workspace }}/dependencies
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: 'true'
     - name: Install Ubuntu packages
@@ -42,16 +42,16 @@ jobs:
         ruby-version: "2.6"
         bundler-cache: true
     # Node.js for wavedrom
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ~/.npm
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-node-
     - name: Setup Node.js
-      uses: actions/setup-node@v2
+      uses: actions/setup-node@v3
       with:
-        node-version: '14'
+        node-version: '16'
     - name: Install Node.js dependencies
       run: npm install ${NPM_PACKAGE_FOLDER}
     - name: Generate PDF
@@ -60,7 +60,7 @@ jobs:
         make
       working-directory: ./specification
     - name: Archive PDF result
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: riscv-aptee-spec.pdf
         path: ./specification/riscv-aptee-spec.pdf
