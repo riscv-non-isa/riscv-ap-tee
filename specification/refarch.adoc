@@ -3,8 +3,93 @@
 [[refarch]]
 == Reference Architecture Details
 
-We describe the properties of the TSM, its instantiation, isolation and 
-operational model for the TVM lifecycle. The description refers to Figure 1.
+We describe the capabilities of the platform to support memory isolation 
+requirements for confidentiality of workloads in TVMs. We then describe 
+the properties of the TSM, its instantiation, isolation and operational model 
+for the TVM lifecycle. The description in this section refers to the reference 
+architecture in Figure 1.
+
+=== AP-TEE Memory Isolation
+
+Memory isolation for TVMs are orchestrated by the TSM in two phases, 
+the conversion of memory to Confidential memory and the assignment of 
+confidential memory (and the enforcement of properties on its use) to TVMs. 
+Thus, AP-TEE requires new Physical Memory Attributes (PMAs): *Confidential* 
+and *Non-Confidential* (These are dynamic/programmable memory attributes 
+[priv ISA]). A TVM needs to access both types of memory:
+
+* Confidential memory - has Confidential PMA - used for TVM code, data
+* Non-Confidential memory - has Non-Confidential PMA - used for communication between TVM and untrusted host entities
+
+The TEEI implemented by the TSM provides interfaces to the VMM to convert / 
+donate memory to Confidential [Convert] and vice-versa [Reclaim]. 
+TVM memory is by default assigned from Confidential memory regions. 
+TVM may be assigned shared memory regions. Both properties are enforced 
+by the TSM. Figure 3 below shows the abstract model of isolation:
+
+* Hart with AP-TEE mode qualifier =1 is allowed to access Confidential 
+and Non-Confidential memory
+* Hart with AP-TEE mode qualifier =0 is allowed to access only Non-confidential Memory
+
+image:img_7.png[]  
+Figure 3: Confidential Memory conversion
+
+Memory with Confidential PMA may be associated with a unique memory encryption 
+key (and similar IO/fabric protection policies). 
+Non-confidential memory is assigned by the VMM - the TSM and TSM-driver are 
+expected to manage the Confidentiality PMA by programming a Memory Tracking Table. 
+The desired security properties of memory tracking are discussed below - implementations 
+are free to choose the format and structure of the memory tracking table/structures. 
+The TSM manages finer-granular (page-based) allocation from Confidential memory regions 
+(enforced by the memory tracking hardware) using the G stage page tables.
+
+Four aspects of memory isolation are impacted due this dynamic configurable confidential PMA: 
+
+==== Address Translation/Page Walk
+The figure 4 below describes a reference model for memory tracking lookup where 
+the physical address derived from the first and guest stage nested page walk is 
+looked up to derive a confidential | non-confidential physical memory attribute. 
+This lookup should be performed for the page sizes per the paging modes supported by the hart.
+
+image:img_8.png[]  
+Figure 4: Memory Tracking for Confidential PMA
+	
+==== Management of Confidential | Non-Confidential dynamic Physical Memory Attributes
+
+The SW TCB manages the assignment of the confidential PMA to memory regions, 
+while the HW TCB enforces the confidential PMA for TVM accesses. The region sizes 
+at which the memory tracking enforces confidential properties may be multiples of 
+the architectural page sizes supported by the hart MMU. Similarly, the IOMMU should 
+support a similar memory tracking lookup to enable direct device access into TVM memory 
+regions. For the AP-TEE reference architecture this TCB hence consists of the HW 
+(MMU, IOMMU, Memory Controller) and the SW/FW elements - TSM-driver and the TSM. 
+The TSM is responsible for enforcing isolation of confidential memory pages among TVMs 
+(via G-stage translation) - pages assigned to the TVM may belong to C | NC PMA to 
+allow for IO access. The TSM may manage additional attributes on TVM-assigned pages such as: 
+TVM-owner, Page-sub-type, TLB versioning information, Locking semaphore and additional metadata etc.
+
+==== Handling Implicit, Explicit Accesses
+For TVM accesses for instruction fetch and page walks (virtual address 
+translation), a Confidential PMA is required to enforce the following security properties:
+
+* TEE Instruction fetch - security property: TVM/TSM cannot fetch code 
+from untrusted shared memory
+* TEE Paging structure walk - security property: TVM/TSM cannot locate 
+page tables in untrusted shared memory (for TVM, G-stage walks enforced 
+to be in confidential memory by the TSM)
+* TEE data fetch - security property: TVM/TSM allowed to relax data 
+accesses to non-confidential memory (via MTT) to allow for IO accesses.
+
+==== Cached translations/TLB management
+During confidential memory conversion or reclamation, the TCB must 
+enforce that stale translations cached in harts are not accessible 
+to the untrusted host or another TVM context.
+During confidential memory assignment to a TVM (or during conversion 
+of confidential memory to shared), the TCB must enforce that stale 
+translations may not be held to memory yielded by a TVM (and used 
+by the host for another TVM or VM or the host). 
+These properties are implemented by the TSM in conjunction with 
+the HW TCB via the proposed TEEI.
 
 === TSM initialization
 
@@ -65,7 +150,7 @@ setup second-stage mapping, activate a TVM virtual hart on a physical hart
 etc. The TSM security routines are invoked by the OS/VMM via an ECALL with 
 the service call specified via registers.  These service calls trap to the 
 TSM-driver.  The TSM-driver switches hart state to the TSM context by 
-loading the hart’s TSM execution state from the THCS.tssa and then returns 
+loading the hart's TSM execution state from the THCS.tssa and then returns 
 via an MRET to the TSM. The TSM executes the security routine requested 
 (where the TSM enforces the security properties) and may either return to 
 the OS/VMM via an ECALL to the TSM-driver (TEERET with reason), or may use 
@@ -185,10 +270,10 @@ invoked in the TSM via a TEECALL may be interrupted and must be resumed via
 a TEERESUME i.e. _the TSM is preemptable but non-reentrant_ . These 
 properties are enforced by the TSM-driver, and other models described above 
 may be implemented. The TSM does not perform any dynamic resource 
-management, scheduling, or interrupt handling of its own. Hence the TSM is 
-not expected to have a S-model interrupt file of its own, and so for 
-issuing IPIs the TSM must invoke the TSM-driver and use the M-mode 
-Interrupt file when the TSM issues IPIs.
+management, scheduling, or interrupt handling of its own. The TSM is not expected 
+to issue IPIs itself; the TSM must track if appropriate IPIs are issued by the 
+host OS/VMM to track that the required security checks are performed on each 
+physical hart (or virtual hart context) as required by specific TEEI flows.
 
 When the TSM is entered via the TSM-driver (as part of the ECALL [TEECALL] 
 - MRET), the TSM starts with sstatus.sie set to 0 i.e. interrupts disabled. 
@@ -232,6 +317,13 @@ is the TSM responsibility, the TSM-driver may pend an S-mode interrupt to
 the TSM to allow cleanup on such events. See Appendix B for a table of 
 interrupt causes and handling requirements.
 
+The TSM may not need to program stimecmp on its own, though it may verify 
+that time is not going back for a TVM. If the TSM needs to start a timer, 
+it should context switch the stimecmp CSR and replace it with its timeout 
+value if it's later than the timer it wants to start. The TSM may still 
+want to be aware of the value programmed into stimecmp to guard against 
+step attacks on TVMs.
+
 Any NMIs experienced during TSM/TVM execution are always handled by the 
 TSM-driver and must cause the TEEs to be destroyed (preventing any loss of 
 confidential info via clearing of machine state). The TSM and therefore all 
@@ -248,7 +340,7 @@ and the TSM-driver.
 There are two facets of TVM and TSM memory isolation that are 
 implementation-specific:
 
-*a)* *Isolation from host software* *access* -  The CPU may enforce a 
+*a)* *Isolation from host software access* -  The CPU may enforce a 
 hardware-based access-control of TSM memory to prevent access from host 
 software (VMM and host OS) V=0, HS-mode untrusted code. TEE and TVM address 
 spaces are identified by an additional (implementation-defined) *AP-TEE 
@@ -307,7 +399,7 @@ the GPA and enforced for memory ownership for the TVM by the HW.
 
 === TVM Execution
 
-TVMs can access two classes of memory - “confidential memory” - which has 
+TVMs can access two classes of memory - "confidential memory" - which has 
 confidentiality and access-control properties for memory exclusive to the 
 TVM, and "non-confidential memory" which is memory accessible to the host 
 OS/VMM and is used for untrusted operations (e.g. virt-io, grpc 
@@ -325,7 +417,7 @@ by the TSM. By default any memory mapped to a TVM is confidential. A TVM
 may then explicitly request that confidential memory be converted to 
 non-confidential memory regions using services provided by the TSM. More 
 information about TVM Execution and the lifecycle of a TVM is described in 
-the <<7_tvm_lifecycle>> section of this document.
+the <<TVM Lifecycle>> section of this document.
 
 === Debug and Performance Monitoring
 
@@ -365,10 +457,9 @@ counters (using mcountinhibit).
 
 If the TVM has opted-in to performance monitoring, the TSM must invoke the 
 TSM-driver to establish a TVM-specific performance monitoring controls 
-(triggers, event selectors). For any counters that the TVM will use, the 
+(counters, event selectors). For any counters that the TVM will use, the 
 TSM will assign those to the TVM via the TSM-driver and inhibit counting in 
-HS/M mode - with Sscofpmf and future RISC-V extensions these controls could 
-be delegated to the TVM (VS mode) by the TSM. The TSM is free to use any 
+HS/M mode. The TSM is free to use any 
 counters that are not delegated. If the TSM is not using any counters and 
 any of the TVMs opt-in to use hpm then the TSM may delegate the LCOFI 
 interrupt (via hideleg[13]=1) for that TVM. The delegated TVM counters 
