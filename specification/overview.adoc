@@ -3,9 +3,16 @@
 [[overview]]
 == Architecture Overview and Threat Model
 
-The AP-TEE extension supports a new class of hardware-attested trusted 
-execution environment called TEE Virtual machines (TVM). The TVMs are 
-supported by a hardware-rooted, attestable TCB and are run-time-isolated from 
+Virtualization platforms are typically comprised of several components including
+platform firmware, host OS, VMM, and the actual payloads that run on them (typically
+in a VM). This model is well established, but the downside is that most platform
+components are in the TCB. This aspect is ill-suited for Confidential Computing workloads
+that rely on HW-Attested Trusted Execution Environments, and strive to minimize the 
+TCB footprint.
+
+This specification describes the AP-TEE architecture which describes a new class of 
+hardware-attested trusted execution environment called TEE Virtual machines (TVM). 
+The TVMs are supported by a hardware-rooted, attestable TCB and are run-time-isolated from 
 the host OS/VMM and other platform software not in the TCB of the TVM. TVMs 
 are protected from a broad set of software-based and hardware-based threats 
 per the threat model described in <<4_1_adversary_model>>. The design enables 
@@ -18,8 +25,30 @@ Figure 1: TEE TCB for VM workloads
 
 As shown in figure 1, the architecture comprises a HS-mode software module 
 called the " *TEE Security Manager* " *(TSM)* that acts as the trusted 
-intermediary between the VMM and the TVM. The TSM implements a set of TEE 
-"flows" that are accessed via a *Trusted Execution Environment Interface 
+intermediary between TEE and non-TEE workloads. The TSM has a minimal possible 
+HW-attested footprint. The TCB (which includes the TSM and HW) enforces strict 
+confidentiality and integrity security properties for workloads. It also isolates 
+confidential workloads from all other platform components (non-confidential and 
+confidential). The responsibility of the TSM is to enforce the security objectives 
+accorded to TEE workloads. The VMM continues to manage the security for 
+non-confidential workloads, and the resource and scheduling management functions for 
+all workloads (confidential and non-confidential).
+
+In this scheme, compute resources like memory start off as 
+traditional untrusted resources in the non-confidential world, and are transtioned 
+to their confidential analogue via the TSM. Once the conversion process is complete, 
+confidential memory may be assigned to a TVM via the TSM. A converted confidential 
+resource can be freely assigned to another TVM when it's no longer in use. 
+However, an unused confidential resource must be explicitly reclaimed for use in the 
+non-confidential world (this is tracked and enforced by the TSM).
+
+The TEE address space can be comprised of confidential and non-confidential regions. 
+The former includes both measured pages (that are part of the initial TVM payload), 
+and confidential zero-pages that can be mapped-in on demand by the VMM following runtime 
+accesses by the TVM. The non-confidential TVM-defined regions include those for 
+shared-pages and MMIO. 
+
+The TSM implements a set of TEE "flows" that are accessed via a *Trusted Execution Environment Interface 
 (TEEI)* ABI hosted by a Trusted Security Manager Driver ( *TSM Driver* ) 
 component operating in the M-mode of the CPU. The TSM itself operates in 
 HS-mode (priv=01; V=0) of the CPU and enables the OS/VMM (also in HS-mode) to 
