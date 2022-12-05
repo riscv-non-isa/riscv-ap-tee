@@ -14,37 +14,6 @@ intrinsics via the TG-ABI (TEE-Guest ABI) to the TVM to provide attestation
 and other trusted services. The TSM may allow the TEE (application or VM) 
 to request host (untrusted) services via the TH-ABI (TEE host-ABI).
 
-==== Background
-Virtualization platforms are typically comprised of several components including
-platform firmware, host OS, VMM, and the actual payloads that run on them (typically
-in a VM). This model is well established, but the downside is that most platform
-components are in the TCB. This aspect is ill-suited for confidential compute workloads
-that rely on Trusted Execution Environments, and strive to minimize the TCB footprint.
-
-We seek to alleviate this concern by introducing the notion of the a trusted broker for
-TEEs known as the TEE Security Manger (TSM). The idea is that the TSM has a minimal possible
-footprint, and acts as a trusted intermediary between the the untrusted platform components,
-and the TEE workloads that run on it. The TCB (which includes the TSM and HW) enforces strict confidentiality
-and integrity security properties for code execution and data integrity for confidential workloads.
-It also isolates confidential workloads from all other platform components (non-confidential and confidential).
-The exact hardware and software mechanisms used to guarantee the isolation are platform dependent, but confidential
-workloads have execution, data integrity, and confidentiality protections from any other platform component. The
-responsibility of the TSM is to enforce the guarantees accorded to TEE workloads. Specifically, security invariants for
-confidential workloads are enforced by the TSM. The VMM manages security for non-confidential workloads, and resource and
-scheduling management functions for all workloads (confidential and non-confidential).
-
-In this scheme, compute resources like memory start off as traditional untrusted resources
-in the non-confidential world, and are transtioned to their confidential analogue via the TSM.
-Once the conversion process is complete, it can be assigned to a TVM via the TSM. A converted confidential-resource
-can be freely assigned to another TVM when it's no longer in use. However, an unused confidential-resource must be
-explicitly reclaimed for use in the non-confidential world (this is tracked and enforced by the TSM).
-
-The TEE address space can be comprised of confidential and non-confidential regions. The former includes
-both measured pages (that are part of the initial TVM payload), and confidential zero-pages that can be
-mapped-in on demand by the VMM following runtime access by the TVM. The non-confidential TVM-defined regions
-include those for shared-pages and MMIO. Without direct-IO support to TVMs, MMIO regions are non-confidential. 
-When direct IO is supported - MMIO page mappings will also be allowed to be in the confidential memory region.
-
 ==== Operational model for the TEE Host Extension
 Executing confidential workloads in a TEE requires a sequence of one or more of the steps detailed below.
 We'll assume that these steps are performed by an untrusted entity like the OS/VMM (host) in conjunction
@@ -354,6 +323,7 @@ struct tvm_vcpu_register_set_location {
 -----------------
 
 
+[#sbi_tee_host_get_tsm_info]
 === Function: TEE Host Get TSM Info (FID #0)
 [source, C]
 -----
@@ -427,6 +397,7 @@ A list of possible TSM states and the associated semantics appears below (TBD: S
 | TSM_READY          | TSM has been loaded & initialized, and is ready to accept ECALLs.
 |===
 
+[#sbi_tee_host_convert_pages]
 === Function: TEE Host Convert Pages (FID #1)
 [source, C]
 -----
@@ -482,6 +453,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_global_fence]
 === Function: TEE Host Initiate Global Fence (FID #3)
 [source, C]
 -----
@@ -504,6 +476,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_local_fence]
 === Function: TEE Host Local Fence (FID #4)
 [source, C]
 -----
@@ -523,6 +496,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_create_tvm]
 === Function: TEE Host Create TVM (FID #5)
 [source, C]
 -----
@@ -541,12 +515,12 @@ about the parameters that should be used to populate `tvm_create_params`.
 struct tvm_create_params {
     /* 
      * The base physical address of the 16KiB confidential memory region
-     * that should be used for the TVM’s page directory. Must be 16KiB-aligned.
+     * that should be used for the TVM's page directory. Must be 16KiB-aligned.
      */
     unsigned long tvm_page_directory_addr;
     /* 
      * The base physical address of the confidential memory region to be used
-     * to hold the TVM’s state. Must be page-aligned and the number of
+     * to hold the TVM's state. Must be page-aligned and the number of
      * pages must be at least the value returned in tsm_info.vm_state_pages
      * returned by the call to sbi_tee_host_get_tsm_info().
      */
@@ -590,6 +564,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_finalize_tvm]
 === Function: TEE Host Finalize TVM (FID #6)
 [source, C]
 ------
@@ -613,6 +588,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
  
+[#sbi_tee_host_destroy_tvm]
 === Function: TEE Host Destroy TVM (FID #7)
 [source, C]
 -------
@@ -637,6 +613,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_add_tvm_memory_region]
 === Function: TEE Host Add TVM Memory Region (FID #8)
 [source, C]
 -----
@@ -689,6 +666,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_add_tvm_page_table_pages]
 === Function: TEE Host Add TVM Page Table Pages (FID #9)
 [source, C]
 -----
@@ -717,6 +695,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_add_tvm_measured_pages]
 === Function: TEE Host Add TVM Measured Pages (FID #10)
 [source, C]
 -----
@@ -751,6 +730,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_add_tvm_zero_pages]
 === Function: TEE Host Add TVM Zero Pages (FID #11)
 [source, C]
 -----
@@ -780,6 +760,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_add_tvm_shared_pages]
 === Function: TEE Host Add TVM Shared Pages (FID #12)
 [source, C]
 -----
@@ -811,6 +792,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_get_tvm_vcpu_num_register_sets]
 === Function: TEE Host Get TVM VCPU Num Register Sets (FID #13)
 [source, C]
 -----
@@ -839,6 +821,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED                | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_get_tvm_vcpu_register_set]
 === Function: TEE Host Get TVM VCPU Register Set (FID #14)
 [source, C]
 -----
@@ -869,6 +852,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED                | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_create_tvm_vcpu]
 === Function: TEE Host Create TVM VCPU (FID #15)
 [source, C]
 -----
@@ -900,6 +884,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_run_tvm_vcpu]
 === Function: TEE Host Run TVM VCPU (FID #16)
 [source, C]
 -----
@@ -1024,6 +1009,7 @@ The TEE Interrupt extension supplements the TEE Host extension with hardware-ass
 virtualization using the RISC-V Advanced Interrupt Architecture (AIA) on platforms which
 support it.
 
+[#sbi_tee_interrupt_init_tvm_aia]
 === Function: TEE Interrupt Init TVM AIA (FID #0)
 [source, C]
 -------
@@ -1086,6 +1072,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_interrupt_set_tvm_aia_cpu_imsic_addr]
 === Function: TEE Interrupt Set TVM AIA CPU IMSIC Addr (FID #1)
 [source, C]
 -------
@@ -1116,6 +1103,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_interrupt_convert_aia_imsic]
 === Function: TEE Interrupt Convert AIA IMSIC (FID #2)
 [source, C]
 -------
@@ -1138,6 +1126,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_interrupt_reclaim_tvm_aia_imsic]
 === Function: TEE Interrupt Reclaim TVM AIA IMSIC (FID #3)
 [source, C]
 -------
@@ -1166,6 +1155,7 @@ usecase for this extension is to relay information to the host.
 TEE-Guest calls cause a trap to the TSM which may exit to the host with 
 scause set to ECALL, a6 set to FID, a0-a5 set to ECALL args.
 
+[#sbi_tee_guest_add_memory_region]
 === Function: TEE Guest Add Memory Region (FID #0)
 [source, C]
 -------
@@ -1194,6 +1184,7 @@ host on success.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_guest_share_memory_region]
 === Function: TEE Guest Share Memory Region (FID #1)
 [source, C]
 -------
@@ -1224,6 +1215,7 @@ Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_guest_unshare_memory_region]
 === Function: TEE Guest Unshare Memory Region (FID #2)
 [source, C]
 -------
@@ -1259,10 +1251,12 @@ Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned.
 
 == Summary Listing of TEEI
 
+=== Summary of TEEI - TH-ABI
+
 |===
 | *Summary of TSM load and initialization operations* | 
 
-| sbi_tee_host_get_tsm_info                          | Used by the OS/VMM to 
+| <<sbi_tee_host_get_tsm_info, sbi_tee_host_get_tsm_info>> | Used by the OS/VMM to 
 discover if a TSM is loaded and initialized else returns an error. If a TSM 
 is loaded and initialized, this operation is used to enumerate TSM 
 information such as: TEE-capable memory regions, Size of static memory to 
@@ -1281,8 +1275,7 @@ other TVM operations. This interface is TBD.
 | sbi_tee_host_tsm_init_local                        | Perform a local 
 (per-hart) initialization of TSM after the global init has been 
 performed.This operation and the above should succeed before the TSM is 
-considered ready to service other TVM 
-operations.                                                                  
+considered ready to service other TVM operations. This interface is TBD.                                                                  
 
 | sbi_tee_host_tsm_update                         | Update TSM binary and/or 
 configuration. Ideally this operation should be performed without shutting 
@@ -1291,18 +1284,18 @@ issued. The TSM update process description is TBD.
 
 | sbi_tee_host_tsm_shutdown                          | Shuts down the TSM. All 
 TVMs must be shutdown and all TVM memory must be reclaimed before this 
-operation can succeed.                                                                     
-    
+operation can succeed. This interface is TBD.                   
+
 | *Summary of TVM global operations*  |
 
-| sbi_tee_host_create_tvm                       | TVM creation (static) 
+| <<sbi_tee_host_create_tvm, sbi_tee_host_create_tvm>> | TVM creation (static) 
 process where a set of TEE pages are assigned for a TVM to hold a TVM’s 
 global state. This routine also configures the global configuration that 
 applies to the TVM and affects all TVM hart settings. For example, features 
 enabled for this TVM, perfmon enabled, debug enabled 
 etc.                                                                         
 
-| sbi_tee_host_destroy_tvm                          | TVM shutdown verifies VMM 
+| <<sbi_tee_host_destroy_tvm, sbi_tee_host_destroy_tvm>> | TVM shutdown verifies VMM 
 has stopped all virtual hart execution for the TVM. The TVM virtual hart 
 may not be entered after this point. The VMM may start reclaiming TVM 
 memory after this 
@@ -1310,119 +1303,118 @@ point.
   
 | *Summary of TVM Global memory management operations* |
 
-| sbi_tee_host_convert_pages | Begins the process of converting memory 
+| <<sbi_tee_host_convert_pages, sbi_tee_host_convert_pages>> | Begins the process 
+of converting memory 
 to be used as confidential memory. The region consists of one or more contiguous 
 4KB memory naturally aligned regions.
 
-| sbi_tee_host_global_fence | This operation initiates TLB version tracking of pages 
-in the region being converted to confidential. The TSM enforces that the VMM performs 
-invalidation of all harts (via IPIs and subsequent sbi_tee_host_local_fence) to remove any cached mappings to the memory 
-regions blocked for conversion via the sbi_tee_host_convert_pages. 
+| <<sbi_tee_host_global_fence, sbi_tee_host_global_fence>> | This operation 
+initiates TLB version tracking of pages in the region being converted to confidential. 
+The TSM enforces that the VMM performs invalidation of all harts (via IPIs and 
+subsequent sbi_tee_host_local_fence) to remove any cached mappings to the memory 
+regions that were previously selected for conversion via the sbi_tee_host_convert_pages. 
 
-| sbi_tee_host_local_fence |  This operation completes the TLB version tracking of pages 
-in the region being connverted to confidential. The TSM tracks that all available physical harts have executed 
-this operation before it considers the TLB version updated. The last local fence completes the conversion of a 
-memory region from non-confidential to confidential for a set of TVM pages.
+| <<sbi_tee_host_local_fence, sbi_tee_host_local_fence>> |  This operation 
+completes the TLB version tracking of pages in the region being connverted to 
+confidential. The TSM tracks that all available physical harts have executed 
+this operation before it considers the TLB version updated. The last local fence 
+completes the conversion of a memory region from non-confidential to confidential 
+for a set of TVM pages.
 
-| sbi_tee_host_reclaim_pages | VMM may unassign memory for TVMs by destroying them. 
-All confidential-unassigned memory may be reclaimed back as non-confidential using this interface.
+| <<sbi_tee_host_reclaim_pages, sbi_tee_host_reclaim_pages>> | VMM may unassign 
+memory for TVMs by destroying them. All confidential-unassigned memory may be 
+reclaimed back as non-confidential using this interface.
 
 | *Summary of TVM memory management operations* |
 
-| sbi_tee_guest_unshare_memory_region | Convert a memory region 
-from non-confidential to confidential for a set of TVM pages.This operation 
-initiates TSM tracking of these pages and also changes the encryption 
+| <<sbi_tee_guest_unshare_memory_region, sbi_tee_guest_unshare_memory_region>> | Convert 
+a memory region from non-confidential to confidential for a set of TVM pages. 
+This operation initiates TSM tracking of these pages and also changes the encryption 
 properties of these pages. These pages can then be selected by the VMM to 
 allocate for TVM control structure pages, second stage page table pages, 
-and TVM 
-pages.                                                                       
+and TVM pages.
 
-| sbi_tee_host_add_tvm_page_table_pages          | Add one or more page 
-mappings to the second stage translation structure for a TVM. The pages to 
-be used for the second stage page table structures must have been converted 
-(and tracked) by the TSM as TEE pages; otherwise this operation will not 
-succeed.                                                                     
+| <<sbi_tee_host_add_tvm_page_table_pages, sbi_tee_host_add_tvm_page_table_pages>> | Add 
+one or more page mappings to the second stage translation structure for a TVM. 
+The pages to be used for the second stage page table structures must have been converted 
+(and tracked) by the TSM as TEE pages; otherwise this operation will not succeed.                                                                     
 
-| sbi_tee_host_add_tvm_measured_pages                 | Add a page for an 
-existing mapping for a TVM page - this add_pre must be performed before 
-finalization of the TVM measurement via teecall_tvm_msmt_commit. For this 
+| <<sbi_tee_host_add_tvm_measured_pages, sbi_tee_host_add_tvm_measured_pages>> | Add 
+a page for an existing mapping for a TVM page - this add_pre must be performed before 
+finalization of the TVM measurement via sbi_tee_host_finalize_tvm. For this 
 operation, the VMM must provide the page contents that get copied into 
 confidential memory pages for the TVM (and get tracked, encrypted etc). The 
-contents of these pages are also measured via the teecall_tvm_msmt_extend, 
+contents of these pages are also measured via the sbi_tee_host_add_tvm_measured_pages, 
 including the GPA at which the page is mapped. After the TVM msmt is 
-finalized via teecall_tvm_msmt_commit, no more pre-add pages are allowed by 
-the TSM for that TVM.                      
+finalized via sbi_tee_host_finalize_tvm, no more pre-add pages are allowed by 
+the TSM for that TVM.
 
-| sbi_tee_host_add_tvm_zero_pages           | Add a zero page for an 
-existing mapping for a TVM page (post initialization). This operation adds 
-a zero page into a mapping and keeps the mapping as pending (i.e. access 
-from the TVM will fault until the TVM accepts that 
-GPA                                                                          
+| <<sbi_tee_host_add_tvm_zero_pages, sbi_tee_host_add_tvm_zero_pages>> | Add a 
+zero page for an existing mapping for a TVM page (post initialization). 
+This operation adds a zero page into a mapping and keeps the mapping as 
+pending (i.e. access from the TVM will fault until the TVM accepts that GPA.
 
-| sbi_tee_guest_global_fence               | Blocks a set of page 
+| sbi_tee_guest_global_fence               | Invalidates a set of page 
 mappings for an existing mapping for a TVM page. This operation prevents 
 new TLB mappings from being created for a particular TVM page mapping. Note 
 that stale TLB mappings may exist and those are invalidated by the TSM. The 
-TSM enforces that mappings are blocked and flushed by the VMM before allowing any page 
-relocation and/or page fragmentation operations.                                                                  
+TSM enforces that mappings are invalid and flushed by the VMM before allowing any page 
+relocation and/or page fragmentation operations.
 
 | sbi_tee_guest_local_fence                | Issue a TVM TLB 
 invalidation (for the relevant harts) after a set of changes to the TVM 
 mappings for confidential pages. The TSM enforces a hfence.gvma for the 
 affected TVM vmid/asid to enforce stale tlb mappings are flushed. For 
 implementations using memory tracking, this operation should also 
-invalidate additional caching structures for page 
-meta-data.                                                                   
+invalidate additional caching structures for page meta-data.
 
 | sbi_tee_guest_page_relocate                     | Relocate a page for an 
 existing mapping for a TVM page. This operation allows the VMM to reassign 
 a new SPA for an existing TVM page mapping. The page mapping must be 
-blocked and fenced before the page mapping can be 
-relocated. This interface specification is TBD.                                                                   
+invalid and fenced before the page mapping can be 
+relocated. This interface specification is TBD.
 
 | sbi_tee_guest_page_promote                      | Promote a set of small 
 page mappings (existing mappings) for a set of TVM pages to a large page 
-mapping. The affected mappings must be blocked before the promote operation 
+mapping. The affected mappings must be invalidated before the promote operation 
 can succeed. The VMM may reclaim the freed second stage page table page if 
-the operation 
-succeeds.                                                                    
+the operation succeeds. This interface specification is TBD. 
 
 | sbi_tee_guest_page_demote                    | Demote a large page 
 mapping for an existing mapping to a set of TVM pages and corresponding 
-small page mappings. The affected mapping must be blocked before the 
+small page mappings. The affected mapping must be invalidated before the 
 operation can succeed. The VMM must provide a free TEE-capable page to the 
-TSM to use as a new second stage page table in the fragmented 
-mapping.                                                                     
+TSM to use as a new second stage page table in the fragmented mapping.
+This interface specification is TBD.
 
 | *Summary of TVM virtual hart management operations* |
 
-| sbi_tee_host_create_tvm_vcpu                   | This operation allows the 
-VMM to assign TEE pages for a virtual hart context structure (VHCS) for a 
+| <<sbi_tee_host_create_tvm_vcpu, sbi_tee_host_create_tvm_vcpu>> | This operation 
+allows the VMM to assign TEE pages for a virtual hart context structure (VHCS) for a 
 specific TVM. This routine also initializes the hart-specific fields of 
 this structure.Note that a virtual hart context structure may consist of 
-more than 1 4KB page. The number of pages are enumerated via the tsm_info 
-call.                                                                        
+more than 1 4KB page. The number of pages are enumerated via the tsm_info call.
 
 | *Summary of TVM measurement operations*  |
 
-| sbi_tee_host_add_tvm_measured_pages | This operation is used to 
-extend the static measurement for a TVM for added page contents.The 
+| <<sbi_tee_host_add_tvm_measured_pages, sbi_tee_host_add_tvm_measured_pages>> | This 
+operation is used to extend the static measurement for a TVM for added page contents.The 
 operation performs a SHA384 hash extend to the measurement register managed 
 by the TSM on a 256 byte block of the page. The page must be added to a 
 valid GPA mapping via the add_pre_init operation. The GPA of the page 
 mapped is part of the measurement operation.The measurement process is a 
 state machine that must be faithfully reproduced by the VMM otherwise the 
 attestation evidence verification by the relying party will fail and the 
-TVM will not be considered trustworthy.   
+TVM will not be considered trustworthy. 
 
-| sbi_tee_host_finalize_tvm                      | This operation enables a 
+| <<sbi_tee_host_finalize_tvm, sbi_tee_host_finalize_tvm>> | This operation enables a 
 VMM to finalize the measurement of a TVM (static). The TSM enforces that a 
 TVM virtual harts cannot be entered unless the TVM measurement is committed 
 via this operation.
 
 | *TVM runtime operations* |
 
-| sbi_tee_run_vcpu                             | Enter or resume a TVM 
+| <<sbi_tee_run_vcpu, sbi_tee_run_vcpu>> | Enter or resume a TVM 
 virtual hart (on any physical hart). A resume operation is performed via a 
 flag passed to this operation. This operation activates a virtual-hart on a 
 physical hart, and may be performed only on a TVM virtual hart structure 
@@ -1432,7 +1424,7 @@ virtual hart.
 
 | *TSM runtime operations* |
 
-| teecall_ *tsm* _teeret                        | This operation is used by 
+| <<sbi_tee_tsm_teeret, sbi_tee_tsm_teeret>> | This operation is used by 
 a TSM to return control to the OS/VMM via the TSM-driver TEERET flow.This 
 operation may be used by the TSM in various scenarios - in response to a 
 sbi_tee_guest_* operation for requests to the VMM, or due to an S-mode 
@@ -1441,8 +1433,7 @@ communicate faults in the second stage page table for a TVM etc.
 
 |===
 
-
-=== TEEI - TG-ABI runtime interface
+=== Summary of TEEI - TG-ABI
 
 |===
 | sbi_tee_guest_drtm_extend   | This intrinsic is used by a TVM component 
@@ -1450,7 +1441,7 @@ to act as a dynamic root of trust of measurement (DRTM) for the TVM to
 extend runtime measurements. These measurements are managed by the TSM in 
 the TVM global structure (To be specified TBD). These measurements are used 
 in the TcbEvidenceInfo when the TVM attestation certificate is generated 
-via teecall_tg_get_evidence. This interface specification is TBD.                                                 
+via sbi_tee_guest_get_evidence. This interface specification is TBD.                                                 
 
 | sbi_tee_guest_get_evidence      | This intrinsic is used by a TVM to get 
 attestation evidence to report to a (remote) relying party.It is supported 
@@ -1459,12 +1450,12 @@ The attestation key used to sign the evidence is provisioned into the TVM
 by the TSM. The TSM certificate is provisioned by the FW TCB (TSM-driver 
 and HW RoT). This interface specification is TBD.                                                                   
 
-| sbi_tee_guest_share_memory_region        | This intrinsic is used by the TVM to 
-request the conversion of the specified GPA to non-confidential (from 
-confidential).The GPA must be mapped to the TVM in a present state, and 
-must be scrubbed by the TVM before it is yielded. The TSM enforces that the 
-page is not-present in the second stage page table and not tracked as a TEE 
-page. The VMM owns the process of reclaiming the page.                            
+| <<sbi_tee_guest_share_memory_region, sbi_tee_guest_share_memory_region>> | This 
+intrinsic is used by the TVM to request the conversion of the specified GPA to 
+non-confidential (from confidential).The GPA must be mapped to the TVM in a 
+present state, and must be scrubbed by the TVM before it is yielded. The TSM 
+enforces that the page is not-present in the second stage page table and not 
+tracked as a TEE page. The VMM owns the process of reclaiming the page.
 
 | sbi_tee_guest_host_invoke          | This intrinsic is supported by the TSM to 
 provide the TVM the ability to request host services e.g. para-virt IO.The 

@@ -37,7 +37,7 @@ Figure 3: Confidential Memory conversion
 Memory with Confidential PMA may be associated with a unique memory encryption 
 key (and similar IO/fabric protection policies). 
 Non-confidential memory is assigned by the VMM - the TSM and TSM-driver are 
-expected to manage the Confidentiality PMA by programming a Memory Tracking Table. 
+expected to manage the Confidentiality PMA by programming a Memory Tracking Table (MTT). 
 The desired security properties of memory tracking are discussed below - implementations 
 are free to choose the format and structure of the memory tracking table/structures. 
 The TSM manages finer-granular (page-based) allocation from Confidential memory regions 
@@ -67,6 +67,7 @@ The TSM is responsible for enforcing isolation of confidential memory pages amon
 (via G-stage translation) - pages assigned to the TVM may belong to C | NC PMA to 
 allow for IO access. The TSM may manage additional attributes on TVM-assigned pages such as: 
 TVM-owner, Page-sub-type, TLB versioning information, Locking semaphore and additional metadata etc.
+This extended memory tracking information managed by the TSM is refered to as the EMTT.
 
 ==== Handling Implicit, Explicit Accesses
 For TVM accesses for instruction fetch and page walks (virtual address 
@@ -370,32 +371,9 @@ of cache blocks.
 *TVM isolation* is the responsibility of the TSM via the second stage 
 address translation table (hgatp). The TSM must track memory assignment of 
 TVMs (by the untrusted VMM/OS) to ensure memory assignment is 
-non-overlapping, along with additional security requirements. The following 
-are the security requirements/invariants for enforcement of the memory 
-access-control for memory assigned to the TVMs. These rules are enforced by 
-the TSM and the HW:
-
-. Contents of a TVM page assigned (statically measured or lazy-initialized) 
-to the TVM is bound to the Guest PA assigned to the TVM during TVM operation.
-. A TVM page can only be assigned to a single TVM, and mapped via a single 
-GPA unless aliases are allowed in which case, such aliases must be tracked 
-by the TSM). Aliases in the virtual address space are under the purview of 
-the TVM OS.
-. 1st stage address translation - A TVM page mapping must be translated 
-only via first stage translation structures which are contained in pages 
-assigned to the same TVM. 
-. 2nd stage address translation:
-  .. A TVM page guest physical address mapping must be translated only via 
-the TSM-managed second stage translation structures for that TVM. 
-  .. 2nd stage structures may not be shared between TVMs, and must not 
-refer to any other TVMs pages.
-  .. The OS/VMM has no access to TVM second stage paging structures
-  .. The OS/VMM may install shared page mappings (via TSM oversight) to 
-non-confidential pages that are not assigned to any TVM or the TSM - this 
-is for example for untrusted IO.
-  .. Circular mappings in the second stage paging structures are disallowed.
-. Access to shared memory pages must be explicitly signaled by the TVM via 
-the GPA and enforced for memory ownership for the TVM by the HW.
+non-overlapping, along with additional security requirements. The security 
+requirements/invariants for enforcement of the memory 
+access-control for memory assigned to the TVMs is described in <<TVM Memory management>>. 
 
 === TVM Execution
 
