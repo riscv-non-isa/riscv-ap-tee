@@ -60,7 +60,7 @@ its measurements, vendor and version into measurement registers which can
 be attested to via the HW RoT-rooted keys. 
 
 The TSM must then provide an implementation of a TEE-Guest ABI (TG-ABI) 
-operation (teecall_tg_get_evidence)  to enable a TVM to generate 
+operation (sbi_tee_guest_get_evidence)  to enable a TVM to generate 
 attestation evidence that a relying party can verify using the certificate 
 chain. 
 
@@ -267,10 +267,10 @@ TVM TcbInfo, and can transfer that certificate to the TVM during
 initialization via a guest firmware mechanism (e.g. device tree or UEFI HOB). 
 Alternately, the TSM can provide an interface to sign TVM TcBInfo and 
 additional data (such as DRTM measurements done by the TVM) at runtime via 
-the teecall_tg_gen_cert interface to generate additional TVM Attestation 
+the sbi_tee_guest_get_evidence interface to generate additional TVM Attestation 
 certificates.
 
-ECALL ( *teecall_tg_gen_cert* ): invoked by TVM - this TEEI operation is 
+*sbi_tee_guest_get_evidence*: invoked by TVM - this TEEI operation is 
 serviced by the TSM.
 
 Inputs/outputs
