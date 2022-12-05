@@ -111,7 +111,7 @@ number of enumerated sets, and then `sbi_tee_host_get_tvm_vcpu_num_register_sets
 
 ===== VCPU creation
 The host must register CPUs/harts with the TSM before they can be used for TVM execution by calling
-`sbi_tee_host_create_tvm_vcpu()`. The host must also configure the the the non-confidential shared memory
+`sbi_tee_host_create_tvm_vcpu()`. The host must also configure the non-confidential shared memory
 that's set-up by the host while creating the VCPU. The shared memory is used both the host and the
 TSM for when processing TVM exits from `sbi_tee_run_vcpu()`.
 
@@ -256,8 +256,8 @@ struct tvm_vcpu_supervisor_gprs {
 struct tvm_vcpu_hypervisor_csrs {
     /*
      *
-     * HTVAL value for guest page faults taken by the TVM vCPU. Written by the TSM upon return
-     * `sbi_tee_host_run_tvm_vcpu()`.
+     * HTVAL value for guest page faults taken by the TVM vCPU. Written by the TSM 
+     * upon return from `sbi_tee_host_run_tvm_vcpu()`.
      *
      */
     unsigned long htval;
@@ -331,7 +331,7 @@ struct sbiret sbi_tee_host_get_tsm_info(unsigned long tsm_info_address,
                                         unsigned long tsm_info_len);
 -----
 Writes up to `tsm_info_len` bytes of information at the physical memory address
-specified by `tsm_info_address`. `tsm_info_len` should be the size of the the
+specified by `tsm_info_address`. `tsm_info_len` should be the size of the
 `tsm_info` struct below. The information returned by the call can be used to determine
 the current state of the TSM, and configure parameters for other TVM-related calls.
 
@@ -507,6 +507,11 @@ Creates a confidential TVM using the specified parameters. The `tvm_create_param
 is the physical address of the buffer containing the `tvm_create_params` structure
 described below, and `tvm_create_params_len` is the size of the structure in bytes. 
 
+TVM creation (static) process where a set of TEE pages are assigned for a TVM to hold a 
+TVM's global state. This routine also configures the global configuration that applies 
+to the TVM and affects all TVM virtual hart settings. For example, features enabled for this 
+TVM, perfmon enabled, debug enabled etc.
+
 Callers of this API should first invoke `sbi_tee_host_get_tsm_info()` to obtain information
 about the parameters that should be used to populate `tvm_create_params`.
 
@@ -537,7 +542,7 @@ struct tvm_create_params {
 *Returns* the *`tvm_guest_id`* in sbiret.value on success. The *`tvm_guest_id`* can be used
 to uniquely reference the TVM in invocations of the other functions that appear below. On
 success, the TVM will be in the "TVM_INITIALIZING" state, until a subsequent call to 
-`sbi_tee_host_finalize_tvm()` to transition to it a `TVM_RUNNABLE` state.
+`sbi_tee_host_finalize_tvm()` is made to transition the TVM to a `TVM_RUNNABLE` state.
 
 The list of possible TVM states appears below.
 
@@ -575,6 +580,9 @@ state. The host must finalize TVM shared-memory execution parameters like the en
 and boot argument (`ENTRY_ARG`) on the boot VCPU configured by `sbi_tee_host_create_tvm()` before making
 this call. 
 
+The TSM enforces that a TVM virtual harts cannot be entered unless the TVM measurement is committed 
+via this operation. No additional measured pages may be added after this operation is successfully completed.
+
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_tee_host_finalize_tvm_errors]
@@ -597,9 +605,13 @@ struct sbiret sbi_tee_host_destroy_tvm(unsigned long tvm_guest_id);
 
 Destroys a confidential TVM previously created using *`sbi_tee_host_create_tvm()`*.  
 
-Confidential TVM memory is automatically released following successful destruction, and it
+Confidential TVM memory is automatically un-assigned following successful destruction, and it
 can be assigned to other TVMs. Repurposing confidential memory for use by non-confidential
 TVMs requires an explicit call to *`sbi_tee_host_reclaim_pages()`* (described below).
+
+TVM destroy verifies that the VMM has stopped all virtual harts execution for the TVM 
+otherwise this call will fail. The TVM virtual hart may not be entered after this point. 
+The VMM may start reclaiming TVM memory after this call succeeds.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -677,7 +689,7 @@ struct sbiret sbi_tee_host_add_tvm_page_table_pages(unsigned long tvm_guest_id,
 Adds `num_pages` confidential memory starting at `base_page_address` to the
 TVM's page-table page-pool. The implied page size is 4KiB.
 
-Page table pages may be added at any time, and a typical usecase is in response to a TVM page fault.
+Page table pages may be added at any time, and a typical use case is in response to a TVM page fault.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -715,6 +727,15 @@ be a legal value for enum type `tsm_page_type`.
 
 This call must not be made after calling `sbi_tee_host_finalize_tvm()`.
 
+This operation is used to extend the static measurement for a TVM for added page contents.
+The operation performs a SHA384 hash extend to the measurement register managed by the TSM on 
+a 4KB page. The page must be added to a valid GPA mapping. The GPA of the page mapped is part 
+of the measurement operation.
+
+The measurement process is a state machine that must be faithfully reproduced by the VMM 
+otherwise the attestation evidence verification by the relying party will fail and the TVM 
+will not be considered trustworthy by the relying party. 
+
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_tee_host_add_tvm_measured_pages_errors]
@@ -726,7 +747,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_INVALID_ADDRESS | `source_address` was invalid, or `dest_address` 
                             wasn't in a confidential memory region.
 | SBI_ERR_INVALID_PARAM   | `tvm_guest_id`, `tsm_page_type`, or `num_pages` were invalid,
-                            or the TVM wasn't in the the `TVM_INITIALIZING` state.
+                            or the TVM wasn't in the `TVM_INITIALIZING` state.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
@@ -746,6 +767,12 @@ The `tvm_base_page_address` must lie within a region of confidential memory crea
 `sbi_tee_host_add_tvm_memory_region()`. The `tsm_page_type` parameter must be a
 legal value for the `tsm_page_type` enum. Zero pages for non-present TVM-specified GPA 
 ranges may be added only post TVM finalization, and are typically demand faulted on TVM access.
+
+Used by the VMM to add pages (eagerly or lazily) to a previously defined shared memory region. 
+Shared pages are not included in TVM measurements, and the VMM may not repurpose added pages 
+until after the TVM has terminated. 
+
+This call may be made only after calling `sbi_tee_host_finalize_tvm()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -800,7 +827,7 @@ struct sbiret sbi_tee_host_get_tvm_vcpu_num_register_sets(unsigned long tvm_gues
 -----
 
 *Returns* the number of register sets in the VCPU shared-memory state area for vCPUs of `guest_id`
-in sbiret.value on success. The host can use this to the number of enumerate individual register
+in sbiret.value on success. The host can use this to enumerate the number of individual register
 sets in the vCPU shared-memory state area (also enumerated by the `vcpu_register_set_id` enum).
 The offsets for the state can vary across TSM versions, and they can be determined by calling
 `sbi_tee_host_get_tvm_vcpu_register_set()`.
@@ -829,7 +856,7 @@ struct sbiret sbi_tee_host_get_tvm_vcpu_register_set(unsigned long tvm_guest_id,
                                                      unsigned long vcpu_register_set_id);
 -----
 
-The host can use this this interface to discover the shared-memory offset of the VCPU state correspomding
+The host can use this this interface to discover the shared-memory offset of the VCPU state corresponding
 to the enum values in `vcpu_register_set_id` for `tvm_guest_id`. The `vcpu_register_set_id` parameter must
 be a legal value for the `vcpu_register_set_id` enum.
 
@@ -918,11 +945,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 The TSM updates the `scause` field in the `tvm_vcpu_supervisor_csrs` region in the
 shared-memory for the VCPU that was previously configured by the host. The host should
 use the `scause` field to determine whether the exit was caused by an interrupt or exception,
-and then use the additional information to in the shared-memory region to determine further
+and then use the additional information in the shared-memory region to determine further
 course of action (if sbiret.value is 0).
 
 The TSM sets the most significant bit in `scause` to indicate that that the exit was caused
-by an interrupt, and if this bit is clear, the implication is that the the exit was caused
+by an interrupt, and if this bit is clear, the implication is that the exit was caused
 by an exception. The remaining bits specific information about the interrupt or exception,
 and the specific reason can be determined using the enumeration detailed below.
 
@@ -1191,17 +1218,25 @@ host on success.
 struct sbiret sbi_tee_guest_share_memory_region(unsigned long tvm_gpa_addr,
                                                 unsigned long region_len);
 -------
-Initiates the conversion of TVM physical address space starting at `tvm_gpa_addr` from confidential to non-confidential/shared memory. 
-The requested range must lie within an existing region of confidential address space, and may or may not be populated. 
-If the region of address space is populated, the TSM invalidates the pages and marks the region as pending conversion to shared. 
-The host must complete a TVM TLB invalidation sequence, initiated by tee_host_tvm_initiate_fence(), in order to complete the conversion. 
-The calling TVM vCPU is considered blocked until the conversion is completed; attempts to run it with tee_host_tvm_run() will fail. 
-Any guest page faults taken by other TVM vCPUs in this region prior to completion of the conversion are considered fatal. The host may 
-not insert any pages in the region prior to completion of the conversion. Upon completion, the host may reclaim the confidential pages 
-that were previously mapped in the region using tee_host_tsm_reclaim_pages() and may insert shared pages into the region using tee_host_tvm_add_shared_pages().
-If the range of address space is completely unpopulated, the region is immediately converted to shared and the host may insert shared pages.
+Initiates the assignment-change of TVM physical address space starting at `tvm_gpa_addr` from 
+confidential to non-confidential/shared memory. The requested range must lie within an existing 
+region of confidential address space, and may or may not be populated. If the region of 
+address space is populated, the TSM invalidates the pages and marks the region as pending 
+assignment-change to shared. The host must complete a TVM TLB invalidation sequence, 
+initiated by tee_host_tvm_initiate_fence(), in order to complete the assignment-change. 
+The calling TVM vCPU is considered blocked until the assignment-change is completed; 
+attempts to run it with tee_host_tvm_run() will fail. Any guest page faults taken by other 
+TVM vCPUs in this region prior to completion of the assignment-change are considered fatal. 
+The host may not insert any pages in the region prior to completion of the 
+assignment-change. Upon completion, the host may reclaim the confidential pages 
+that were previously mapped in the region using tee_host_tsm_reclaim_pages() and may insert 
+shared pages into the region using tee_host_tvm_add_shared_pages(). If the range of 
+address space is completely unpopulated, the region is immediately mapped as shared and 
+the host may insert shared pages.
 
 Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned. 
+
+The possible error codes returned in sbiret.error are:
 
 [#table_sbi_tee_guest_share_memory_region_errors]
 .TEE Guest Share Memory Region
@@ -1222,14 +1257,14 @@ Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned.
 struct sbiret sbi_tee_guest_unshare_memory_region(unsigned long tvm_gpa_addr,
                                                   unsigned long region_len);
 -------
-Initiates the conversion of TVM physical address space starting at `tvm_gpa_addr` from shared to confidential. 
+Initiates the assignment-change of TVM physical address space starting at `tvm_gpa_addr` from shared to confidential. 
 The requested range must lie within an existing region of non-confidential address space, and may or may not be populated. 
-If the region of address space is populated, the TSM invalidates the pages and marks the region as pending conversion to confidential. 
-The host must complete a TVM TLB invalidation sequence, initiated by tee_host_tvm_initiate_fence(), in order to complete the conversion. 
-The calling TVM vCPU is considered blocked until the conversion is completed; attempts to run it with tee_host_tvm_run() will fail. 
-Any guest page faults taken by other TVM vCPUs in this region prior to completion of the conversion are considered fatal. The host may 
-not insert any pages in the region prior to completion of the conversion. Upon completion, the host may (if required) convert host memory pages 
-using tee_host_convert_pages() and may insert un-assigned confidential pages into the region using sbi_tee_host_add_tvm_zero_pages().
+If the region of address space is populated, the TSM invalidates the pages and marks the region as pending assignment-change to confidential. 
+The host must complete a TVM TLB invalidation sequence, initiated by tee_host_tvm_initiate_fence(), in order to complete the assignment-change. 
+The calling TVM vCPU is considered blocked until the assignment-change is completed; attempts to run it with tee_host_tvm_run() will fail. 
+Any guest page faults taken by other TVM vCPUs in this region prior to completion of the assignment-change are considered fatal. The host may 
+not insert any pages in the region prior to completion of the assignment-change. Upon completion, the host may (if required) convert host memory pages 
+using sbi_tee_host_convert_pages() and may assign un-assigned confidential pages into the region using sbi_tee_host_add_tvm_zero_pages().
 If the range of address space is unpopulated, the host may insert zero pages on faults during TVM access.
 
 Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned.
@@ -1246,6 +1281,139 @@ Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned.
                             span a `SHARED_MEMORY_REGION`
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
+
+
+[#sbi_tee_guest_get_attcaps]
+=== Function: TEE Guest Get Attestation Capabilities (FID #3)
+[source, C]
+-------
+struct sbiret sbi_tee_guest_get_attcaps(unsigned long tvm_gpa_cap_addr,
+                                        unsigned long caps_size);
+-------
+This intrinsic is used by a TVM component to get the SBI implementation attestation capabilities. 
+The attestation capabilities let the TEEI implementations expose which hash algorithm is being used 
+for measurements, which evidence formats are supported. The attestation capabilities structure 
+also contains a map of all measurement registers the TVM can extend.
+
+Both `tvm_cap_addr` and `caps_size` must be 4kB-aligned.
+
+[source, C]
+-------
+enum HashAlgorithm {
+    /* SHA-384 */
+    Sha384,
+    /* SHA-512 */
+    Sha512
+};
+
+struct AttestationCapabilities {
+    /* The TCB Secure Version Number. */
+    uint64_t tcb_svn;
+    /* The supported hash algorithm */
+    enum HashAlgorithm hash_algorithm;
+    /* The supported evidence formats. This is a bitmap */
+    uint32_t evidence_formats;
+    /* Number of static measurement registers */
+    uint_8 static_measurements;
+    /* Number of runtime measurement registers */
+    uint_8 runtime_measurements;
+    /* Array of all measurement register descriptors */
+    MeasurementRegisterDescriptor[MAX_MEASUREMENT_REGISTERS] msmt_regs;
+};
+-------
+
+[#table_sbi_tee_guest_get_attcaps]
+.TEE Guest Get Attestation Capabilities
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+                          | This implies an exit to the host, and a subsequent resume of execution.
+| SBI_ERR_INVALID_ADDRESS | `tvm_caps_addr` was invalid.
+| SBI_ERR_INVALID_PARAM   | `caps_len` was invalid, or the entire range doesn't
+                            span a `CONFIDENTIAL_MEMORY_REGION`
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+
+[#sbi_tee_guest_drtm_extend]
+=== Function: TEE Guest Measurement Extend (FID #4)
+[source, C]
+-------
+struct sbiret sbi_tee_guest_drtm_extend(unsigned long tvm_gpa_buf_address,
+                                        unsigned long buffer_len,
+                                        Unsigned long msmt_index);
+-------
+This intrinsic is used by a TVM component to act as an extended root of trust of measurement 
+for the TVM to extend runtime measurements beyond the static measurements performed by the TSM. 
+The measurements for each TVM always contain the same chain of TCB elements rooted in the HW RoT.
+
+The TVM static measurements are managed by the TSM in the TVM global structure. 
+These measurements are used in the TcbEvidenceInfo when the TVM attestation certificate 
+is generated via sbi_tee_guest_get_evidence.
+
+Both `tvm_gpa_buf_addr` and `region_len` must be 4kB-aligned.
+msmt_index must be a valid index per the attestation capabilities reported via `sbi_tee_guest_get_attcaps`.
+
+[#table_sbi_tee_guest_drtm_extend_errors]
+.TEE Guest Drtm Extend
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+                          | This implies an exit to the host, and a subsequent resume of execution.
+| SBI_ERR_INVALID_ADDRESS | `tvm_gpa_buf_addr` was invalid.
+| SBI_ERR_INVALID_PARAM   | `region_len` was invalid, or the entire range doesn't
+                            span a `CONFIDENTIAL_MEMORY_REGION`
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+
+
+[#sbi_tee_guest_get_evidence]
+=== Function: TEE Guest Get Evidence (FID #5)
+[source, C]
+-------
+struct sbiret sbi_tee_guest_get_evidence(uint64_t cert_request_addr, 
+                                         uint64_t cert_request_size,
+                                         uint64_t request_data_addr,
+                                         enum EvidenceFormat evidence_format,
+                                         uint64_t cert_addr_out,
+                                         uint64_t cert_size);
+-------
+If the `sbi_tee_guest_get_attcaps` enumerates attestation services provided by the TSM, then 
+this intrinsic is used by a TVM to get attestation evidence to report to a (remote) relying party. 
+This may take the form of a request for an attestation certificate or a TSM-signed TVM 
+measurement (using an attestation certificate specific to the TVM).
+
+Get attestation evidence from a Certificate Signing Request (CSR) 
+per https://datatracker.ietf.org/doc/html/rfc2986. The caller passes the CSR and its length 
+through the first 2 arguments. The third argument is the address where the caller 
+places a data blob that will be included in the generated certificate. 
+Typically, this is a cryptographic nonce. The fourth argument is the evidence 
+format: DiceTcbInfo (0), DiceMultiTcbInfo (1) or OpenDice (2). The fifth argument 
+is the address where the generated certificate will be placed. The evidence is 
+formatted an x.509 DiceTcbInfo certificate extension
+
+It is supported by the TSM to provide HW-key-signed measurements of the TVM and the TSM. 
+The attestation key used to sign the evidence is provisioned into the TVM by the TSM. 
+The TSM certificate is provisioned by the FW TCB (TSM-driver and HW RoT).
+
+Both `cert_request_addr`, `request_data_addr` and `cert_addr_out` must be 4kB-aligned.
+
+[#table_sbi_tee_guest_get_evidence_errors]
+.TEE Guest Get Evidence
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+                          | This implies an exit to the host, and a subsequent resume of execution.
+| SBI_ERR_INVALID_ADDRESS | One of the addresses provided was invalid.
+| SBI_ERR_INVALID_PARAM   | `cert_size` or `cert_request_size` was invalid, or the entire range doesn't
+                            span a `CONFIDENTIAL_MEMORY_REGION`
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
 
 
 
