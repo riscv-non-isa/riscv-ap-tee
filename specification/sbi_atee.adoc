@@ -1422,39 +1422,12 @@ Both `cert_request_addr`, `request_data_addr` and `cert_addr_out` must be 4kB-al
 === Summary of TEEI - TH-ABI
 
 |===
-| *Summary of TSM load and initialization operations* | 
 
 | <<sbi_tee_host_get_tsm_info, sbi_tee_host_get_tsm_info>> | Used by the OS/VMM to 
 discover if a TSM is loaded and initialized else returns an error. If a TSM 
 is loaded and initialized, this operation is used to enumerate TSM 
 information such as: TEE-capable memory regions, Size of static memory to 
 allocate per TVM, Size of memory to allocate per TVM Virtual Hart and so on. 
-
-| sbi_tee_host_tsm_load                              | Used by the OS/VMM to load 
-a TSM binary image into TSM-memory region. Pages used for TSM will be 
-declared as part of this function to load the TSM. Loading and updates 
-to the TSM should be done via the TSM-driver. This interface is TBD. 
-
-| sbi_tee_host_tsm_init_global                    | Perform a global state 
-initialization of the TSM after a load or update. This operation and the 
-following should succeed before the TSM is considered ready to service 
-other TVM operations. This interface is TBD.
-
-| sbi_tee_host_tsm_init_local                        | Perform a local 
-(per-hart) initialization of TSM after the global init has been 
-performed.This operation and the above should succeed before the TSM is 
-considered ready to service other TVM operations. This interface is TBD.                                                                  
-
-| sbi_tee_host_tsm_update                         | Update TSM binary and/or 
-configuration. Ideally this operation should be performed without shutting 
-down the TVMs, however all TVMs have to be paused before an update can be 
-issued. The TSM update process description is TBD.                                                                         
-
-| sbi_tee_host_tsm_shutdown                          | Shuts down the TSM. All 
-TVMs must be shutdown and all TVM memory must be reclaimed before this 
-operation can succeed. This interface is TBD.                   
-
-| *Summary of TVM global operations*  |
 
 | <<sbi_tee_host_create_tvm, sbi_tee_host_create_tvm>> | TVM creation (static) 
 process where a set of TEE pages are assigned for a TVM to hold a TVM’s 
@@ -1469,8 +1442,6 @@ may not be entered after this point. The VMM may start reclaiming TVM
 memory after this 
 point.                                                                       
   
-| *Summary of TVM Global memory management operations* |
-
 | <<sbi_tee_host_convert_pages, sbi_tee_host_convert_pages>> | Begins the process 
 of converting memory 
 to be used as confidential memory. The region consists of one or more contiguous 
@@ -1493,15 +1464,6 @@ for a set of TVM pages.
 memory for TVMs by destroying them. All confidential-unassigned memory may be 
 reclaimed back as non-confidential using this interface.
 
-| *Summary of TVM memory management operations* |
-
-| <<sbi_tee_guest_unshare_memory_region, sbi_tee_guest_unshare_memory_region>> | Convert 
-a memory region from non-confidential to confidential for a set of TVM pages. 
-This operation initiates TSM tracking of these pages and also changes the encryption 
-properties of these pages. These pages can then be selected by the VMM to 
-allocate for TVM control structure pages, second stage page table pages, 
-and TVM pages.
-
 | <<sbi_tee_host_add_tvm_page_table_pages, sbi_tee_host_add_tvm_page_table_pages>> | Add 
 one or more page mappings to the second stage translation structure for a TVM. 
 The pages to be used for the second stage page table structures must have been converted 
@@ -1522,48 +1484,30 @@ zero page for an existing mapping for a TVM page (post initialization).
 This operation adds a zero page into a mapping and keeps the mapping as 
 pending (i.e. access from the TVM will fault until the TVM accepts that GPA.
 
-| sbi_tee_guest_global_fence               | Invalidates a set of page 
-mappings for an existing mapping for a TVM page. This operation prevents 
-new TLB mappings from being created for a particular TVM page mapping. Note 
-that stale TLB mappings may exist and those are invalidated by the TSM. The 
-TSM enforces that mappings are invalid and flushed by the VMM before allowing any page 
-relocation and/or page fragmentation operations.
-
-| sbi_tee_guest_local_fence                | Issue a TVM TLB 
-invalidation (for the relevant harts) after a set of changes to the TVM 
-mappings for confidential pages. The TSM enforces a hfence.gvma for the 
-affected TVM vmid/asid to enforce stale tlb mappings are flushed. For 
-implementations using memory tracking, this operation should also 
-invalidate additional caching structures for page meta-data.
-
-| sbi_tee_guest_page_relocate                     | Relocate a page for an 
+| sbi_tee_host_page_relocate                     | Relocate a page for an 
 existing mapping for a TVM page. This operation allows the VMM to reassign 
 a new SPA for an existing TVM page mapping. The page mapping must be 
 invalid and fenced before the page mapping can be 
 relocated. This interface specification is TBD.
 
-| sbi_tee_guest_page_promote                      | Promote a set of small 
+| sbi_tee_host_page_promote                      | Promote a set of small 
 page mappings (existing mappings) for a set of TVM pages to a large page 
 mapping. The affected mappings must be invalidated before the promote operation 
 can succeed. The VMM may reclaim the freed second stage page table page if 
 the operation succeeds. This interface specification is TBD. 
 
-| sbi_tee_guest_page_demote                    | Demote a large page 
+| sbi_tee_host_page_demote                    | Demote a large page 
 mapping for an existing mapping to a set of TVM pages and corresponding 
 small page mappings. The affected mapping must be invalidated before the 
 operation can succeed. The VMM must provide a free TEE-capable page to the 
 TSM to use as a new second stage page table in the fragmented mapping.
 This interface specification is TBD.
 
-| *Summary of TVM virtual hart management operations* |
-
 | <<sbi_tee_host_create_tvm_vcpu, sbi_tee_host_create_tvm_vcpu>> | This operation 
 allows the VMM to assign TEE pages for a virtual hart context structure (VHCS) for a 
 specific TVM. This routine also initializes the hart-specific fields of 
 this structure.Note that a virtual hart context structure may consist of 
 more than 1 4KB page. The number of pages are enumerated via the tsm_info call.
-
-| *Summary of TVM measurement operations*  |
 
 | <<sbi_tee_host_add_tvm_measured_pages, sbi_tee_host_add_tvm_measured_pages>> | This 
 operation is used to extend the static measurement for a TVM for added page contents.The 
@@ -1580,9 +1524,7 @@ VMM to finalize the measurement of a TVM (static). The TSM enforces that a
 TVM virtual harts cannot be entered unless the TVM measurement is committed 
 via this operation.
 
-| *TVM runtime operations* |
-
-| <<sbi_tee_run_vcpu, sbi_tee_run_vcpu>> | Enter or resume a TVM 
+| <<sbi_tee_host_run_tvm_vcpu, sbi_tee_host_run_tvm_vcpu>> | Enter or resume a TVM 
 virtual hart (on any physical hart). A resume operation is performed via a 
 flag passed to this operation. This operation activates a virtual-hart on a 
 physical hart, and may be performed only on a TVM virtual hart structure 
@@ -1590,33 +1532,28 @@ that is assigned to the TVM and one that is not already active. The TSM
 verifies if the operation is performed in the right state for that 
 virtual hart.
 
-| *TSM runtime operations* |
+|===
 
-| <<sbi_tee_tsm_teeret, sbi_tee_tsm_teeret>> | This operation is used by 
-a TSM to return control to the OS/VMM via the TSM-driver TEERET flow.This 
-operation may be used by the TSM in various scenarios - in response to a 
-sbi_tee_guest_* operation for requests to the VMM, or due to an S-mode 
-interrupt that the TSM must report to the OS/VMM. It is also used to 
-communicate faults in the second stage page table for a TVM etc.
+=== Summary of TEE Interrupt Extension
+
+|===
+| <<sbi_tee_interrupt_init_tvm_aia, sbi_tee_interrupt_init_tvm_aia>> | This 
+intrinsic is supported by the TSM to configure AIA virtualization for the TVM
+
+| <<sbi_tee_interrupt_set_tvm_aia_cpu_imsic_addr, sbi_tee_interrupt_set_tvm_aia_cpu_imsic_addr>> | 
+Set TVM CPU AIA address
+
+| <<sbi_tee_interrupt_convert_aia_imsic, sbi_tee_interrupt_convert_aia_imsic>> | Convert 
+TVM GPA AIA address to confidential
+
+| <<sbi_tee_interrupt_reclaim_aia_imsic, sbi_tee_interrupt_reclaim_aia_imsic>> | 
+Reclaim TVM GPA AIA address from confidential
 
 |===
 
 === Summary of TEEI - TG-ABI
 
 |===
-| sbi_tee_guest_drtm_extend   | This intrinsic is used by a TVM component 
-to act as a dynamic root of trust of measurement (DRTM) for the TVM to 
-extend runtime measurements. These measurements are managed by the TSM in 
-the TVM global structure (To be specified TBD). These measurements are used 
-in the TcbEvidenceInfo when the TVM attestation certificate is generated 
-via sbi_tee_guest_get_evidence. This interface specification is TBD.                                                 
-
-| sbi_tee_guest_get_evidence      | This intrinsic is used by a TVM to get 
-attestation evidence to report to a (remote) relying party.It is supported 
-by the TSM to provide HW-key-signed measurements of the TVM and the TSM. 
-The attestation key used to sign the evidence is provisioned into the TVM 
-by the TSM. The TSM certificate is provisioned by the FW TCB (TSM-driver 
-and HW RoT). This interface specification is TBD.                                                                   
 
 | <<sbi_tee_guest_share_memory_region, sbi_tee_guest_share_memory_region>> | This 
 intrinsic is used by the TVM to request the conversion of the specified GPA to 
@@ -1625,10 +1562,33 @@ present state, and must be scrubbed by the TVM before it is yielded. The TSM
 enforces that the page is not-present in the second stage page table and not 
 tracked as a TEE page. The VMM owns the process of reclaiming the page.
 
-| sbi_tee_guest_host_invoke          | This intrinsic is supported by the TSM to 
-provide the TVM the ability to request host services e.g. para-virt IO.The 
-TVM indicates to the TSM during this operation which x/v/f registers should 
-be passed to the OS/VMM without clearing. The specification of this interface is TBD.
+| <<sbi_tee_guest_unshare_memory_region, sbi_tee_guest_unshare_memory_region>> | Convert 
+a memory region from non-confidential to confidential for a set of TVM pages. 
+This operation initiates TSM tracking of these pages and also changes the encryption 
+properties of these pages. These pages can then be selected by the VMM to 
+allocate for TVM control structure pages, second stage page table pages, 
+and TVM pages.
+
+| <<sbi_tee_guest_get_attcaps, sbi_tee_guest_get_attcaps>>   | This 
+intrinsic is used by a TVM to get attestation capabilities supported by the TSM.
+the capabilities enumerated are then used to extend measurements and/or get 
+evidence to support attestation.                                                 
+
+| <<sbi_tee_guest_drtm_extend, sbi_tee_guest_drtm_extend>>   | This 
+intrinsic is used by a TVM component 
+to act as a dynamic root of trust of measurement (DRTM) for the TVM to 
+extend runtime measurements. These measurements are managed by the TSM in 
+the TVM global structure (To be specified TBD). These measurements are used 
+in the TcbEvidenceInfo when the TVM attestation certificate is generated 
+via sbi_tee_guest_get_evidence. This interface specification is TBD.                                                 
+
+| <<sbi_tee_guest_get_evidence, sbi_tee_guest_get_evidence>>      | This 
+intrinsic is used by a TVM to get 
+attestation evidence to report to a (remote) relying party.It is supported 
+by the TSM to provide HW-key-signed measurements of the TVM and the TSM. 
+The attestation key used to sign the evidence is provisioned into the TVM 
+by the TSM. The TSM certificate is provisioned by the FW TCB (TSM-driver 
+and HW RoT). This interface specification is TBD.                                                                   
 
 | sbi_tee_guest_enable_debug      | This intrinsic is supported by the TSM to 
 enable the TVM to request for debugging to be enabled for the TVM (TSM 
