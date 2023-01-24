@@ -1,3 +1,5 @@
+:imagesdir: ./images
+
 [[sbi_tee]]
 == Trusted Execution Environment (TEE) SBI extension proposal
 This section describes the normative Trusted Execution Environment (TEE) SBI extension proposal. 
@@ -178,6 +180,15 @@ explicitly via the `sbi_tee_guest_(un)share_memory_region`. This request results
 enforces the security properties on the mapping and exits to the VMM host to enforce TLB invalidation. 
 The expectation is that the host will service these requests and handle subsequent page-faults to allow the TVM 
 to access required confidential or non-confidential memory per the TVMs request.
+
+image:tsm_detection_and_tvm_creation.svg[Figure 7]
+Figure 7: TSM Detection and TVM creation
+
+image:tvm_destruction_and_memory_reclaimation.svg[Figure 8]
+Figure 8: TVM destruction and Memory reclaimation
+
+image:tvm_runtime_execution.svg[Figure 9]
+Figure 9: TVM runtime execution
 
 == TEE Host Extension (EID #0x54454548)
 
