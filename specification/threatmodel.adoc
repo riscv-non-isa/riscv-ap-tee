@@ -120,3 +120,68 @@ threats from system software adversaries. Implementations may choose to
 mitigate threats from additional adversaries. For all cases, denial of 
 service by TVMs must be prevented. At the same time, denial of service by 
 host software is considered out of scope.
+
+[[design_survey]]
+=== TVM Security Requirements to address threat model 
+
+|===
+| Category  |  Security Criteria  |  AP-TEE Requirement |  Example methods to meet requirement | Description/Example | RVI HC/SIG/TG owner 
+
+| Memory Footprint | Stolen/reserved memory | Implementation-specific | Minimize reserved memory | Recording meta data of secure memory | AP-TEE TG to specify
+
+| Memory Assignment | Ability to make memory confidential or non-confidential | Required | MMU, MPU, PMA/MTT extension | Confidential memory should be dynamically allocated/unallocated as required | "AP-TEE to specify priv. architecture" 
+
+| TEE CPU State Protection | State Isolation | Required | AP-TEE qualifier and privilege levels M S HS U | Prevent untrusted code from arbitrarily accessing/modifying TEE CPU state | AP-TEE TG to specify 
+
+| Memory Confidentiality | Memory isolation (read)     | Required                | cryptography and/or MMU, MPU, PMA/MTT extension | Prevent untrusted components from reading TEE memory       | AP-TEE TG specify 
+| Memory Confidentiality | Cipher text read prevention | Required                | cryptography and/or MMU, MPU, PMA/MTT extension | Prevent untrusted code from accessing encrypted TEE memory | AP-TEE TG specify 
+| Memory Confidentiality | Per TEE encryption          | Implementation-specific | cryptography and/or MMU, MPU, PMA/MTT extension | Each VM has one or more unique keys                        | AP-TEE TG to recommend 
+| Memory Confidentiality | Memory encryption strength  | Implementation-specific | cryptography                                    | Encryption algorithm and key strength                      | AP-TEE TG to recommend 
+| Memory Confidentiality | Number of encryption keys   | Implementation-specific | cryptography                                    | Number of TEE keys supported                               | AP-TEE TG to recommend 
+
+| Memory Integrity | Memory integrity against SW attacks | Required                | MMU, MPU, PMA/MTT extension                     | Prevent SW attacks such as remapping aliasing replay corruption etc.                                      | AP-TEE TG to specify 
+| Memory Integrity | Memory integrity against HW attacks | Implementation-specific | cryptography and/or MMU, MPU, PMA/MTT extension | Prevent HW attacks DRAM-bus attacks and physical attacks that replace TEE memory with tampered / old data | AP-TEE TG to recommend 
+| Memory Integrity | Memory isolation (Write exec)       | Required                | cryptography and/or MMU, MPU, PMA/MTT extension | Prevent TEE from executing from normal memory; Enforce integrity of TEE data on writes                    | AP-TEE TG specify 
+| Memory Integrity | Rowhammer attack prevention         | Implementation-specific | cryptography and/or memory-specific extension   | Prevent untrusted code from flipping bits of TEE memory                                                   | AP-TEE TG to recommend 
+
+| Shared Memory | TEE controls data shared with untrusted code | Required                | cryptography and/or MMU, MPU, PMA/MTT extension | Prevent malicious code from exfiltrating information without TEE consent/opt-in | AP-TEE TG to specify 
+| Shared Memory | TEE controls data shared with another TEE    | Implementation-specific | cryptography and/or MMU, MPU, PMA/MTT extension | Ability to securely share memory with another TEE                               | AP-TEE TG to recommend 
+
+| I/O Protection | DMA protection from untrusted devices | Required                | DMA access-control e.g. IOPMP, IOMMU       | Prevent untrusted peripheral devices from accessing TEE memory | AP-TEE TG to specify 
+| I/O Protection | Trusted I/O from trusted devices      | Implementation-specific | Device attestation, Link protection, IOMMU | Admission control to bind devices to TEEs                      | AP-TEE, IOMMU TG to specify 
+
+| Secure IRQ | Trusted Interrupts | Required | Secure interrupt files, MMU, MPU, PMA/MTT extension | Prevent IRQ injections that violate priority or masking | AIA AP-TEE to specify 
+
+| Secure Timetamp | Trusted timestamps | Required | AP-TEE mode qualifier for CSR accesses | Ensure TEE have consistent timestamp view | AP-TEE TG specify 
+
+| Debug & Profile | Trusted performance monitoring unit       | Required | AP-TEE mode qualifier for perf. mon. counter controls | Ensure TEEs get correct PMU info; prevent data leakage due to PMU information (fingerprint attacks) | AP-TEE, Performance Mon. SIG to specify 
+| Debug & Profile | Debug support                             | Required | AP-TEE mode qualifier for Sdtrig controls             | Support debug trigger registers for TVM                                                             | AP-TEE, Debug TG to specify
+| Debug & Profile | Authenticated debug (Production device)   | Required | Authorize debug via TEE RoT                           | Ensure hardware debug prob (e.g., JTAG SWD) is disabled in production                               | AP-TEE, Debug TG specify 
+
+| Availability | TVM DoS Protection            | Required                | VMM retains ability to interrupt TVM  | Prevent TVM from refusing to exit               | AP-TEE TG specify 
+| Availability | VMM DoS Protection            | Implementation-specific | Not in scope for AP-TEE               | Prevent untrusted code from refusing to run TEE | Not applicable 
+
+| Side Channel | Protected address mapping (controlled side channel)         | Required                 | AP-TEE mode qualifier, cryptography, MMU/MPU, MTT | Similar to memory remapping attacks                                                                 | uSG SIG, AP-TEE to specify 
+| Side Channel | Uarchitectural side channels (branch prediction             | Required                 | uArch state flushing, entropy defenses            | Prevent attacks such as meltdown/spectre (it is difficult to defend agains such attacks in advance) | uSC SIG, AP-TEE specify
+| Side Channel | Control channels, single-step/zero-step attacks             | Required                 | uArch state flushing, entropy defenses            | Prevent interrupt/exception injection (combined with cache side channel to leak sensitive data)     | uSC SIG , AP-TEE specify
+| Side Channel | Architectural cache side channel                            | Implementation-specific  | uArch state flushing, entropy defenses            | Prevent shared resource contention, e.g. attacks prime probe                                        | uSG SIG, AP-TEE to specify
+| Side Channel | Architectural timing side channel                           | Implementation-specific  | data independent operations, uArch state flushing |  Leveraging data dependency timing channels                                                         | uSG SIG, AP-TEE to specify 
+
+| Secure and measured boot | Establishes root of trust in support of attestation | Required | RoT unique trust chain for TEE TCB | Enforcing initial firmware authorization and versioning | Security Model TG 
+
+| Attestation | Remote attestation           | Required | HW RoT based PKI (trust assertions) via Internet | Prevent fake hardware and software TCB; Prevent malicious hardware debugging in production. | AP-TEE TG to specify 
+| Attestation | Mutual attestation           | Implementation-specific | S/U mode  | Attestation to another TEE on the same platform | AP-TEE TG specify 
+| Attestation | Remote mutual attestation    | Required | Internet |  Attestation to a relying party on a different platform | AP-TEE TG specify 
+| Attestation | Local attestation            | Implementation-specific | Sealing |  Verification of attestation by TCB | AP-TEE TG specify 
+| Attestation | TCB versioning (and updates) | Required | Mutable firmware where TVM has to opt-in if TCB updates are allowed or not - HW TCB then enforces lower TCB elements are updatable (with apropos controls like SVN) only after that opt-in has been honored. | Allow TCB updates - Prevent TCB rollback | AP-TEE TG specify 
+| Attestation | TCB composition -Single root of trust for msmt. for confidential compute | Required |  How do we express the issue with TCB elements being composed of various elements? e.g. M-mode,  ROT firmware. Perhaps we can only express the requirement of a single root of trust for measurement and reporting | Malicious components introduced in the TCB | AP-TEE TG specify 
+| Attestation | Dynamic vs Static Attestation interop (between platform TCB and TEE TCB) - enforce isolation of the entire trust chain | Required | TEE TCB should not be affected by other TCB reporting chains. TEE TCB is seperately reportable and recoverable. | Malicious host tampers with TEE TCB or reporting chain | AP-TEE TG specify 
+| Attestation | TCB transparency (and auditability) | Implementation-specific | Mutable firmware | TCB elements reviewable | AP-TEE TG recommend
+| Attestation | Sealing                             | Implementation-specific | HW Rot sealing keys per TVM | Binding of secrets to TEEs | AP-TEE TG specify 
+
+| Operational Features | TVM Migration | Implementation-specific | Secure migration of TEEs | Malicious host tampers with TVM assets during migration | Hypervisor SIG, AP-TEE TG specify 
+| Operational Features | TVM Nesting | Implementation-specific |  Nested TEE Workloads | Malicious host tampers with nested VMM policies | Hypervisor SIG, AP-TEE TG specify 
+| Operational Features | Memory introspection/ Scanners | Implementation-specific | Interoperability with security features for TVM workload | Unauthorised security TVM | Security HC to specify   
+| Operational Features | QOS interoperability | Implementation-specific | Interoperability with QoS features for TVM workload | Malicious host uses QoS capabilities as a side-channel | QOS SIG to specify 
+| Operational Features | RAS interoperability | Implementation-specific | Interoperability with RAS features for TVM workload | Malicious host uses RAS capabilities as a side-channel or to cause integrity violations | RAS SIG to specify 
+|===

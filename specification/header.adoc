@@ -71,6 +71,4 @@ include::swlifecycle.adoc[]
 include::sbi_atee.adoc[]
 include::appendix_a.adoc[]
 include::appendix_b.adoc[]
-//the index must precede the bibliography
-include::index.adoc[]
 include::bibliography.adoc[]
