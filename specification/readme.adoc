@@ -1,10 +1,7 @@
-= RISC-V docs-spec-template
+= AP-TEE Architecture and ABI specification
 
-This repository is used to prime GitHub repos for the RISC-V organization which will be used 
-to create specifications.  
-
-**If you are reading this in a specification repo, please update the title for this section and 
-provide your introduction to your repository.**
+This repository is for specification deliverables of the AP-TEE TG per the proposed charter. 
+The specification(s) are in development stage, not ratified, and everything in these documents may change.
 
 = License
 
