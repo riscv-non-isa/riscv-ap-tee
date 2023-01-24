@@ -56,7 +56,7 @@ The host is responsible for the following memory management functions:
 . Donating confidential memory for the TVM page-table pool
 . Defining confidential memory regions
 . Mapping TVM code and data payload to confidential TVM-pages
-. Mapping zero-page confidential pages to the TVM regions 
+. Mapping zero-page confidential pages to the TVM regions
 . Mapping non-confidential pages TVM-defined regions for shared-pages / MMIO
 
 ===== Converting non-confidential memory to confidential memory
@@ -69,9 +69,9 @@ regions on the platform.
 
 This requires the host to make three separate ECALLs to the TSM:
 
-. sbi_tee_host_convert_pages()
-. sbi_tee_host_global_fence()
-. sbi_tee_host_local_fence()
+. `sbi_tee_host_convert_pages()`
+. `sbi_tee_host_global_fence()`
+. `sbi_tee_host_local_fence()`
 
 The memory conversion process is complete when sbi_tee_host_local_fence() is successfully completed
 on the CPU/hart on the platform.
@@ -133,7 +133,7 @@ host action(like adding of MMIO and shared-memory regions), TVM page-faults, vir
 
 ===== Mapping confidential demand-zero pages and non-confidential shared pages
 The host can handle TVM page-faults by determining whether it was caused by access to a confidential or
-non-confidential region. In the former case, it can call use `sbi_tee_host_add_tvm_zero_pages()` to 
+non-confidential region. In the former case, it can use `sbi_tee_host_add_tvm_zero_pages()` to
 populate the region with a previously converted confidential page. The TSM verifies that the confidential
 page isn't currently in use, and zeroes it out before assigning it the TVM. Demand-zero pages have no bearing
 on the TVM measurement, and can be added at any point of time.
@@ -153,7 +153,7 @@ shared-memory region.
 
 ===== Management of secure interrupts
 The host can use the Tee Interrupt Extension (EXT_TEE_INTERRUPT) to manage secure TVM interrupts on
-platforms with AIA-support. 
+platforms with AIA-support.
 
 ===== TVM teardown
 The host can teardown a TVM by calling `sbi_tee_host_destroy_tvm()`. This automatically releases all
@@ -233,7 +233,7 @@ enum vcpu_register_set_id {
 
 [source, C]
 -------------------
-/* 
+/*
  * General purpose registers for he TVM VCPU.
  * Corresponds to `GPRS` in `vcpu_register_set_id`.
  */
@@ -260,7 +260,7 @@ struct tvm_vcpu_supervisor_gprs {
 
 [source, C]
 -------------------
-/* 
+/*
  * Hypervisor [HS-level] CSRs.
  * Corresponds to `HYPERVISOR_CSRS` in `vcpu_register_set_id`.
  */
@@ -293,7 +293,7 @@ struct tvm_vcpu_hypervisor_csrs {
 
 [source, C]
 -------------------
-/* 
+/*
  * Supervisor-level CSRs.
  * Corresponds to `SUPERVISOR_CSRS` in `vcpu_register_set_id`.
  */
@@ -360,7 +360,7 @@ enum tsm_state {
 };
 
 struct tsm_info {
-    /* 
+    /*
      * The current state of the TSM (see tsm_state enum above). If the state is not TSM_READY,
      * the remaining fields are invalid and will be initialized to 0.
      */
@@ -391,7 +391,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
 | SBI_ERR_INVALID_ADDRESS | `tsm_info_address` was invalid.
-| SBI_ERR_INVALID_PARAM   | tsm_info_len was insufficient.
+| SBI_ERR_INVALID_PARAM   | `tsm_info_len` was insufficient.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
@@ -402,7 +402,6 @@ A list of possible TSM states and the associated semantics appears below (TBD: S
 [%header,%autowidth]
 |===
 | TSM State          | Meaning
-
 | TSM_NOT_LOADED     | TSM has not been loaded on this platform.
 | TSM_LOADED         | TSM has been loaded, but has not yet been initialized.
 | TSM_READY          | TSM has been loaded & initialized, and is ready to accept ECALLs.
@@ -516,7 +515,7 @@ struct sbiret sbi_tee_host_create_tvm(unsigned long tvm_create_params_addr,
 -----
 Creates a confidential TVM using the specified parameters. The `tvm_create_params_addr`
 is the physical address of the buffer containing the `tvm_create_params` structure
-described below, and `tvm_create_params_len` is the size of the structure in bytes. 
+described below, and `tvm_create_params_len` is the size of the structure in bytes.
 
 TVM creation (static) process where a set of TEE pages are assigned for a TVM to hold a 
 TVM's global state. This routine also configures the global configuration that applies 
@@ -529,12 +528,12 @@ about the parameters that should be used to populate `tvm_create_params`.
 [source, C]
 ----
 struct tvm_create_params {
-    /* 
+    /*
      * The base physical address of the 16KiB confidential memory region
      * that should be used for the TVM's page directory. Must be 16KiB-aligned.
      */
     unsigned long tvm_page_directory_addr;
-    /* 
+    /*
      * The base physical address of the confidential memory region to be used
      * to hold the TVM's state. Must be page-aligned and the number of
      * pages must be at least the value returned in tsm_info.vm_state_pages
@@ -552,7 +551,7 @@ struct tvm_create_params {
 
 *Returns* the *`tvm_guest_id`* in sbiret.value on success. The *`tvm_guest_id`* can be used
 to uniquely reference the TVM in invocations of the other functions that appear below. On
-success, the TVM will be in the "TVM_INITIALIZING" state, until a subsequent call to 
+success, the TVM will be in the `TVM_INITIALIZING` state, until a subsequent call to
 `sbi_tee_host_finalize_tvm()` is made to transition the TVM to a `TVM_RUNNABLE` state.
 
 The list of possible TVM states appears below.
@@ -562,10 +561,10 @@ The list of possible TVM states appears below.
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | State              | Description
-|===
 | TVM_INITIALZING    | The TVM has been created, but isn't yet ready to run.
-| TVM_RUNNABLE       | The TVM is in a runnable state, and can be executed by 
+| TVM_RUNNABLE       | The TVM is in a runnable state, and can be executed by
                      | calling `sbi_tee_host_run_tvm_vcpu()`.
+|===
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -586,10 +585,10 @@ The possible error codes returned in `sbiret.error` are shown below.
 ------
 struct sbiret sbi_tee_host_finalize_tvm(unsigned long tvm_guest_id);
 ------
-Transitions the TVM specified by `tvm_guest_id` from the "TVM_INITIALIZING" state to a "TVM_RUNNABLE"
+Transitions the TVM specified by `tvm_guest_id` from the `TVM_INITIALIZING` state to a `TVM_RUNNABLE`
 state. The host must finalize TVM shared-memory execution parameters like the entry point (`ENTRY_PC`)
 and boot argument (`ENTRY_ARG`) on the boot VCPU configured by `sbi_tee_host_create_tvm()` before making
-this call. 
+this call.
 
 The TSM enforces that a TVM virtual harts cannot be entered unless the TVM measurement is committed 
 via this operation. No additional measured pages may be added after this operation is successfully completed.
@@ -755,7 +754,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
-| SBI_ERR_INVALID_ADDRESS | `source_address` was invalid, or `dest_address` 
+| SBI_ERR_INVALID_ADDRESS | `source_address` was invalid, or `dest_address`
                             wasn't in a confidential memory region.
 | SBI_ERR_INVALID_PARAM   | `tvm_guest_id`, `tsm_page_type`, or `num_pages` were invalid,
                             or the TVM wasn't in the `TVM_INITIALIZING` state.
@@ -773,10 +772,10 @@ struct sbiret sbi_tee_host_add_tvm_zero_pages(unsigned long tvm_guest_id,
                                               unsigned long tvm_base_page_address);
 -----
 Maps num_pages zero-filled pages of confidential memory starting at `base_page_address`
-into the TVM's physical address space starting at `tvm_base_page_address`. 
+into the TVM's physical address space starting at `tvm_base_page_address`.
 The `tvm_base_page_address` must lie within a region of confidential memory created with
 `sbi_tee_host_add_tvm_memory_region()`. The `tsm_page_type` parameter must be a
-legal value for the `tsm_page_type` enum. Zero pages for non-present TVM-specified GPA 
+legal value for the `tsm_page_type` enum. Zero pages for non-present TVM-specified GPA
 ranges may be added only post TVM finalization, and are typically demand faulted on TVM access.
 
 Used by the VMM to add pages (eagerly or lazily) to a previously defined shared memory region. 
@@ -814,7 +813,7 @@ region of non-confidential memory previously defined by the TVM via the guest in
 The `tsm_page_type` parameter must be a legal value
 for the `tsm_page_type` enum.
 
-Shared pages can be added only after the TVM begins execution, and calls the TSM to define the 
+Shared pages can be added only after the TVM begins execution, and calls the TSM to define the
 location of shared-memory regions. They are typically demand faulted on TVM access.
 
 The possible error codes returned in `sbiret.error` are shown below.
@@ -903,7 +902,7 @@ Adds a VCPU with ID `vcpu_id` to the TVM specified by `tvm_guest_id`. `tvm_state
 must be page-aligned and point to a confidential memory region used to hold the TVM's vCPU
 state, and must be `tsm_info::tvm_state_pages` pages in length.`tvm_vcpu_shared_page_addr` must
 be page-aligned and point to a sufficient number of non-confidential pages to hold a structure
-with the maximum offset enumerated by `sbi_tee_host_get_tvm_vcpu_register_set`. These pages are 
+with the maximum offset enumerated by `sbi_tee_host_get_tvm_vcpu_register_set`. These pages are
 "pinned" in the non-confidential state (i.e. cannot be converted to confidential) until the TVM
 is destroyed.This call must not be made after calling `sbi_tee_host_finalize_tvm()`. The host must
 configure a boot VCPU by adding a `tvm_vcpu_id` with a value that specified for `tvm_boot_vcpuid`
@@ -930,7 +929,7 @@ struct sbiret sbi_tee_host_run_tvm_vcpu(unsigned long tvm_guest_id,
                                         unsigned long tvm_vcpu_id);
 -----
 Runs the VCPU specified by `tvm_vcpu_id` in the TVM specified by `tvm_guest_id`.
-The `tvm_guest_id` must be in a "runnable" state (requires a prior call 
+The `tvm_guest_id` must be in a "runnable" state (requires a prior call
 to `sbi_tee_host_finalize_tvm()`). The function does not return unless the TVM exits with
 a trap that cannot be handled by the TSM.
 
@@ -1018,7 +1017,7 @@ enum Exception {
      * can then be used to determine the type of memory region, and making the appropriate
      * call (example: sbi_tee_host_add_tvm_zero_pages() to add a demand-zero confidential
      * page if applicable), and then calling sbi_tee_host_run_tvm_vcpu to resume execution at
-     * the following instruction. 
+     * the following instruction.
     */
     GUEST_LOAD_PAGE_FAULT = 21,
     /* 
@@ -1028,7 +1027,7 @@ enum Exception {
      * if appropriate to resume execution at the following instruction.
     */
     VIRTUAL_INSTRUCTION = 22,
-    /* 
+    /*
      * The TVM encountered a store fault in a confidential, MMIO, or shared-memory
      * region. The host should determine the fault address by retrieving the
      * `htval` from `tvm_vcpu_hypervisor_csrs` and `stval` from `tvm_vcpu_supervisor_csrs`
@@ -1058,7 +1057,7 @@ struct sbiret sbi_tee_interrupt_init_tvm_aia(unsigned long tvm_guest_id,
 
 Configures AIA virtualization for the TVM identified by `tvm_guest_id` based on the
 parameters in the `tvm_aia_params` structure at the non-confidential physical address
-at `tvm_aia_params_addr`. The `tvm_aia_params_len` is the byte-length of the `tvm_aia_params` 
+at `tvm_aia_params_addr`. The `tvm_aia_params_len` is the byte-length of the `tvm_aia_params`
 structure.
 
 This cannot be called after `sbi_tee_host_finalize_tvm()`.
@@ -1068,7 +1067,7 @@ The format and semantics of the `tvm_aia_params_addr` structure appears below.
 [source, C]
 -------
 struct tvm_aia_params {
-    /* 
+    /*
      * The base address of the virtualized IMSIC in TVM physical address space.
      *
      * IMSIC addresses follow the below pattern:
@@ -1120,7 +1119,7 @@ struct sbiret sbi_tee_interrupt_set_tvm_aia_cpu_imsic_addr(unsigned long tvm_gue
 -------
 
 Sets the guest physical address of the specified VCPU’s virtualized IMSIC to `tvm_vcpu_imsic_gpa`.
-The `tvm_vcpu_imsic_gpa` must be valid for the AIA configuration that was set by 
+The `tvm_vcpu_imsic_gpa` must be valid for the AIA configuration that was set by
 `sbi_tee_interrupt_init_tvm_aia()`. No two VCPUs may share the same `tvm_vcpu_imsic_gpa`.
 
 This can be called only after `sbi_tee_interrupt_init_tvm_aia()` and before `sbi_tee_host_finalize_tvm()`.
