@@ -1,6 +1,6 @@
 = Confidential Computing on RISC-V platforms - Application-Processor Trusted Execution Environment (AP-TEE) TG
 
-Acting Chair: Ravi Sahita
+Chairs: Ravi Sahita (ravi@rivosinc.com), Guerney Hunt
 
 Confidential computing defines the mechanisms for protecting the confidentiality and integrity of data-in-use against software and hardware attacks via a hardware-attested Trusted Compute Base (TCB). This TG will define the threat model, reference architecture and interfaces for Scalable Trusted Execution Environments on RISC-V Application Processor-based platforms to support confidential-compute scenarios. The TG will focus on multi-tenant hardware-virtualized workloads to enable the broadest set of confidential workloads while minimizing application changes.  
 
