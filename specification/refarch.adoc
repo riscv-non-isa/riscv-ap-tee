@@ -206,7 +206,7 @@ handle the interrupt and may resume that TSM thread or may invoke another
 TSM security routine on a different (non-busy) thread context (and on a 
 different hart). This model of TSM operation requires additional 
 concurrency controls on internal data structures and per-TVM global data 
-structures (such as the second stage page table structures).
+structures (such as the G-stage page table structures).
 
 image:img_3.png[]  
 Figure 3: TSM operation - Interruptible and non-reentrant TSM model shown.
@@ -368,7 +368,7 @@ integrity-protected using a MAC on the memory contents. The MAC may be
 maintained at various granularity - e.g. cache block size or in multiples 
 of cache blocks.
 
-*TVM isolation* is the responsibility of the TSM via the second stage 
+*TVM isolation* is the responsibility of the TSM via the G-stage
 address translation table (hgatp). The TSM must track memory assignment of 
 TVMs (by the untrusted VMM/OS) to ensure memory assignment is 
 non-overlapping, along with additional security requirements. The security 
@@ -388,9 +388,9 @@ encryption, the encryption keys used for confidential memory must be
 different from non-confidential memory. 
 
 All TVM memory is mapped in the second-stage page tables controlled by the 
-TSM explicitly - the allocation of memory for the second stage paging 
-structures pages used for the second stage mapping is also performed by the 
-OS/VMM but the security properties of the second stage mapping are enforced 
+TSM explicitly - the allocation of memory for the G-stage paging
+structures pages used for the G-stage mapping is also performed by the
+OS/VMM but the security properties of the G-stage mapping are enforced
 by the TSM. By default any memory mapped to a TVM is confidential. A TVM 
 may then explicitly request that confidential memory be converted to 
 non-confidential memory regions using services provided by the TSM. More 

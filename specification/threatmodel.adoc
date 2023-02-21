@@ -57,7 +57,7 @@ in-scope adversaries
 T6: Incorrect execution of workload via runtime modification of CPU 
 registers, CSRs, mode switches via in-scope adversaries
 
-T7: Invalid code execution or data injection/replacement via second stage
+T7: Invalid code execution or data injection/replacement via G-stage
 paging remap attacks via system software adversary
 
 T8: Malicious asynchronous interrupt injection or dropped leading to 
