@@ -57,7 +57,7 @@ in-scope adversaries
 T6: Incorrect execution of workload via runtime modification of CPU 
 registers, CSRs, mode switches via in-scope adversaries
 
-T7: Invalid code execution or data injection/replacement via second stagel 
+T7: Invalid code execution or data injection/replacement via second stage
 paging remap attacks via system software adversary
 
 T8: Malicious asynchronous interrupt injection or dropped leading to 
@@ -162,7 +162,7 @@ host software is considered out of scope.
 | Availability | VMM DoS Protection            | Implementation-specific | Not in scope for AP-TEE               | Prevent untrusted code from refusing to run TEE | Not applicable 
 
 | Side Channel | Protected address mapping (controlled side channel)         | Required                 | AP-TEE mode qualifier, cryptography, MMU/MPU, MTT | Similar to memory remapping attacks                                                                 | uSG SIG, AP-TEE to specify 
-| Side Channel | Uarchitectural side channels (branch prediction             | Required                 | uArch state flushing, entropy defenses            | Prevent attacks such as meltdown/spectre (it is difficult to defend agains such attacks in advance) | uSC SIG, AP-TEE specify
+| Side Channel | Micro-architectural side channels (branch prediction        | Required                 | uArch state flushing, entropy defenses            | Prevent attacks such as meltdown/spectre (it is difficult to defend agains such attacks in advance) | uSC SIG, AP-TEE specify
 | Side Channel | Control channels, single-step/zero-step attacks             | Required                 | uArch state flushing, entropy defenses            | Prevent interrupt/exception injection (combined with cache side channel to leak sensitive data)     | uSC SIG , AP-TEE specify
 | Side Channel | Architectural cache side channel                            | Implementation-specific  | uArch state flushing, entropy defenses            | Prevent shared resource contention, e.g. attacks prime probe                                        | uSG SIG, AP-TEE to specify
 | Side Channel | Architectural timing side channel                           | Implementation-specific  | data independent operations, uArch state flushing |  Leveraging data dependency timing channels                                                         | uSG SIG, AP-TEE to specify 
@@ -175,7 +175,7 @@ host software is considered out of scope.
 | Attestation | Local attestation            | Implementation-specific | Sealing |  Verification of attestation by TCB | AP-TEE TG specify 
 | Attestation | TCB versioning (and updates) | Required | Mutable firmware where TVM has to opt-in if TCB updates are allowed or not - HW TCB then enforces lower TCB elements are updatable (with apropos controls like SVN) only after that opt-in has been honored. | Allow TCB updates - Prevent TCB rollback | AP-TEE TG specify 
 | Attestation | TCB composition -Single root of trust for msmt. for confidential compute | Required |  How do we express the issue with TCB elements being composed of various elements? e.g. M-mode,  ROT firmware. Perhaps we can only express the requirement of a single root of trust for measurement and reporting | Malicious components introduced in the TCB | AP-TEE TG specify 
-| Attestation | Dynamic vs Static Attestation interop (between platform TCB and TEE TCB) - enforce isolation of the entire trust chain | Required | TEE TCB should not be affected by other TCB reporting chains. TEE TCB is seperately reportable and recoverable. | Malicious host tampers with TEE TCB or reporting chain | AP-TEE TG specify 
+| Attestation | Dynamic vs Static Attestation interop (between platform TCB and TEE TCB) - enforce isolation of the entire trust chain | Required | TEE TCB should not be affected by other TCB reporting chains. TEE TCB is separately reportable and recoverable. | Malicious host tampers with TEE TCB or reporting chain | AP-TEE TG specify
 | Attestation | TCB transparency (and auditability) | Implementation-specific | Mutable firmware | TCB elements reviewable | AP-TEE TG recommend
 | Attestation | Sealing                             | Implementation-specific | HW Rot sealing keys per TVM | Binding of secrets to TEEs | AP-TEE TG specify 
 

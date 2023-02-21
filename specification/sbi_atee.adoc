@@ -142,7 +142,7 @@ The host can process non-confidential pages by calling `sbi_tee_host_add_shared_
 shared memory regions are defined by the TVM using the EXT_TEE_GUEST extension.
 
 ===== Handling MMIO faults
-TVMs can define MMIO regions using the EXT_TEE_GUEST extension, and a rutime access to such a region causes
+TVMs can define MMIO regions using the EXT_TEE_GUEST extension, and a runtime access to such a region causes
 a resumable exit from the TVM. The host can examine the exit code and `scause`, update the per-VCPU
 shared-memory region as appropriate, and resume TVM execution. This may involve instruction decoding
 using the information from the shared-memory region.
@@ -234,7 +234,7 @@ enum vcpu_register_set_id {
 [source, C]
 -------------------
 /*
- * General purpose registers for he TVM VCPU.
+ * General purpose registers for the TVM VCPU.
  * Corresponds to `GPRS` in `vcpu_register_set_id`.
  */
 struct tvm_vcpu_supervisor_gprs {
@@ -561,7 +561,7 @@ The list of possible TVM states appears below.
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | State              | Description
-| TVM_INITIALZING    | The TVM has been created, but isn't yet ready to run.
+| TVM_INITIALIZING   | The TVM has been created, but isn't yet ready to run.
 | TVM_RUNNABLE       | The TVM is in a runnable state, and can be executed by
                      | calling `sbi_tee_host_run_tvm_vcpu()`.
 |===
