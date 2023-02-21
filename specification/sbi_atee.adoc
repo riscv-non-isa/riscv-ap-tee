@@ -11,7 +11,7 @@ The proposal introduces three new extensions that will be described later:
 
 === TEEI - TH-ABI runtime interface 
 ECALL invocation from VS (guest OS) causes traps that are handled by the 
-TSM module (enforced via mdeleg configuration). The TSM then may provide 
+TSM module (enforced via medeleg configuration). The TSM then may provide
 intrinsics via the TG-ABI (TEE-Guest ABI) to the TVM to provide attestation 
 and other trusted services. The TSM may allow the TEE (application or VM) 
 to request host (untrusted) services via the TH-ABI (TEE host-ABI).

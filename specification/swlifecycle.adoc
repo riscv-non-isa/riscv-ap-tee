@@ -205,7 +205,7 @@ this value holds the identifier (e.g. PPN) for the TVM control page (4KB TEE-
 TSM-TVM page); else it is 0.
 | Page sub-type | Following types apply If Memory Type is Confidential and 
 Page-Type is TVM:
-* HGAT - pages used for HGAT structures
+* HGATP - pages used for HGATP structures
 * Data - pages used for TVM content
 Following types apply If Memory Type is Confidential and Page-Type is TSM:
 * MTT - pages used for MTT structures
@@ -311,22 +311,22 @@ and validate the mapping
 
 ==== Page Mapping Page Assignment
 
-The VMM uses this operation to add a hgat structure page to be used for mapping 
+The VMM uses this operation to add a hgatp structure page to be used for mapping
 a guest physical address (GPA) to a physical address (PA). The inputs to this 
 operation are the TVM identifier and the physical address(es) for the new 
-page(s) to be used for the hgat structure entries
+page(s) to be used for the hgatp structure entries
 
 *Page Mapping Assignment Operation*:
 
 * Verify that the TVM has been created successfully 
-* Verify that the PPN(s) for the new page(s) to be used for TVM hgat is/are 
+* Verify that the PPN(s) for the new page(s) to be used for TVM hgatp is/are
 Unassigned-Confidential per the MTT
-* For the GPA to be mapped, perform a TVM-hgat walk to locate the non-leaf 
+* For the GPA to be mapped, perform a TVM-hgatp walk to locate the non-leaf
 entry that should refer to the new page being added (to hold the next level of the 
 mapping for the GPA). If the mapping already exists, the operation is aborted.
-* Initialize the new hgat page to zero (no hgat page table entries are valid)
-* Update the parent hgat entry to refer to the new hgat page (mark non-lead as valid)
-* Update the hgat page EMTT entry with the TVM owner-id and page-type
+* Initialize the new hgatp page to zero (no hgatp page table entries are valid)
+* Update the parent hgatp entry to refer to the new hgatp page (mark non-lead as valid)
+* Update the hgatp page EMTT entry with the TVM owner-id and page-type
 
 ==== Measured page assignment into a TVM memory map
 
@@ -339,7 +339,7 @@ If the contents of the page are not specified, which is allowed post-finalizatio
 the TSM zero's the page during initialization. The guest physical address (GPA) to the 
 selected page physical address (PA) is specified in the add operation by the VMM. 
 The TSM verifies that a free guest page mapping must exist for this operation to succeed. 
-Effectively, this operation sets up the properties of the HGAT L0 leaf entry for the PA. 
+Effectively, this operation sets up the properties of the HGATP L0 leaf entry for the PA.
 
 The inputs to this operation are: TVM identifier, physical address for the new page to 
 be assigned to the TVM, source physical address for the source of the page contents 
@@ -352,7 +352,7 @@ for the guest mapping to be added.
 * If the source page is provided, this operation can only be performed if the 
 TVM measurement has not been finalized. 
 * Verify that the PFN for the new page to be used for TVM is free in the MTT 
-* For the GPA to be mapped, perform a TVM-hgat walk to locate the leaf entry that should 
+* For the GPA to be mapped, perform a TVM-hgatp walk to locate the leaf entry that should
 refer to the new page being added. If the mapping does not exist OR exists but is not in 
 the unmapped state, the operation is aborted.
 * Initialize the new TVM page with contents from source page OR zero if no source page 
@@ -361,7 +361,7 @@ memory will be with AP-TEE-mode asserted and via the TSMs paging structure of th
 assigned to the TVM - hence the memory will be treated as confidential.
 * The measurement of the TVM is extended with the GPA used to map to the page.
 * Update the TVM page MTT entry with the TVM owner PPN and page type as TEE-TVM
-* Update the leaf hgat page table entry to refer to the new page (mark leaf as valid) 
+* Update the leaf hgatp page table entry to refer to the new page (mark leaf as valid)
 to allow TLB mappings to be created when the TVM vcpu is executing subsequently.
 
 
