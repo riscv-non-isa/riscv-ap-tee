@@ -67,7 +67,7 @@ The TSM is responsible for enforcing isolation of confidential memory pages amon
 (via G-stage translation) - pages assigned to the TVM may belong to C | NC PMA to 
 allow for IO access. The TSM may manage additional attributes on TVM-assigned pages such as: 
 TVM-owner, Page-sub-type, TLB versioning information, Locking semaphore and additional metadata etc.
-This extended memory tracking information managed by the TSM is refered to as the EMTT.
+This extended memory tracking information managed by the TSM is referred to as the EMTT.
 
 ==== Handling Implicit, Explicit Accesses
 For TVM accesses for instruction fetch and page walks (virtual address 
@@ -248,10 +248,10 @@ the TSM. S-mode interrupts will cause the TSM to save state and TEERET.
   ** If required, pend an S-mode interrupt to the TSM and SRET
 * _Implementation Note -_ _The TSM-driver does not need to keep state of 
 the TSM being interrupted as, on an interrupt the TSM can enforce:_
-  ** _If it was preemptible but not-reentrant that the next invocation on 
+  ** _If it was preemptable but not-reentrant that the next invocation on
 that hart is a TEERESUME with identical parameters as the interrupted 
 security routine._
-  ** _If the TSM was preemptible and re-entrant then the TSM would accept 
+  ** _If the TSM was preemptable and re-entrant then the TSM would accept
 both TEERESUME and TEECALL as subsequent invocations (as long as TSM 
 threads are available)._
 * Restore the OS/VMM state saved on transition to the TSM: sstatus, stvec, 
@@ -291,7 +291,7 @@ pended as S-mode interrupts to the TSM which must save its execution
 context and return control to the OS/VMM via a TEERET..
 
 If an S-mode interrupt occurs while the hart is operating in the TSM 
-(HS-mode), it should pre-empt out and return to the OS/VMM using TEERET. 
+(HS-mode), it should preempt out and return to the OS/VMM using TEERET.
 The TSM may take certain actions on S-mode interrupts - for example, saving 
 status of a host security routine, and/or change the status of TVMs. The 
 TSM is however not expected to retire the S-mode interrupt but keep the 

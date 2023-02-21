@@ -106,7 +106,7 @@ into TVM confidential memory.
 
 TVM memory may be lazily granted to the TVM by the host VMM, however confidential 
 memory may be only lazily added via sbi_tee_host_add_tvm_zero_pages after the TVM measurement
-has been finalzed. The TVM manages its internal memory database to indicate 
+has been finalized. The TVM manages its internal memory database to indicate
 which guest physical page frames are confidential for mapping into VS-stage 
 mappings. There are at least two use scenarios for this ABI - first, late add of memory 
 to enable TVM boot with the minimal measured state, and second, if some 
@@ -136,7 +136,7 @@ mapped by the mapping can be relocated, fragmented (for page promotion or
 demotion) or reclaimed back by the VMM. Then, before the new mappings 
 may be activated, the TSM tracks that the VMM has invoked sbi_tee_guest_local_fence 
 and caused invalidation of the TLB on all virtual harts of the TVM. The VMM achieves 
-this via interprocessor interrupts to all the vcpus for the TVM. The local fence is 
+this via inter-processor interrupts to all the vcpus for the TVM. The local fence is
 enforced by the TSM by executing HFENCE.GVMA for the TVM VMID. This sequence is described 
 in more detail in <<TVM memory management>>.
 
