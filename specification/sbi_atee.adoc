@@ -1475,8 +1475,8 @@ memory for TVMs by destroying them. All confidential-unassigned memory may be
 reclaimed back as non-confidential using this interface.
 
 | <<sbi_tee_host_add_tvm_page_table_pages, sbi_tee_host_add_tvm_page_table_pages>> | Add 
-one or more page mappings to the second stage translation structure for a TVM. 
-The pages to be used for the second stage page table structures must have been converted 
+one or more page mappings to the G-stage translation structure for a TVM.
+The pages to be used for the G-stage page table structures must have been converted
 (and tracked) by the TSM as TEE pages; otherwise this operation will not succeed.                                                                     
 
 | <<sbi_tee_host_add_tvm_measured_pages, sbi_tee_host_add_tvm_measured_pages>> | Add 
@@ -1503,14 +1503,14 @@ relocated. This interface specification is TBD.
 | sbi_tee_host_page_promote                      | Promote a set of small 
 page mappings (existing mappings) for a set of TVM pages to a large page 
 mapping. The affected mappings must be invalidated before the promote operation 
-can succeed. The VMM may reclaim the freed second stage page table page if 
+can succeed. The VMM may reclaim the freed G-stage page table page if
 the operation succeeds. This interface specification is TBD. 
 
 | sbi_tee_host_page_demote                    | Demote a large page 
 mapping for an existing mapping to a set of TVM pages and corresponding 
 small page mappings. The affected mapping must be invalidated before the 
 operation can succeed. The VMM must provide a free TEE-capable page to the 
-TSM to use as a new second stage page table in the fragmented mapping.
+TSM to use as a new G-stage page table in the fragmented mapping.
 This interface specification is TBD.
 
 | <<sbi_tee_host_create_tvm_vcpu, sbi_tee_host_create_tvm_vcpu>> | This operation 
@@ -1569,14 +1569,14 @@ Reclaim TVM GPA AIA address from confidential
 intrinsic is used by the TVM to request the conversion of the specified GPA to 
 non-confidential (from confidential).The GPA must be mapped to the TVM in a 
 present state, and must be scrubbed by the TVM before it is yielded. The TSM 
-enforces that the page is not-present in the second stage page table and not 
+enforces that the page is not-present in the G-stage page table and not
 tracked as a TEE page. The VMM owns the process of reclaiming the page.
 
 | <<sbi_tee_guest_unshare_memory_region, sbi_tee_guest_unshare_memory_region>> | Convert 
 a memory region from non-confidential to confidential for a set of TVM pages. 
 This operation initiates TSM tracking of these pages and also changes the encryption 
 properties of these pages. These pages can then be selected by the VMM to 
-allocate for TVM control structure pages, second stage page table pages, 
+allocate for TVM control structure pages, G-stage page table pages,
 and TVM pages.
 
 | <<sbi_tee_guest_get_attcaps, sbi_tee_guest_get_attcaps>>   | This 

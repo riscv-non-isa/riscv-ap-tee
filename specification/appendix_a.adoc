@@ -72,7 +72,7 @@ handled by the TSM (default all)
 | hcounteren  | Initialized by TSM per TVM configuration
 | htimedelta  | Initialized by TSM per TVM configuration
 | htimedeltah | Initialized by TSM per TVM configuration
-| hgatp       | TVM enforces page remap protection via this second stage 
+| hgatp       | TVM enforces page remap protection via this G-stage
 translation. Hart register is programmed by TSM to activate at TVM entry 
 via SRET
 | The values htval and htinst are cleared by TSM on TEECALL and masked (to 

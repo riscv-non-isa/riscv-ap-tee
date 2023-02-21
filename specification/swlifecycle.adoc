@@ -71,7 +71,7 @@ manages the activation of the virtual hart on the physical hart selected by
 the VMM. During this activation the TCB trusted firmware can enforce that 
 stale TLB entries that govern guest physical to system physical page access 
 have been evicted across all hart TLBs. There may also be TLB flushes for 
-the virtual-harts due to first stage translation changes (guest virtual to 
+the virtual-harts due to VS-stage translation changes (guest virtual to
 guest physical) performed by the TVM OS - these are initiated by the TVM OS 
 to cause IPIs to the virtual-harts managed by the TVM OS (and verified by 
 the TVM OS to ensure the IPIs are received by the TVM OS to invalidate the 
@@ -86,9 +86,9 @@ following hardware enforcement is recommended to address the threat model
 described in <<Architecture Overview and Threat Model>>:
 
 * TVM instruction fetches and page walks (both VS/second-stage and 
-G/first-stage) are implicitly enforced to be in confidential memory. This 
-requires that the TVM supervisor code should not locate first stage page 
-tables in non-confidential memory. The TSM enforces that second stage page 
+G/VS-stage) are implicitly enforced to be in confidential memory. This
+requires that the TVM supervisor code should not locate VS-stage page
+tables in non-confidential memory. The TSM enforces that G-stage page
 tables are in confidential memory.
 * TVM access to confidential or non-confidential memory is subject to 
 VS-stage address translation (this is existing); G-stage address 
@@ -154,7 +154,7 @@ Memory access-control is enforced at two levels:
  via the Memory Tracking Table structure and is enforced by the CPU MMU. The MTT tracks 
  the Confidential | Non-confidential state for a software-accessible physical address.
 * Isolation of memory between TVMs - memory tracking is augmented by the TSM via the 
-second stage translation structures to maintain compatibility with OS/VMM memory 
+G-stage translation structures to maintain compatibility with OS/VMM memory
 management, and is also enforced by the CPU MMU. The correct operation of this 
 access-control level is dependent on trusted enforcement of item 1 above.
 
@@ -170,19 +170,19 @@ to the TVM is bound to the Guest PA assigned to the TVM during TVM operation.
 GPA unless aliases are allowed in which case, such aliases must be tracked 
 by the TSM). Aliases in the virtual address space are under the purview of 
 the TVM OS.
-. 1st stage address translation - A TVM page mapping must be translated 
-only via first stage translation structures which are contained in pages 
+. VS-stage address translation - A TVM page mapping must be translated
+only via VS-stage translation structures which are contained in pages
 assigned to the same TVM. 
-. 2nd stage address translation:
+. G-stage address translation:
   .. A TVM page guest physical address mapping must be translated only via 
-the TSM-managed second stage translation structures for that TVM. 
-  .. 2nd stage structures may not be shared between TVMs, and must not 
+the TSM-managed G-stage translation structures for that TVM.
+  .. G-stage structures may not be shared between TVMs, and must not
 refer to any other TVMs pages.
-  .. The OS/VMM has no access to TVM second stage paging structures
+  .. The OS/VMM has no access to TVM G-stage paging structures
   .. The OS/VMM may install shared page mappings (via TSM oversight) to 
 non-confidential pages that are not assigned to any TVM or the TSM - this 
 is for example for untrusted IO.
-  .. Circular mappings in the second stage paging structures are disallowed.
+  .. Circular mappings in the G-stage paging structures are disallowed.
 . Access to shared memory pages must be explicitly signaled by the TVM via 
 the GPA and enforced for memory ownership for the TVM by the HW.
 
@@ -303,7 +303,7 @@ or the TVM virtual-harts (for per-TVM scope invalidation) have been invalidated 
 the new TLB version - the TVM exit is reported to the VMM.
 * Migration of a virtual-hart to a different hart is checked by the TSM to compares the 
 TVM TLB version with the hart TLB version and is fenced by the TSM during vcpu run.  
-* -----No active/usable translations for converted memory or for TVM 2nd stage mappings exist at this point -----
+* -----No active/usable translations for converted memory or for TVM G-stage mappings exist at this point -----
 * Invoke the specific mapping change operation (remove, relocate, promote, migrate etc.)
 * Checks that the affected mapping(s) are invalidated in the MTT and/or g-stage mapping 
 and validate the mapping
