@@ -124,7 +124,8 @@ transition.
 
 The host can use the aforementioned shared-memory to set up TVM execution parameters like the
 entrypoint (`ENTRY_PC`) / boot argument (`ENTRY_ARG`), then `sbi_tee_host_finalize_tvm()`, followed by
-sbi_tee_host_run_tvm_vcpu()` to begin execution. TVM execution continues until there an event like an
+`sbi_tee_host_run_tvm_vcpu()` to begin execution. The host must boot vCPU `0` first otherwise
+`sbi_tee_host_run_tvm_vcpu()` call will fail. TVM execution continues until there an event like an
 interrupt, or fault that cannot be serviced by the TSM. Some interrupts and exceptions are resumable,
 and the host can determine reason specific reason by examining the `scause` field in the `tvm_vcpu_supervisor_csrs`
 previously setup by the call to `sbi_tee_host_create_tvm_vcpu()`. The host can then examine the shared-memory region
@@ -540,12 +541,6 @@ struct tvm_create_params {
      * returned by the call to sbi_tee_host_get_tsm_info().
      */
     unsigned long tvm_state_addr;
-    /*
-     * The vcpuid for the VCPU that will be designated as the boot VCPU.
-     * The host must add create a VCPU with this vcpuid by calling `sbi_tee_host_create_tvm_vcpu`
-     * before calling `sbi_tee_host_finalize_tvm().
-     */
-    unsigned long tvm_boot_vcpuid;
 };
 ----
 
@@ -903,9 +898,7 @@ state, and must be `tsm_info::tvm_state_pages` pages in length.`tvm_vcpu_shared_
 be page-aligned and point to a sufficient number of non-confidential pages to hold a structure
 with the maximum offset enumerated by `sbi_tee_host_get_tvm_vcpu_register_set`. These pages are
 "pinned" in the non-confidential state (i.e. cannot be converted to confidential) until the TVM
-is destroyed.This call must not be made after calling `sbi_tee_host_finalize_tvm()`. The host must
-configure a boot VCPU by adding a `tvm_vcpu_id` with a value that specified for `tvm_boot_vcpuid`
-in the `tvm_create_params` structure that was used with sbi_tee_tvm_create().
+is destroyed. This call must not be made after calling `sbi_tee_host_finalize_tvm()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
