@@ -53,7 +53,7 @@ The TSM implements a set of TEE "flows" that are accessed via a *Trusted Executi
 component operating in the M-mode of the CPU. The TSM itself operates in 
 HS-mode (priv=01; V=0) of the CPU and enables the OS/VMM (also in HS-mode) to 
 create TVMs, assign resources to TVMs, manage/execute and destroy a TVM - 
-_this specification aims to describe the TEEI and TSM interfaces_ . By using 
+_this specification aims to describe the TEEI and TSM interfaces_. By using 
 the Hypervisor extension of the RISC-V privileged specification <<R0>>, this 
 specification minimizes ISA changes to introduce a scalable architecture for 
 hosting TEE workloads. More than one TVM may be hosted by the host OS/VMM. 
@@ -61,7 +61,7 @@ Each TVM may consist of the guest firmware, a guest OS and applications.
 
 As shown in figure 1, the M-mode firmware is in the TCB of all AP-TEE 
 workloads hosted on the platform. The TSM-driver (operating in M-mode) uses 
-the hardware capabilities to  provide:
+the hardware capabilities to provide:
 
 * Isolation of memory associated with TEEs (including the TSM). We describe 
 *TEE- capable memory* as memory that provides access-control, confidentiality 
@@ -72,7 +72,7 @@ memory management are described in detail below.
 software to interact with the TSM-driver in an OS and platform agnostic manner.
 
 The TSM-driver delegates parts of the TEE management functions to the TSM, 
-specifically  isolation across TEE-capable memory assigned to TVMs. The TSM is 
+specifically isolation across TEE-capable memory assigned to TVMs. The TSM is 
 designed to be portable across AP-TEE class platforms and interact with the 
 machine specific capabilities in the platform through the TEEI. The TSM 
 provides an ABI to the OS/VMM which has two aspects: A *TH-ABI* that includes 
@@ -97,7 +97,7 @@ This per-hart AP-TEE mode bit is used by the processor to enforce
 access-control properties on instructions restricted for use by the TSM. This 
 bit is cached in other micro-architectural states to enforce the isolation for 
 TEE (TSM, TVM) resources (such as memory, IO, CSRs, TLB, paging structure 
-caches etc). The implementation of this mode  bit  is not specified by this 
+caches etc). The implementation of this mode bit is not specified by this 
 document, and may be implemented via an M-mode CSR for example.
 
 The TSM functionality is explicitly limited to support the necessary security 

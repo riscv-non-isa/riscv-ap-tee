@@ -21,7 +21,7 @@ and *Non-Confidential* (These are dynamic/programmable memory attributes
 * Confidential memory - has Confidential PMA - used for TVM code, data
 * Non-Confidential memory - has Non-Confidential PMA - used for communication between TVM and untrusted host entities
 
-The TEEI implemented by the TSM provides interfaces to the VMM to convert / 
+The TEEH implemented by the TSM provides interfaces to the VMM to convert / 
 donate memory to Confidential [Convert] and vice-versa [Reclaim]. 
 TVM memory is by default assigned from Confidential memory regions. 
 TVM may be assigned shared memory regions. Both properties are enforced 
@@ -117,7 +117,7 @@ authenticated (per cryptographic signature mechanisms) by the TSM-driver
 during the loading process, so that the TSM used is reflected in the 
 attestation rooted in a HW RoT. The authentication process provides 
 additional control to restrict TSM binaries that can be loaded on the 
-platform based on policies such as version, vendor etc.  In addition to the 
+platform based on policies such as version, vendor etc. In addition to the 
 measurements, a security version number (SVN) of the TSM should be recorded 
 by the TSM-driver into the firmware measurement registers accessible only 
 to the TSM-driver and higher privilege components. The measurements and 
@@ -136,10 +136,10 @@ TSM state should be stored in pages that form a TSM Hart Control Structure
 initialization. The THCS structure definition is part of the TEEI and may 
 be extended by an implementation, with the minimum state shown in the 
 structure. Isolating and establishing the execution state of the TSM is the 
-responsibility of the TSM-driver. Saving and restoring  of the execution 
+responsibility of the TSM-driver. Saving and restoring the execution 
 state of the TSM (for interrupted routines) is performed by the TSM. The 
 operating modes of the TSM are described in Section 5.2. Saving and 
-restoring of the TVM execution state in the TVM virtual-harts (called the 
+restoring the TVM execution state in the TVM virtual-harts (called the 
 VHCS) is the responsibility of the TSM and is held in TEE-capable memory 
 assigned to the TVM by the VMM.
 
@@ -149,8 +149,8 @@ The TSM implements security routines that are invoked by the OS/VMM or by
 the TVMs, e.g. by the VMM to grant a TVM a TEE-capable memory page and 
 setup second-stage mapping, activate a TVM virtual hart on a physical hart 
 etc. The TSM security routines are invoked by the OS/VMM via an ECALL with 
-the service call specified via registers.  These service calls trap to the 
-TSM-driver.  The TSM-driver switches hart state to the TSM context by 
+the service call specified via registers. These service calls trap to the 
+TSM-driver. The TSM-driver switches hart state to the TSM context by 
 loading the hart's TSM execution state from the THCS.tssa and then returns 
 via an MRET to the TSM. The TSM executes the security routine requested 
 (where the TSM enforces the security properties) and may either return to 
@@ -176,7 +176,7 @@ SRET to enter into a TVM (where the execution may be interruptible again).
 
 * *Interruptible TSM with no re-entrancy* - In this model, after the 
 initial entry to the TSM with S-mode interrupts disabled, the TSM enables 
-interrupts during execution of  the TSM security routines. The TSM may 
+interrupts during execution of the TSM security routines. The TSM may 
 install its interrupt handlers at this entry (or may be installed via the 
 TEECALL flow as shown below). On an S-mode interrupt, the TSM hart context 
 is saved by the TSM and keeps the interrupt pending. The TSM may then 
@@ -262,13 +262,13 @@ return status from TEERET (TSM sets a0, a1 registers always - other
 registers may be selected by the TVM)
 * Clear AP-TEE-mode on hart (via implementation-specific M-mode CSR to 
 block non-TEE mode accesses to TEE-assigned memory.) 
-* MRET to resumes execution in OS/VMM at mepc set to THCS.hssa.pc 
+* MRET to resume execution in OS/VMM at mepc set to THCS.hssa.pc 
 (THCS.hssa.pc adjusted to refer to opcode after the ECALL that triggered 
 the TEECALL / TEERESUME) 
 
 The TSM is stateless across TEECALL invocations, however a security routine 
 invoked in the TSM via a TEECALL may be interrupted and must be resumed via 
-a TEERESUME i.e. _the TSM is preemptable but non-reentrant_ . These 
+a TEERESUME i.e. _the TSM is preemptable but non-reentrant_. These 
 properties are enforced by the TSM-driver, and other models described above 
 may be implemented. The TSM does not perform any dynamic resource 
 management, scheduling, or interrupt handling of its own. The TSM is not expected 
@@ -288,7 +288,7 @@ If an M-mode interrupt occurs while the hart is operating in the TSM or any
 TVM, the control always goes to the TSM-driver handler, which can handle 
 it, or if the event must be reported to the untrusted OS/VMM, they are 
 pended as S-mode interrupts to the TSM which must save its execution 
-context and return control to the OS/VMM via a TEERET..
+context and return control to the OS/VMM via a TEERET.
 
 If an S-mode interrupt occurs while the hart is operating in the TSM 
 (HS-mode), it should preempt out and return to the OS/VMM using TEERET.
@@ -410,10 +410,10 @@ debug authorization is implementation-specific, but must support the
 security properties described in the Section 3.12 of the RISC-V Debug 
 Support specification version 1.0.0-STABLE <<R6>>. The RoT may support 
 multiple levels of debug authorization depending on access granted. For 
-probe-based debugging of the hardware, the RoT  performing debug 
+probe-based debugging of the hardware, the RoT performing debug 
 authentication must ensure that separate attestation keys are used for TCB 
 reporting when probe-debug is authorized vs when the platform is not under 
-probe-debug mode.The probe-mode debug authorization process must invalidate 
+probe-debug mode. The probe-mode debug authorization process must invalidate 
 sealed keys to disallow sealed data access when in probe-debug modes. 
 
 When a TVM is under self-hosted debugging - on a transition to TVM 

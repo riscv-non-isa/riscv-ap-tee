@@ -11,7 +11,7 @@ The proposal introduces three new extensions that will be described later:
 
 === TEEI - TH-ABI runtime interface 
 ECALL invocation from VS (guest OS) causes traps that are handled by the 
-TSM module (enforced via medeleg configuration). The TSM then may provide
+TSM module (enforced via `medeleg` configuration). The TSM then may provide
 intrinsics via the TG-ABI (TEE-Guest ABI) to the TVM to provide attestation 
 and other trusted services. The TSM may allow the TEE (application or VM) 
 to request host (untrusted) services via the TH-ABI (TEE host-ABI).
@@ -42,7 +42,7 @@ with the TSM.
 ===== Platform TSM detection and capability enumeration
 Platform support for the TSM can be detected by probing for the EXT_TEE_HOST extension, and then
 calling `sbi_tee_host_get_tsm_info()` to get information about the current status of the TSM. The
-TSM must be be in `TSM_READY` in order to process further ECALLs.
+TSM must be in `TSM_READY` in order to process further ECALLs.
 
 ===== TVM creation
 TVMs are created using the sbi_tee_host_create_tvm(). This creates a TVM with state set to `TVM_INITIALIZING`.
@@ -62,7 +62,7 @@ The host is responsible for the following memory management functions:
 ===== Converting non-confidential memory to confidential memory
 Platform memory is non-confidential by default, and must be converted to confidential memory
 before use with TVMs. The conversion process is initiated by designating the host physical
-pages that to be converted, and then issuing fence operations to ensure that all outstanding
+pages that are to be converted, and then issuing fence operations to ensure that all outstanding
 TLB entries to the non-confidential memory are flushed across all CPUs/harts on the platform. This
 ensures that there's no overlapping mapping between the confidential and non-confidential memory
 regions on the platform.
@@ -82,7 +82,7 @@ page-table mappings, access to the converted memory from inside the non-confiden
 an access fault.
 
 ===== Defining confidential memory regions
-The host can declare the TVM physical address ranges for mapping of confidential memory. There can be multiples ranges,
+The host can declare the TVM physical address ranges for mapping confidential memory. There can be multiple ranges,
 but no two regions can overlap. The region can be sparsely mapped; however, any sparsely mapped confidential page that's
 demand-paged following an access fault by the TVM can only be a demand-zero page.
 
@@ -97,7 +97,7 @@ The host can create a confidential page region by calling `sbi_tee_host_add_tvm_
 The region can be sparsely populated, and since the host cannot directly access  confidential memory, it must copy the TVM
 code and data payload from non-confidential memory to confidential memory by calling `sbi_tee_host_add_tvm_measured_pages()`.
 This operation requires the host to convert a sufficient number of non-confidential pages to confidential (by calling
-`sbi_tee_host_convert_pages()`, or by using converted page that aren't currently assigned to a TVM. The TSM copies the 
+`sbi_tee_host_convert_pages()`, or by using converted pages that aren't currently assigned to a TVM. The TSM copies the 
 payload for the TVM from non-confidential pages to confidential pages, and extends the corresponding measurements for the
 TVM.
 
@@ -118,7 +118,7 @@ that's set-up by the host while creating the VCPU. The shared memory is used bot
 TSM for when processing TVM exits from `sbi_tee_run_vcpu()`.
 
 ===== TVM execution
-Following assignment of memory and VCPU resources, the host can transition the guest into a `TVM_RUNNABLE`
+Following the assignment of memory and VCPU resources, the host can transition the guest into a `TVM_RUNNABLE`
 state by calling `sbi_tee_host_finalize_tvm()`. Note that some TEE calls are no longer permissible after this
 transition.
 
@@ -135,8 +135,8 @@ host action(like adding of MMIO and shared-memory regions), TVM page-faults, vir
 The host can handle TVM page-faults by determining whether it was caused by access to a confidential or
 non-confidential region. In the former case, it can use `sbi_tee_host_add_tvm_zero_pages()` to
 populate the region with a previously converted confidential page. The TSM verifies that the confidential
-page isn't currently in use, and zeroes it out before assigning it the TVM. Demand-zero pages have no bearing
-on the TVM measurement, and can be added at any point of time.
+page isn't currently in use, and zeroes it out before assigning it to the TVM. Demand-zero pages have no bearing
+on the TVM measurement, and can be added at any point in time.
 
 The host can process non-confidential pages by calling `sbi_tee_host_add_shared_pages()`. Non-confidential
 shared memory regions are defined by the TVM using the EXT_TEE_GUEST extension.
@@ -153,7 +153,7 @@ shared-memory region.
 
 ===== Management of secure interrupts
 The host can use the Tee Interrupt Extension (EXT_TEE_INTERRUPT) to manage secure TVM interrupts on
-platforms with AIA-support.
+platforms with AIA support.
 
 ===== TVM teardown
 The host can teardown a TVM by calling `sbi_tee_host_destroy_tvm()`. This automatically releases all
@@ -184,8 +184,8 @@ to access required confidential or non-confidential memory per the TVMs request.
 image:tsm_detection_and_tvm_creation.svg[Figure 7]
 Figure 7: TSM Detection and TVM creation
 
-image:tvm_destruction_and_memory_reclaimation.svg[Figure 8]
-Figure 8: TVM destruction and Memory reclaimation
+image:tvm_destruction_and_memory_reclamation.svg[Figure 8]
+Figure 8: TVM destruction and Memory reclamation
 
 image:tvm_runtime_execution.svg[Figure 9]
 Figure 9: TVM runtime execution
@@ -731,7 +731,7 @@ struct sbiret sbi_tee_host_add_tvm_measured_pages(unsigned long tvm_guest_id,
 -----
 Copies num_pages pages from non-confidential memory at `source_address` to confidential
 memory at `dest_addr`, then measures and maps the pages at `dest_addr` at the TVM physical
-address space at `tvm_guest_gpa. The mapping must lie within a region of confidential memory
+address space at `tvm_guest_gpa`. The mapping must lie within a region of confidential memory
 created with `sbi_tee_host_add_tvm_memory_region()`. The tsm_page_type parameter must
 be a legal value for enum type `tsm_page_type`.
 
@@ -743,7 +743,7 @@ a 4KB page. The page must be added to a valid GPA mapping. The GPA of the page m
 of the measurement operation.
 
 The measurement process is a state machine that must be faithfully reproduced by the VMM 
-otherwise the attestation evidence verification by the relying party will fail and the TVM 
+otherwise, the attestation evidence verification by the relying party will fail and the TVM 
 will not be considered trustworthy by the relying party. 
 
 The possible error codes returned in `sbiret.error` are shown below.
@@ -810,11 +810,10 @@ struct sbiret sbi_tee_host_add_tvm_shared_pages(unsigned long tvm_guest_id,
 Maps num_pages of non-confidential memory starting at `base_page_address` into the TVM's physical
 address space starting at `tvm_base_page_address`. The `tvm_base_page_address` must lie within a
 region of non-confidential memory previously defined by the TVM via the guest interface to the TSM.
-The `tsm_page_type` parameter must be a legal value
-for the `tsm_page_type` enum.
+The `tsm_page_type` parameter must be a legal value for the `tsm_page_type` enum.
 
 Shared pages can be added only after the TVM begins execution, and calls the TSM to define the
-location of shared-memory regions. They are typically demand faulted on TVM access.
+location of shared memory regions. They are typically demand faulted on TVM access.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -945,8 +944,8 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 | Error code            | Description
 | SBI_ERR_SUCCESS       | The TVM exited, and sbiret.value contains 0 if the
-                        | interrupt or exception is resumable. The host can
-                        | examine `scause` to determine details.
+                          interrupt or exception is resumable. The host can
+                          examine `scause` to determine details.
 | SBI_ERR_INVALID_PARAM | `tvm_guest_id` or `tvm_vcpu_id` were invalid, or the
                           TVM wasn't in `TVM_RUNNABLE` state.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
@@ -958,9 +957,9 @@ use the `scause` field to determine whether the exit was caused by an interrupt 
 and then use the additional information in the shared-memory region to determine further
 course of action (if sbiret.value is 0).
 
-The TSM sets the most significant bit in `scause` to indicate that that the exit was caused
+The TSM sets the most significant bit in `scause` to indicate that the exit was caused
 by an interrupt, and if this bit is clear, the implication is that the exit was caused
-by an exception. The remaining bits specific information about the interrupt or exception,
+by an exception. The remaining bits are specific information about the interrupt or exception,
 and the specific reason can be determined using the enumeration detailed below.
 
 [source, C]
@@ -1215,7 +1214,7 @@ host on success.
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
-                          | This implies an exit to the host, and a subsequent resume of execution.
+                            This implies an exit to the host, and a subsequent resume of execution.
 | SBI_ERR_INVALID_ADDRESS | `tvm_gpa_addr` was invalid.
 | SBI_ERR_INVALID_PARAM   | `tvm_memory_region_type` or `region_len` were invalid
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
@@ -1233,14 +1232,14 @@ confidential to non-confidential/shared memory. The requested range must lie wit
 region of confidential address space, and may or may not be populated. If the region of 
 address space is populated, the TSM invalidates the pages and marks the region as pending 
 assignment-change to shared. The host must complete a TVM TLB invalidation sequence, 
-initiated by tee_host_tvm_initiate_fence(), in order to complete the assignment-change. 
+initiated by `tee_host_tvm_initiate_fence()`, in order to complete the assignment-change. 
 The calling TVM vCPU is considered blocked until the assignment-change is completed; 
-attempts to run it with tee_host_tvm_run() will fail. Any guest page faults taken by other 
+attempts to run it with `sbi_tee_host_run_tvm_vcpu()` will fail. Any guest page faults taken by other 
 TVM vCPUs in this region prior to completion of the assignment-change are considered fatal. 
-The host may not insert any pages in the region prior to completion of the 
+The host may not insert any pages in the region prior to the completion of the 
 assignment-change. Upon completion, the host may reclaim the confidential pages 
-that were previously mapped in the region using tee_host_tsm_reclaim_pages() and may insert 
-shared pages into the region using tee_host_tvm_add_shared_pages(). If the range of 
+that were previously mapped in the region using `tee_host_tsm_reclaim_pages()` and may insert 
+shared pages into the region using `tee_host_tvm_add_shared_pages()`. If the range of 
 address space is completely unpopulated, the region is immediately mapped as shared and 
 the host may insert shared pages.
 
@@ -1254,7 +1253,7 @@ The possible error codes returned in sbiret.error are:
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
-                          | This implies an exit to the host, and a subsequent resume of execution.
+                            This implies an exit to the host, and a subsequent resume of execution.
 | SBI_ERR_INVALID_ADDRESS | `tvm_gpa_addr` was invalid.
 | SBI_ERR_INVALID_PARAM   | `region_len` was invalid, or the entire range does not map to a `CONFIDENTIAL_REGION`
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
@@ -1270,22 +1269,22 @@ struct sbiret sbi_tee_guest_unshare_memory_region(unsigned long tvm_gpa_addr,
 Initiates the assignment-change of TVM physical address space starting at `tvm_gpa_addr` from shared to confidential. 
 The requested range must lie within an existing region of non-confidential address space, and may or may not be populated. 
 If the region of address space is populated, the TSM invalidates the pages and marks the region as pending assignment-change to confidential. 
-The host must complete a TVM TLB invalidation sequence, initiated by tee_host_tvm_initiate_fence(), in order to complete the assignment-change. 
-The calling TVM vCPU is considered blocked until the assignment-change is completed; attempts to run it with tee_host_tvm_run() will fail. 
+The host must complete a TVM TLB invalidation sequence, initiated by `tee_host_tvm_initiate_fence()`, in order to complete the assignment-change. 
+The calling TVM vCPU is considered blocked until the assignment-change is completed; attempts to run it with `sbi_tee_host_run_tvm_vcpu()` will fail. 
 Any guest page faults taken by other TVM vCPUs in this region prior to completion of the assignment-change are considered fatal. The host may 
 not insert any pages in the region prior to completion of the assignment-change. Upon completion, the host may (if required) convert host memory pages 
-using sbi_tee_host_convert_pages() and may assign un-assigned confidential pages into the region using sbi_tee_host_add_tvm_zero_pages().
+using `sbi_tee_host_convert_pages()` and may assign un-assigned confidential pages into the region using `sbi_tee_host_add_tvm_zero_pages()`.
 If the range of address space is unpopulated, the host may insert zero pages on faults during TVM access.
 
 Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned.
 
 [#table_sbi_tee_guest_unshare_memory_region_errors]
-.TEE Guest Share Memory Region
+.TEE Guest Unshare Memory Region
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
-                          | This implies an exit to the host, and a subsequent resume of execution.
+                            This implies an exit to the host, and a subsequent resume of execution.
 | SBI_ERR_INVALID_ADDRESS | `tvm_gpa_addr` was invalid.
 | SBI_ERR_INVALID_PARAM   | `region_len` was invalid, or the entire range doesn't
                             span a `SHARED_MEMORY_REGION`
@@ -1338,7 +1337,7 @@ struct AttestationCapabilities {
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
-                          | This implies an exit to the host, and a subsequent resume of execution.
+                            This implies an exit to the host, and a subsequent resume of execution.
 | SBI_ERR_INVALID_ADDRESS | `tvm_caps_addr` was invalid.
 | SBI_ERR_INVALID_PARAM   | `caps_len` was invalid, or the entire range doesn't
                             span a `CONFIDENTIAL_MEMORY_REGION`
@@ -1371,7 +1370,7 @@ msmt_index must be a valid index per the attestation capabilities reported via `
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
-                          | This implies an exit to the host, and a subsequent resume of execution.
+                            This implies an exit to the host, and a subsequent resume of execution.
 | SBI_ERR_INVALID_ADDRESS | `tvm_gpa_buf_addr` was invalid.
 | SBI_ERR_INVALID_PARAM   | `region_len` was invalid, or the entire range doesn't
                             span a `CONFIDENTIAL_MEMORY_REGION`
@@ -1417,7 +1416,7 @@ Both `cert_request_addr`, `request_data_addr` and `cert_addr_out` must be 4kB-al
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
-                          | This implies an exit to the host, and a subsequent resume of execution.
+                            This implies an exit to the host, and a subsequent resume of execution.
 | SBI_ERR_INVALID_ADDRESS | One of the addresses provided was invalid.
 | SBI_ERR_INVALID_PARAM   | `cert_size` or `cert_request_size` was invalid, or the entire range doesn't
                             span a `CONFIDENTIAL_MEMORY_REGION`
@@ -1464,7 +1463,7 @@ subsequent sbi_tee_host_local_fence) to remove any cached mappings to the memory
 regions that were previously selected for conversion via the sbi_tee_host_convert_pages. 
 
 | <<sbi_tee_host_local_fence, sbi_tee_host_local_fence>> |  This operation 
-completes the TLB version tracking of pages in the region being connverted to 
+completes the TLB version tracking of pages in the region being converted to 
 confidential. The TSM tracks that all available physical harts have executed 
 this operation before it considers the TLB version updated. The last local fence 
 completes the conversion of a memory region from non-confidential to confidential 
@@ -1516,7 +1515,7 @@ This interface specification is TBD.
 | <<sbi_tee_host_create_tvm_vcpu, sbi_tee_host_create_tvm_vcpu>> | This operation 
 allows the VMM to assign TEE pages for a virtual hart context structure (VHCS) for a 
 specific TVM. This routine also initializes the hart-specific fields of 
-this structure.Note that a virtual hart context structure may consist of 
+this structure. Note that a virtual hart context structure may consist of 
 more than 1 4KB page. The number of pages are enumerated via the tsm_info call.
 
 | <<sbi_tee_host_add_tvm_measured_pages, sbi_tee_host_add_tvm_measured_pages>> | This 
@@ -1567,7 +1566,7 @@ Reclaim TVM GPA AIA address from confidential
 
 | <<sbi_tee_guest_share_memory_region, sbi_tee_guest_share_memory_region>> | This 
 intrinsic is used by the TVM to request the conversion of the specified GPA to 
-non-confidential (from confidential).The GPA must be mapped to the TVM in a 
+non-confidential (from confidential). The GPA must be mapped to the TVM in a 
 present state, and must be scrubbed by the TVM before it is yielded. The TSM 
 enforces that the page is not-present in the G-stage page table and not
 tracked as a TEE page. The VMM owns the process of reclaiming the page.
@@ -1594,7 +1593,7 @@ via sbi_tee_guest_get_evidence. This interface specification is TBD.
 
 | <<sbi_tee_guest_get_evidence, sbi_tee_guest_get_evidence>>      | This 
 intrinsic is used by a TVM to get 
-attestation evidence to report to a (remote) relying party.It is supported 
+attestation evidence to report to a (remote) relying party. It is supported 
 by the TSM to provide HW-key-signed measurements of the TVM and the TSM. 
 The attestation key used to sign the evidence is provisioned into the TVM 
 by the TSM. The TSM certificate is provisioned by the FW TCB (TSM-driver 

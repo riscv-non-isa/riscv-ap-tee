@@ -484,7 +484,7 @@ Updating IOMMU MSI page tables.
 Copying interrupt state from the guest interrupt file to the virtual hart's MRIF.
 Converting the guest interrupt file back to a non-confidential state.
 
-Upon success the virtual hart is considered "unbound"and the guest interrupt file it 
+Upon success the virtual hart is considered "unbound" and the guest interrupt file it 
 was using is available for OS/VMM use.
 
 While a TVM virtual hart is unbound, MSIs directed at the virtual hart shall 
