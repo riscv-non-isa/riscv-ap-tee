@@ -1140,7 +1140,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_interrupt_convert_aia_imsic]
+[#sbi_tee_interrupt_convert_tvm_aia_imsic]
 === Function: TEE Interrupt Convert AIA IMSIC (FID #2)
 [source, C]
 -------
@@ -1553,10 +1553,10 @@ intrinsic is supported by the TSM to configure AIA virtualization for the TVM
 | <<sbi_tee_interrupt_set_tvm_aia_cpu_imsic_addr, sbi_tee_interrupt_set_tvm_aia_cpu_imsic_addr>> | 
 Set TVM CPU AIA address
 
-| <<sbi_tee_interrupt_convert_aia_imsic, sbi_tee_interrupt_convert_aia_imsic>> | Convert 
+| <<sbi_tee_interrupt_convert_tvm_aia_imsic, sbi_tee_interrupt_convert_tvm_aia_imsic>> | Convert 
 TVM GPA AIA address to confidential
 
-| <<sbi_tee_interrupt_reclaim_aia_imsic, sbi_tee_interrupt_reclaim_aia_imsic>> | 
+| <<sbi_tee_interrupt_reclaim_tvm_aia_imsic, sbi_tee_interrupt_reclaim_tvm_aia_imsic>> | 
 Reclaim TVM GPA AIA address from confidential
 
 |===
