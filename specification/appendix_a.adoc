@@ -74,11 +74,14 @@ handled by the TSM (default all)
 | htimedeltah | Initialized by TSM per TVM configuration
 | hgatp       | TVM enforces page remap protection via this G-stage
 translation. Hart register is programmed by TSM to activate at TVM entry 
-via SRET
-| The values htval and htinst are cleared by TSM on TEECALL and masked (to 
-clear page offset) by the TSM on a TEERET when reporting a guest page 
-fault_The vs* and x/v/f registers are not listed here but are maintained by 
-the TSM per virtual hart for TVMs._ |                                                                            
+via SRET |
 |===
 
+[NOTE]
+====
+The values htval and htinst are cleared by TSM on TEECALL and masked (to
+clear page offset) by the TSM on a TEERET when reporting a guest page
+fault_The vs* and x/v/f registers are not listed here but are maintained by
+the TSM per virtual hart for TVMs.
+====
 
