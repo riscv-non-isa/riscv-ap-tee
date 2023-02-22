@@ -1626,6 +1626,11 @@ has stopped all virtual hart execution for the TVM. The TVM virtual hart
 may not be entered after this point. The VMM may start reclaiming TVM
 memory after this point.
 
+| <<sbi_tee_host_add_tvm_memory_region, sbi_tee_host_add_tvm_memory_region>> | Adds a
+memory region to the TVM at the specified range of guest physical address space. The
+memory range is confidential to the guest and may only be populated with confidential
+pages.
+
 | <<sbi_tee_host_add_tvm_page_table_pages, sbi_tee_host_add_tvm_page_table_pages>> | Add 
 one or more page mappings to the G-stage translation structure for a TVM.
 The pages to be used for the G-stage page table structures must have been converted
@@ -1651,6 +1656,11 @@ zero page for an existing mapping for a TVM page (post initialization).
 This operation adds a zero page into a mapping and keeps the mapping as 
 pending (i.e. access from the TVM will fault until the TVM accepts that GPA.
 
+| <<sbi_tee_host_add_tvm_shared_pages, sbi_tee_host_add_tvm_shared_pages>> | Maps
+the given number of pages of non-confidential memory into the TVM's physical address space.
+The guest physical address must lie within a region of non-confidential memory previously
+defined by the TVM via the guest interface to the TSM.
+
 | <<sbi_tee_host_create_tvm_vcpu, sbi_tee_host_create_tvm_vcpu>> | This operation 
 allows the VMM to assign TEE pages for a virtual hart context structure (VHCS) for a 
 specific TVM. This routine also initializes the hart-specific fields of 
@@ -1664,6 +1674,13 @@ physical hart, and may be performed only on a TVM virtual hart structure
 that is assigned to the TVM and one that is not already active. The TSM 
 verifies if the operation is performed in the right state for that 
 virtual hart.
+
+| <<sbi_tee_host_tvm_fence, sbi_tee_host_tvm_fence>> | Initiates a TLB invalidation
+sequence for all pages that have been invalidated in the given TVM's address space
+since the previous call to `sbi_tee_host_tvm_fence()`. The TLB invalidation sequence is
+completed when all vCPUs in the TVM that were running before the call to
+`sbi_tee_host_tvm_fence()` have taken a trap into the TSM, which the host can
+cause by sending an IPI to the physical CPUs on which the TVM's vCPUs are running.
 
 | sbi_tee_host_page_relocate                     | Relocate a page for an 
 existing mapping for a TVM page. This operation allows the VMM to reassign 
@@ -1701,11 +1718,47 @@ TVM GPA AIA address to confidential
 | <<sbi_tee_interrupt_reclaim_tvm_aia_imsic, sbi_tee_interrupt_reclaim_tvm_aia_imsic>> | 
 Reclaim TVM GPA AIA address from confidential
 
+| <<sbi_tee_interrupt_bind_aia_imsic, sbi_tee_interrupt_bind_aia_imsic>> |
+Binds a TVM vCPU to the current physical CPU using the confidential guest interrupt file.
+
+| <<sbi_tee_interrupt_unbind_aia_imsic_begin, sbi_tee_interrupt_unbind_aia_imsic_begin>> |
+Begins the unbind process for the specified vCPU from its guest interrupt file.
+
+| <<sbi_tee_interrupt_unbind_aia_imsic_end, sbi_tee_interrupt_unbind_aia_imsic_end>> |
+Completes the unbind process for the specified vCPU from its guest interrupt files after
+a TLB flush sequence for the TVM has been completed.
+
+| <<sbi_tee_interrupt_inject_tvm_cpu, sbi_tee_interrupt_inject_tvm_cpu>> |
+Injects an external interrupt with the given interrupt_id into the specified vCPU.
+
+| <<sbi_tee_interrupt_rebind_aia_imsic_begin, sbi_tee_interrupt_rebind_aia_imsic_begin>> |
+Begins the rebinding process for the specified vCPU to the current physical CPU and the specified
+confidential guest interrupt file. The host must complete a TLB invalidation sequence
+for the TVM before cloning old interrupt file state using `sbi_tee_interrupt_rebind_aia_imsic_clone()`.
+
+| <<sbi_tee_interrupt_rebind_aia_imsic_clone, sbi_tee_interrupt_rebind_aia_imsic_clone>> |
+Clones the old guest interrupt file of the specified vCPU. Caller must make sure to invoke this from
+old physical CPU. The guest interrupt file after this is free to be reclaimed or bound to another
+vCPU.
+
+| <<sbi_tee_interrupt_rebind_aia_imsic_end, sbi_tee_interrupt_rebind_aia_imsic_end>> |
+Completes the rebind process for the specified vCPU from this physical CPU and its guest
+interrupt files. Must be called from the same physical CPU as
+`sbi_tee_interrupt_rebind_aia_imsic_begin()`.
+
 |===
 
 === Summary of TEEI - TG-ABI
 
 |===
+
+| <<sbi_tee_guest_add_mmio_region, sbi_tee_guest_add_mmio_region>> |
+Marks the specified range of TVM physical address space starting at `tvm_gpa_addr` as used for emulated
+MMIO. Upon return, all accesses by the TVM within the range are trapped and may be emulated by the host.
+
+| <<sbi_tee_guest_remove_mmio_region, sbi_tee_guest_remove_mmio_region>> |
+Removes the specified range of TVM physical address space starting at `tvm_gpa_addr` from the emulated
+MMIO regions. Upon return, all accesses by the TVM within the range will result in a page fault.
 
 | <<sbi_tee_guest_share_memory_region, sbi_tee_guest_share_memory_region>> | This 
 intrinsic is used by the TVM to request the conversion of the specified GPA to 
@@ -1720,6 +1773,15 @@ This operation initiates TSM tracking of these pages and also changes the encryp
 properties of these pages. These pages can then be selected by the VMM to 
 allocate for TVM control structure pages, G-stage page table pages,
 and TVM pages.
+
+| <<sbi_tee_guest_allow_external_interrupt, sbi_tee_guest_allow_external_interrupt>> |
+Allows injection of the specified external interrupt ID into the calling TVM vCPU. Passing
+an `interrupt_id` of -1 allows injection of all external interrupts. TVM vCPUs are started with
+injection of external interrupts completely disabled by default.
+
+| <<sbi_tee_guest_deny_external_interrupt, sbi_tee_guest_deny_external_interrupt>> |
+Denies injection of the specified external interrupt ID into the calling TVM vCPU. Passing
+an `interrupt_id` of -1 denies injection of all external interrupts.
 
 | <<sbi_tee_guest_get_attcaps, sbi_tee_guest_get_attcaps>>   | This 
 intrinsic is used by a TVM to get attestation capabilities supported by the TSM.
