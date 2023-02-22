@@ -934,6 +934,32 @@ enum Exception {
 };
 -------
 
+[#sbi_tee_host_tvm_fence]
+=== Function: TEE Host Initiate TVM Fence (FID #15)
+[source, C]
+-----
+struct sbiret sbi_tee_host_tvm_fence(unsigned long tvm_guest_id);
+-----
+Initiates a TLB invalidation sequence for all pages that have been invalidated in the
+given TVM's address space since the previous call to `sbi_tee_host_tvm_fence()`. The TLB
+invalidation sequence is completed when all vCPUs in the TVM that were running prior to
+the call to `sbi_tee_host_tvm_fence()` have taken a trap into the TSM, which the host can
+cause by sending an IPI to the physical CPUs on which the TVM's vCPUs are running. Note
+that the physical CPUs don't have to necessarily perform anything on those IPIs. An error is
+returned if a TLB invalidation sequence is already in progress for the TVM.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_tvm_fence_errors]
+.TEE Host Initiate TVM Fence
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_ALREADY_STARTED | A fence operation is already in progress.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
 == TEE Interrupt Extension (EID #0x54414949)
 The TEE Interrupt extension supplements the TEE Host extension with hardware-assisted interrupt
 virtualization using the RISC-V Advanced Interrupt Architecture (AIA) on platforms which
