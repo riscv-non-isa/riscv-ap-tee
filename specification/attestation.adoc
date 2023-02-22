@@ -46,9 +46,9 @@ Figure 4: Remote Attestation Framework (IETF RATS)
 
 This TEE proposal uses the layered attestation model <<R1>> where the RoT 
 is the initial Attesting Environment. Claims are collected from or about 
-each layer.  The corresponding Claims can be structured in a nested fashion 
-that reflects the nesting of the Attester's layers.  The previous layer 
-acts as the Attesting Environment for the next layer.  Claims about a RoT 
+each layer. The corresponding claims can be structured in a nested fashion 
+that reflects the nesting of the Attester's layers. The previous layer 
+acts as the Attesting Environment for the next layer. Claims about a RoT 
 typically are asserted by an Endorser.
 
 The following are the key requirements for attestation mapped to this 

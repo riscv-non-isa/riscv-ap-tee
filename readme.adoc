@@ -15,7 +15,7 @@ https://github.com/riscv-non-isa/riscv-ap-tee/blob/main/specification/contributo
 = Dependencies
 
 This project is built using AsciiDoctor (Ruby). The repository has been setup to build the PDF on
-checkin using GitHub actions.  Workflow dependencies are located in the `dependencies` directory.
+checkin using GitHub actions. Workflow dependencies are located in the `dependencies` directory.
 
 For more information on AsciiDoctor, specification guidelines, or building locally, see the
 https://github.com/riscv/docs-dev-guide[RISC-V Documentation Developer Guide].
@@ -27,7 +27,7 @@ to include the https://github.com/riscv/docs-resources[RISC-V docs-resources pro
 to achieve a common look and feel.
 
 When cloning this repository for the first time, you must either use 
-`git clone --recurse-submodules` or execute `git submodule init` and `git submodule update` after the clone to populate the docs-resources directory.  Failure to clone the submodule, will result
+`git clone --recurse-submodules` or execute `git submodule init` and `git submodule update` after the clone to populate the docs-resources directory. Failure to clone the submodule, will result
 in the PDF build fail with an error message like the following:
 
     $ make

@@ -6,7 +6,7 @@ Confidential computing defines the mechanisms for protecting the confidentiality
 
 The TG aims to deliver: 
 
-- A non-ISA specification for an ABI between the TCB and non-TCB components. This ABI enables OS/VMM software to manage confidential workloads, while keeping the OS/VMM software, firmware, developers and system operators outside the TCB.  A related non-ISA specification for an ABI between the TCB and workload components e.g. a TEE VM will be specified. 
+- A non-ISA specification for an ABI between the TCB and non-TCB components. This ABI enables OS/VMM software to manage confidential workloads, while keeping the OS/VMM software, firmware, developers and system operators outside the TCB. A related non-ISA specification for an ABI between the TCB and workload components e.g. a TEE VM will be specified. 
 
 -  ISA extensions required to fill potential gaps in the ratified privileged ISA (specifically H-extension) needed to satisfy security, performance, TCB isolation, and attestation requirements of various deployment models. Creation of new ISA extensions will be in collaboration with the Privileged Arch. TG and will work with the Priv committee to proceed in the appropriate fashion (as part of this TG or a new TG under priv or fastrack).
 

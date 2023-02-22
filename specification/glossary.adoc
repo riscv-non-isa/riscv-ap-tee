@@ -9,7 +9,7 @@ for this software entity.
 
 | VM | Virtual Machines hosted by a VMM
 
-| Host software | All software elements including type-1 or type 2 HS-mode VMM 
+| Host software | All software elements including type-1 or type-2 HS-mode VMM 
 and OS; U mode user-space VMM tools; ordinary VMs hosted by the VMM that 
 emulate devices. The hosting platform is typically a multi-tenant platform 
 that hosts multiple mutually distrusting Tenants.
@@ -83,7 +83,7 @@ information.
 
 | CDI | Compound Device Identifier - This value represents the hardware, 
 software and firmware combination measured by the TCB elements transitively. 
-A CDI is the output of a DICE <<R2>> and is passed to the entity  which is 
+A CDI is the output of a DICE <<R2>> and is passed to the entity which is 
 measured by the previous TCB layer. The CDI is a secret that may be 
 certified to use for attestation protocols. 
 
