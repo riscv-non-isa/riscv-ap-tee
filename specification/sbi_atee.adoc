@@ -960,7 +960,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-== TEE Interrupt Extension (EID #0x54414949)
+== TEE Interrupt Extension (EID #0x54454549)
 The TEE Interrupt extension supplements the TEE Host extension with hardware-assisted interrupt
 virtualization using the RISC-V Advanced Interrupt Architecture (AIA) on platforms which
 support it.
@@ -1102,6 +1102,190 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_SUCCESS             | The operation completed successfully.
 | SBI_ERR_INVALID_ADDRESS | `imsic_page_addr` was invalid.
 | SBI_ERR_INVALID_PARAM   | The memory is still assigned to a TVM.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+[#sbi_tee_interrupt_bind_aia_imsic]
+=== Function: TEE Interrupt Bind AIA IMSIC (FID #4)
+[source, C]
+-------
+struct sbiret sbi_tee_interrupt_bind_aia_imsic(unsigned long tvm_guest_id,
+                                               unsigned long tvm_vcpu_id,
+                                               unsigned long imsic_mask);
+-------
+
+Binds a TVM vCPU to the current physical CPU using the confidential guest interrupt files
+specified in `imsic_mask`, restoring interrupt state from the vCPU's software interrupt
+file if necessary. Note that `imsic_mask` is in the same format as the `hgeie` and `hgeip`
+CSRs, that is bit N corresponds to guest interrupt file N-1 and bit `0` is always `0`. The
+number of bits set in `imsic_mask` must be equal to the number of interrupt files in the
+vCPU's virtualized IMSIC (i.e. 1 + `guests_per_hart`). The vCPU must currently be unbound.
+Upon completion, the vCPU is eligible to be run on this CPU with `sbi_tee_host_run_tvm_vcpu()`.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_bind_aia_imsic_errors]
+.TEE Interrupt Bind AIA IMSIC
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `tvm_vcpu_id` or `imsic_mask`
+                            were invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+[#sbi_tee_interrupt_unbind_aia_imsic_begin]
+=== Function: TEE Interrupt Bind AIA IMSIC Begin (FID #5)
+[source, C]
+-------
+struct sbiret sbi_tee_interrupt_unbind_aia_imsic_begin(unsigned long tvm_guest_id,
+                                                       unsigned long tvm_vcpu_id);
+-------
+
+Begins the unbinding process for the specified vCPU from its guest interrupt files. The
+translations for the vCPU's virtualized IMSIC are invalidated, and a TLB flush sequence
+for the TVM must be completed before calling `sbi_tee_interrupt_unbind_aia_imsic_end()`
+to complete the unbinding process. Must be called on the physical CPU to which the vCPU is bound.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_unbind_aia_imsic_begin_errors]
+.TEE Interrupt Unbind AIA IMSIC Begin
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation was completed successfully.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `tvm_vcpu_id` were invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+[#sbi_tee_interrupt_unbind_aia_imsic_end]
+=== Function: TEE Interrupt Bind AIA IMSIC End (FID #6)
+[source, C]
+-------
+struct sbiret sbi_tee_interrupt_unbind_aia_imsic_end(unsigned long tvm_guest_id,
+                                                     unsigned long tvm_vcpu_id);
+-------
+
+Completes the unbinding process for the specified vCPU from its guest interrupt files after
+a TLB flush sequence for the TVM has been completed. The interrupt state is saved to the vCPU's
+software interrupt file and the guest interrupt files are free to be reclaimed via
+`sbi_tee_interrupt_reclaim_tvm_aia_imsic()` or bound to another vCPU via `sbi_tee_interrupt_unbind_aia_imsic_begin()`.
+Must be called on the physical CPU to which the vCPU is bound. Upon success, the vCPU is 
+free to be bound to another physical CPU.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_unbind_aia_imsic_end_errors]
+.TEE Interrupt Unbind AIA IMSIC End
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation was completed successfully.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `tvm_vcpu_id` were invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+[#sbi_tee_interrupt_inject_tvm_cpu]
+=== Function: TEE Interrupt Inject TVM CPU (FID #7)
+[source, C]
+-------
+struct sbiret sbi_tee_interrupt_inject_tvm_cpu(unsigned long tvm_guest_id,
+                                               unsigned long tvm_vcpu_id
+                                               unsigned long interrupt_id);
+-------
+
+Injects an external interrupt with the given `interrupt_id` into the specified vCPU. If the
+vCPU is presently bound to an IMSIC guest interrupt file, the interrupt is immediately
+injected by writing to the interrupt file. If it is not bound, the interrupt is recorded
+in the software and will be injected once the vCPU becomes bound. The specified interrupt ID
+must be valid and must have been allowed by the guest with `sbi_tee_guest_allow_external_interrupt()`.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_interrupt_inject_tvm_cpu_errors]
+.TEE Interrupt Inject TVM CPU
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `tvm_vcpu_id` or `interrupt_id` were invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+[#sbi_tee_interrupt_rebind_aia_imsic_begin]
+=== Function: TEE Interrupt Rebind AIA IMSIC Begin (FID #8)
+[source, C]
+-------
+struct sbiret sbi_tee_interrupt_rebind_aia_imsic_begin(unsigned long tvm_guest_id,
+                                                       unsigned long tvm_vcpu_id,
+                                                       unsigned long imsic_mask);
+-------
+
+Begins the rebinding process for the specified vCPU to the current physical CPU and the specified
+confidential guest interrupt file. The host must complete a TLB invalidation sequence
+for the TVM before cloning the old interrupt file state using `sbi_tee_interrupt_rebind_aia_imsic_clone()`.
+Once cloned, the old file will be restored to the new guest interrupt file on 
+`sbi_tee_interrupt_rebind_aia_imsic_end()` invocation.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_rebind_aia_imsic_begin_errors]
+.TEE Interrupt Rebind AIA IMSIC Begin
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation was completed successfully.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `tvm_vcpu_id` or `imsic_mask` were invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+[#sbi_tee_interrupt_rebind_aia_imsic_clone]
+=== Function: TEE Interrupt Rebind AIA IMSIC Clone (FID #9)
+[source, C]
+-------
+struct sbiret sbi_tee_interrupt_rebind_aia_imsic_clone(unsigned long tvm_guest_id,
+                                                       unsigned long tvm_vcpu_id);
+-------
+
+TSM clones the old guest interrupt file of the specified VCPU. The cloned copy is maintained in VCPU
+specific structure visible to TSM only. The host must make sure to invoke this from the old physical
+CPU. The guest interrupt file after this is free to be reclaimed or bound to another VCPU.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_rebind_aia_imsic_clone_errors]
+.TEE Interrupt Rebind AIA IMSIC Clone
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation was completed successfully.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `tvm_vcpu_id` were invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+[#sbi_tee_interrupt_rebind_aia_imsic_end]
+=== Function: TEE Interrupt Rebind AIA IMSIC End (FID #10)
+[source, C]
+-------
+struct sbiret sbi_tee_interrupt_rebind_aia_imsic_end(unsigned long tvm_guest_id,
+                                                     unsigned long tvm_vcpu_id);
+-------
+
+Completes the rebinding process for the specified vCPU from this physical CPU and its guest
+interrupt files. Must be called from the same physical CPU as
+`sbi_tee_interrupt_rebind_aia_imsic_begin()`.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_rebind_aia_imsic_end_errors]
+.TEE Interrupt Rebind AIA IMSIC End
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation was completed successfully.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `tvm_vcpu_id` were invalid.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 

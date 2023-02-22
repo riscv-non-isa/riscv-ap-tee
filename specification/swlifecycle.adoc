@@ -431,6 +431,13 @@ migrating any interrupt state from the virtual hart's MRIF.
 *Unbinding* a TVM virtual hart from an IMSIC guest interrupt file and 
 migrating interrupt state to an MRIF.
 
+If MRIFs are not supported by the hardware then TSM must additionally support one
+more operation to allow TVM virtual hart migration from one physical hart to another:
+
+*Rebinding* a TVM virtual hart to an IMSIC guest interrupt file on a physical CPU,
+migrating any interrupt state from the virtual hart's previous IMSIC guest interrupt
+file.
+
 Additionally, the TSM must provide a way for the OS/VMM to query if an inactive 
 virtual hart has external interrupts pending. The TH-ABI calls to support these 
 operations are described below:
@@ -492,6 +499,35 @@ trigger the notice interrupt registered in tvm_vhart_aia_init. Attempts by other
 TVM virtual harts to write the virtual hart's IMSIC in the guest physical address 
 space (e.g. for the purposes of generating an IPI) shall generate a guest page 
 fault exit on the virtual hart which initiated the write.
+
+*tvm_vhart_imsic_rebind*
+
+Rebinds a virtual hart to a guest interrupt file on the current physical hart.
+The guest interrupt file number is supplied by the OS/VMM. State of the previous
+guest interrupt file is copied over to the new file at the end of the operation.
+
+This is an optional interface that must be supported in case of missing MRIF
+support. Given the complexity introduced due to missing MRIF the interface
+is divided into three ABI calls to migrate a virtual hart:
+
+* tvm_vhart_imsic_rebind_begin(): Attaches the hart to the new interrupt file and
+updates IOMMU MSI page tables with the address of the new interrupt file. The previous
+interrupt file is no more in use after this call and all the interrupts are forwarded
+to the new interrupt file.
+* tvm_vhart_imsic_rebind_clone(): This must be called from the previous physical hart to
+create a copy of the previous interrupt file state.
+* tvm_vhart_imsic_rebind_end(): Must be run on the new hart. This call copies over the
+saved interrupt state to new interrupt file.
+
+Upon success, the virtual hart is considered "bound" to the current physical hart and
+is eligible to be run. Attempts to run the virtual hart on a different physical hart
+or to run a "rebinding" virtual hart shall return an error. The previous interrupt file
+is now free to be used by another virtual hart.
+
+Note that depending on the implementation's mechanism for isolating guest interrupt
+files, a coordinated TLB invalidation of the guest interrupt file using the
+invalidate + fence procedure described in <<TVM memory management>> may be required when
+converting the interrupt file to confidential memory.
 
 *tvm_vhart_external_interrupt_pending*
 
