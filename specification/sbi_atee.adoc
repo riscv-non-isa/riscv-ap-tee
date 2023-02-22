@@ -101,36 +101,117 @@ This operation requires the host to convert a sufficient number of non-confident
 payload for the TVM from non-confidential pages to confidential pages, and extends the corresponding measurements for the
 TVM.
 
-===== VCPU shared state enumeration
-The TSM communicates additional information about TVM exits from `sbi_tee_host_run_tvm_vcpu()` using a non-confidential
-shared memory region that's configured on a per-VCPU basis by the host. The host can also use this shared memory
-region to control and configure TVM parameters like the initial-entry point (SEPC), initial parameter, etc., and
-to respond to TVM exits.
+===== VCPU shared state
+Host needs access to some of the TVM CSRS and GPRs to handle TVM exits. For example, the host needs `htval` to determine
+the fault address, `a0`-`a7` GPRs are needed to handle forwarded ECALLs and so on. For this purpose, the host and TSM use NACL
+Extension based shared memory interface <<R10>>, from now on called NACL shared memory to avoid confusion with shared memory pages
+between TVM and the host.
 
-The layout of the shared-memory region can vary by TSM version. The host can determine the size and offset of the
-regions enumerated in `vcpu_register_set_id` by calling `sbi_tee_host_get_tvm_vcpu_num_register_sets()` to get the
-number of enumerated sets, and then `sbi_tee_host_get_tvm_vcpu_num_register_sets()` to determine the offset.
+The NACL shared memory interface is between TSM and the host and TSM is responsible for writing any trap-related CSRs and GPRs
+needed by the host to handle the exception. TSM is also responsible for reading the returned result and forwarding it to the TVM.
+Further details about which CSRs and GPRS are used by the TSM and the host can be found in <<table_tsm_csr_updates_in_nacl>>.
+The layout of NACL shared memory is shown below as `struct nacl_shmem` and `scratch` space layout for TSM is shown as
+`struct tsm_shmem_scratch`.
+
+[source, C]
+-------------------
+struct nacl_shmem {
+    /* Scratch space. The layout of this scratch space is defined by the particular function being
+     * invoked.
+     *
+     * For the `sbi_tee_host_run_tvm_vcpu()` function in the TEE-H extension, the layout of this 
+     * scratch space matches the `tsm_shmem_scratch` struct given below.
+     */
+    uint64_t scratch[256];
+    uint64_t _reserved[240];
+    /* Bitmap indicating which CSRs in `csrs` the host wishes to sync.
+     *
+     * Currently unused in the TEE-related extensions and will not be read or written by the TSM.
+     */
+    uint64_t dirty_bitmap[16];
+    /* Hypervisor and virtual-supervisor CSRs. The 12-bit CSR number is transformed into a 10-bit
+     * index by extracting bits `{csr[11:10], csr[7:0]}` since `csr[9:8]` is always 2'b10 for HS
+     * and VS CSRs.
+     *
+     * These CSRs may be updated by `sbi_tee_host_run_tvm_vcpu()` in the TEE-Host extension. See
+     * the documentation of `sbi_tee_host_run_tvm_vcpu()` for more details.
+     */
+    uint64_t csrs[1024];
+};
+
+struct tsm_shmem_scratch {
+    /* General purpose registers for a TVM guest.
+     *
+     * The TSM will always read or write the minimum number of registers in this set to complete
+     * the requested action. To avoid leaking information from the TVM, the TSM must follow the
+     * given rules.
+     *
+     * The TSM will write to these registers upon return from `sbi_tee_host_run_tvm_vcpu()` when:
+     *  - The vCPU takes a store guest page fault in an emulated MMIO region.
+     *  - The vCPU makes an ECALL that is to be forwarded to the host.
+     *
+     * The TSM will read from these registers when:
+     *  - The vCPU takes a load guest page fault in an emulated MMIO region.
+     */
+    uint64_t guest_gprs[32];
+    uint64_t _reserved[224];
+};
+-------------------
+
+The below table describes the list of CSRs and GPRs that the TSM and the host are supposed to use from NACL shared memory.
+It also describes the operation allowed for each entity in terms of `R` (read) and `W` (write) permissions. Note that the TSM
+and the host can read/write to any of the fields without any faults but the permissions depict the expected use case. For write only
+CSRs or GPRs TSM is supposed to ignore any modifications by the host. TSM is only supposed to take modifications from CSRs or GPRs
+with read permission such as `a0` and `a1` GPRs.
+
+[#table_tsm_csr_updates_in_nacl]
+.TSM NACL CSRs and GPRs
+[cols="2,1,1,12", width=100%, align="center", options="header"]
+|===
+| *CSRs*     | *TSM* | *Host* | *Purpose*
+| htinst     |  W    |  R     | TSM writes the faulting instruction into htinst to allow the host to emulate the MMIO.
+| htval      |  W    |  R     | In case of a guest page-fault, TSM writes the guest's physical address that faulted into
+                                htval CSR.
+| htimedelta |  W    |  R     | TSM writes the guest htimedelta in this CSR. This is to allow the host to schedule an internal
+                                software timer for the guest to keep the timer interrupt ticking.
+| vstimecmp  |  W    |  R     | TSM writes the guest's vstimecmp to allow the host to schedule an internal software timer for the guest. 
+| vsie       |  W    |  R     | TSM writes the guest's vsie to allow the host to check which interrupts are enabled. This is useful
+                                in waking up a guest's vcpu when it's sleeping due to a `WFI` instruction.
+| *GPRs*     |       |        |
+| a0         |  RW   |  RW    | Used for both passing argument and returning the result for ECALLs forwarded to the host.
+| a1         |  RW   |  RW    | Used for both passing argument and returning the result for ECALLs forwarded to the host.
+| a2         |  W    |  R     | Used for passing an argument for ECALLs forwarded to the host.
+| a3         |  W    |  R     | Used for passing an argument for ECALLs forwarded to the host.
+| a4         |  W    |  R     | Used for passing an argument for ECALLs forwarded to the host.
+| a5         |  W    |  R     | Used for passing an argument for ECALLs forwarded to the host.
+| a6         |  W    |  R     | Used for passing an argument for ECALLs forwarded to the host.
+| a7         |  W    |  R     | Used for passing an argument for ECALLs forwarded to the host.
+| x0-x31     |  RW   |  RW    | Any of the GPR used in load/store instruction trapped for MMIO emulation.
+|===
+
+[TIP]
+====
+It's recommended that the TSM should transform the load or store instruction to/from `a0` before writing to the htinst CSR.
+So that `a0` will be the only GPR used for MMIO emulation reducing the GPRs accessible to the host.
+====
 
 ===== VCPU creation
 The host must register CPUs/harts with the TSM before they can be used for TVM execution by calling
-`sbi_tee_host_create_tvm_vcpu()`. The host must also configure the non-confidential shared memory
-that's set-up by the host while creating the VCPU. The shared memory is used both the host and the
-TSM for when processing TVM exits from `sbi_tee_run_vcpu()`.
+`sbi_tee_host_create_tvm_vcpu()`. The NACL shared memory interface is used between the host and the
+TSM for processing TVM exits from `sbi_tee_host_run_tvm_vcpu()`.
 
 ===== TVM execution
 Following the assignment of memory and VCPU resources, the host can transition the guest into a `TVM_RUNNABLE`
-state by calling `sbi_tee_host_finalize_tvm()`. Note that some TEE calls are no longer permissible after this
-transition.
+state by calling `sbi_tee_host_finalize_tvm()`. The host must set up TVM Boot vCPU execution parameters like the
+entrypoint (`ENTRY_PC`) and boot argument (`ENTRY_ARG`) using arguments to `sbi_tee_host_finalize_tvm()`. Note that
+some TEE calls are no longer permissible after this transition.
 
-The host can use the aforementioned shared-memory to set up TVM execution parameters like the
-entrypoint (`ENTRY_PC`) / boot argument (`ENTRY_ARG`), then `sbi_tee_host_finalize_tvm()`, followed by
-`sbi_tee_host_run_tvm_vcpu()` to begin execution. The host must boot vCPU `0` first otherwise
-`sbi_tee_host_run_tvm_vcpu()` call will fail. TVM execution continues until there an event like an
-interrupt, or fault that cannot be serviced by the TSM. Some interrupts and exceptions are resumable,
-and the host can determine reason specific reason by examining the `scause` field in the `tvm_vcpu_supervisor_csrs`
-previously setup by the call to `sbi_tee_host_create_tvm_vcpu()`. The host can then examine the shared-memory region
-if needed to determine further course of action. This may involve servicing exits caused by TVM-ECALLs that require
-host action(like adding of MMIO and shared-memory regions), TVM page-faults, virtual instructions, etc.
+The host can then call sbi_tee_host_run_tvm_vcpu()` to begin execution. The host must boot vCPU `0` first otherwise
+`sbi_tee_host_run_tvm_vcpu()` call will fail. TVM execution continues until there is an event like an interrupt, or
+fault that cannot be serviced by the TSM. Some interrupts and exceptions are resumable, and the host can determine
+specific reason by examining the `scause` CSR. The host can then examine the NACL shared memory if needed to determine
+further course of action. This may involve servicing exits caused by TVM-ECALLs that require host action (like adding
+MMIO region or share memory with the host), TVM page-faults, virtual instructions, etc.
 
 ===== Mapping confidential demand-zero pages and non-confidential shared pages
 The host can handle TVM page-faults by determining whether it was caused by access to a confidential or
@@ -144,13 +225,15 @@ shared memory regions are defined by the TVM using the EXT_TEE_GUEST extension.
 
 ===== Handling MMIO faults
 TVMs can define MMIO regions using the EXT_TEE_GUEST extension, and a runtime access to such a region causes
-a resumable exit from the TVM. The host can examine the exit code and `scause`, update the per-VCPU
-shared-memory region as appropriate, and resume TVM execution. This may involve instruction decoding
-using the information from the shared-memory region.
+a resumable exit from the TVM. The host can examine the exit code from `scause` CSR, and when the exception
+is a guest load/store page fault, the host will check if the fault address belongs to any of the registered MMIO
+emulation regions. The fault address information comes from `stval` and `htval` CSRs. After emulation, the host
+updates the NACL shared memory region as appropriate and resumes TVM execution. This process also involves instruction
+decoding using the `htinst` CSR from the NACL shared memory region.
 
 ===== Handling virtual instructions
 The host can handle exits caused by virtual instruction by examining and decoding the contents of the
-shared-memory region.
+NACL shared memory region.
 
 ===== Management of secure interrupts
 The host can use the Tee Interrupt Extension (EXT_TEE_INTERRUPT) to manage secure TVM interrupts on
@@ -219,121 +302,6 @@ enum tvm_state {
     TVM_RUNNABLE = 1,
 };
 -------------------
-
-[source, C]
--------------------
-enum vcpu_register_set_id {
-    /* General purpose registers */
-    GPRS = 0,
-    /* Supervisor CSRs */
-    SUPERVISOR_CSRS = 1,
-    /* Hypervisor (HS-level) CSRs */
-    HYPERVISOR_CSRS = 2,
-};
--------------------
-
-[source, C]
--------------------
-/*
- * General purpose registers for the TVM VCPU.
- * Corresponds to `GPRS` in `vcpu_register_set_id`.
- */
-struct tvm_vcpu_supervisor_gprs {
-    /*
-     * Indexed VCPU GPRs from X0 - X31.
-     *
-     * The TSM will always read or write the minimum number of registers in this set to
-     * complete the requested action, in order to avoid leaking information from the TVM.
-     *
-     * The TSM will write to these registers upon return from `TvmCpuRun` when:
-     * 1) The VCPU takes a store guest page fault in an emulated MMIO region.
-     * 2) The VCPU makes an ECALL that is to be forwarded to the host.
-     *
-     * The TSM will read from these registers when:
-     * 1) The VCPU takes a load guest page fault in an emulated MMIO region.
-     * 2) The host calls `sbi_tee_host_finalize_tvm()`, latching the entry point argument
-     * (stored in 'A1') for the boot VCPU.
-     *
-     */
-    unsigned long gprs[32];
-};
--------------------
-
-[source, C]
--------------------
-/*
- * Hypervisor [HS-level] CSRs.
- * Corresponds to `HYPERVISOR_CSRS` in `vcpu_register_set_id`.
- */
-struct tvm_vcpu_hypervisor_csrs {
-    /*
-     *
-     * HTVAL value for guest page faults taken by the TVM vCPU. Written by the TSM 
-     * upon return from `sbi_tee_host_run_tvm_vcpu()`.
-     *
-     */
-    unsigned long htval;
-    /*
-     *
-     * HTINST value for guest page faults or virtual instruction exceptions taken by the TVM vCPU.
-     *
-     * The TSM will only write `htinst` in the following cases:
-     *
-     * MMIO load page faults. The value written to the register in `gprs` corresponding to the
-     * 'rd' register in the instruction will be used to complete the load upon the next call to
-     * `sbi_tee_host_run_tvm_vcpu()` for this vCPU.
-     *
-     * MMIO store page faults. The TSM will write the value to be stored by the vCPU to the
-     * register in `gprs` corresponding to the 'rs2' register in the instruction upon return
-     * from `sbi_tee_host_run_tvm_vcpu()`.
-     *
-     */
-    unsigned long htinst;
-};
--------------------
-
-[source, C]
--------------------
-/*
- * Supervisor-level CSRs.
- * Corresponds to `SUPERVISOR_CSRS` in `vcpu_register_set_id`.
- */
-struct tvm_vcpu_supervisor_csrs {
-    /*
-     * Initial SEPC value (entry point) of a TVM vCPU. Latched for the TVM's boot VCPU when
-     * sbi_tee_host_finalize_tvm() is called; ignored for all other VCPUs.
-     */
-    unsigned long sepc;
-    /*
-     * SCAUSE value for the trap taken by the TVM vCPU. Written by the TSM upon return from
-     * `sbi_tee_host_run_tvm_vcpu()`
-     */
-    unsigned long scause;
-    /*
-     * STVAL value for guest page faults or virtual instruction exceptions taken by the TVM VCPU.
-     * Written by the TSM upon return from sbi_tee_host_run_tvm_vcpu()
-     *
-     * Note that guest virtual addresses are not exposed by the TSM, so only the 2 LSBs will
-     * ever be non-zero for guest page fault exceptions.
-     */
-    unsigned long stval;
-};
--------------------
-
-[source, C]
------------------
-struct tvm_vcpu_register_set_location {
-    /*
-     * A value of enum type `vcpu_register_set_id`.
-     */
-    uint16_t id;
-    /*
-     * The offset of the register set from the start of the VCPU's shared-memory state area.
-     */
-    uint16_t offset;
-};
------------------
-
 
 [#sbi_tee_host_get_tsm_info]
 === Function: TEE Host Get TSM Info (FID #0)
@@ -578,12 +546,15 @@ The possible error codes returned in `sbiret.error` are shown below.
 === Function: TEE Host Finalize TVM (FID #6)
 [source, C]
 ------
-struct sbiret sbi_tee_host_finalize_tvm(unsigned long tvm_guest_id);
+struct sbiret sbi_tee_host_finalize_tvm(unsigned long tvm_guest_id,
+                                        unsigned long entry_sepc,
+                                        unsigned long entry_arg);
 ------
 Transitions the TVM specified by `tvm_guest_id` from the `TVM_INITIALIZING` state to a `TVM_RUNNABLE`
-state. The host must finalize TVM shared-memory execution parameters like the entry point (`ENTRY_PC`)
-and boot argument (`ENTRY_ARG`) on the boot VCPU configured by `sbi_tee_host_create_tvm()` before making
-this call.
+state. Also, sets the entry point (`ENTRY_PC`) using `entry_sepc` and boot argument (`ENTRY_ARG`) 
+using `entry_arg` for the boot VCPU. Both `entry_sepc` and `entry_arg` are included in the measurement
+of the TVM. 'entry_sepc' is the address in TVM binary to start the boot VCPU from and `entry_arg` is 
+the address of guest fdt and is passed as an argument to the boot VCPU in `a1` GPR. 
 
 The TSM enforces that a TVM virtual harts cannot be entered unless the TVM measurement is committed 
 via this operation. No additional measured pages may be added after this operation is successfully completed.
@@ -823,82 +794,18 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_get_tvm_vcpu_num_register_sets]
-=== Function: TEE Host Get TVM VCPU Num Register Sets (FID #13)
-[source, C]
------
-struct sbiret sbi_tee_host_get_tvm_vcpu_num_register_sets(unsigned long tvm_guest_id);
------
-
-*Returns* the number of register sets in the VCPU shared-memory state area for vCPUs of `guest_id`
-in sbiret.value on success. The host can use this to enumerate the number of individual register
-sets in the vCPU shared-memory state area (also enumerated by the `vcpu_register_set_id` enum).
-The offsets for the state can vary across TSM versions, and they can be determined by calling
-`sbi_tee_host_get_tvm_vcpu_register_set()`.
-
-Note that the VCPU layout is likely to be common across all TVMs, in which case the host can enumerate
-it once. The interface is intended to provide future extensibility to accommodate heterogeneous TVMs
-that may choose to "opt-in" or "opt-out" of specific platform extensions.
-
-The possible error codes returned in `sbiret.error` are shown below.
-
-[#table_sbi_tee_host_get_tvm_vcpu_num_register_sets_errors]
-.TEE Host Get TVM VCPU Num Register Sets
-[cols="2,3", width=90%, align="center", options="header"]
-|===
-| Error code                    | Description
-| SBI_SUCCESS                   | The operation completed successfully.
-| SBI_ERR_INVALID_PARAM         | `tvm_guest_id` was invalid.
-| SBI_ERR_FAILED                | The operation failed for unknown reasons.
-|===
-
-[#sbi_tee_host_get_tvm_vcpu_register_set]
-=== Function: TEE Host Get TVM VCPU Register Set (FID #14)
-[source, C]
------
-struct sbiret sbi_tee_host_get_tvm_vcpu_register_set(unsigned long tvm_guest_id,
-                                                     unsigned long vcpu_register_set_id);
------
-
-The host can use this this interface to discover the shared-memory offset of the VCPU state corresponding
-to the enum values in `vcpu_register_set_id` for `tvm_guest_id`. The `vcpu_register_set_id` parameter must
-be a legal value for the `vcpu_register_set_id` enum.
-
-*Returns* a 32-bit value with the same layout as the `tvm_vcpu_register_set_location` structure in sbiret.value
-on success.
-
-Note that the VCPU layout is likely to be common across all TVMs, in which case the host can enumerate
-it once. The interface is intended to provide future extensibility to accommodate heterogeneous TVMs
-that may choose to "opt-in" or "opt-out" of specific platform extensions.
-
-The possible error codes returned in `sbiret.error` are shown below.
-
-[#table_sbi_tee_host_get_tvm_vcpu_register_set_errors]
-.TEE Host Get TVM VCPU Register Set
-[cols="2,3", width=90%, align="center", options="header"]
-|===
-| Error code                    | Description
-| SBI_SUCCESS                   | The operation completed successfully.
-| SBI_ERR_INVALID_PARAM         | `tvm_guest_id` or `vcpu_register_set_id` was invalid.
-| SBI_ERR_FAILED                | The operation failed for unknown reasons.
-|===
-
 [#sbi_tee_host_create_tvm_vcpu]
-=== Function: TEE Host Create TVM VCPU (FID #15)
+=== Function: TEE Host Create TVM VCPU (FID #13)
 [source, C]
 -----
 struct sbiret sbi_tee_host_create_tvm_vcpu(unsigned long tvm_guest_id,
                                            unsigned long tvm_vcpu_id,
-                                           unsigned long tvm_state_page_addr,
-                                           unsigned long tvm_vcpu_shared_page_addr);
+                                           unsigned long tvm_state_page_addr);
 -----
 Adds a VCPU with ID `vcpu_id` to the TVM specified by `tvm_guest_id`. `tvm_state_page_addr`
 must be page-aligned and point to a confidential memory region used to hold the TVM's vCPU
-state, and must be `tsm_info::tvm_state_pages` pages in length.`tvm_vcpu_shared_page_addr` must
-be page-aligned and point to a sufficient number of non-confidential pages to hold a structure
-with the maximum offset enumerated by `sbi_tee_host_get_tvm_vcpu_register_set`. These pages are
-"pinned" in the non-confidential state (i.e. cannot be converted to confidential) until the TVM
-is destroyed. This call must not be made after calling `sbi_tee_host_finalize_tvm()`.
+state, and must be `tsm_info::tvm_state_pages` pages in length. This call must not be made
+after calling `sbi_tee_host_finalize_tvm()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -914,7 +821,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_tee_host_run_tvm_vcpu]
-=== Function: TEE Host Run TVM VCPU (FID #16)
+=== Function: TEE Host Run TVM VCPU (FID #14)
 [source, C]
 -----
 struct sbiret sbi_tee_host_run_tvm_vcpu(unsigned long tvm_guest_id,
@@ -944,11 +851,9 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
 
-The TSM updates the `scause` field in the `tvm_vcpu_supervisor_csrs` region in the
-shared-memory for the VCPU that was previously configured by the host. The host should
-use the `scause` field to determine whether the exit was caused by an interrupt or exception,
-and then use the additional information in the shared-memory region to determine further
-course of action (if sbiret.value is 0).
+The TSM updates the hosts `scause` CSR. The host should use the `scause` field to determine whether
+the exit was caused by an interrupt or exception, and then use the additional information in the NACL
+shared memory region to determine further course of action (if sbiret.value is 0).
 
 The TSM sets the most significant bit in `scause` to indicate that the exit was caused
 by an interrupt, and if this bit is clear, the implication is that the exit was caused
@@ -990,9 +895,8 @@ enum Exception {
     USER_ENVCALL = 8,
     SUPERVISOR_ENVCALL = 9,
     /*
-     * The TVM made an ECALL request directed at the host.
-     * The host should examine GPRs A0-A7 in the `tvm_vcpu_supervisor_gprs`
-     * area of the VCPU shared-memory region to process the ECALL.
+     * The TVM made an ECALL request directed at the host. The host should examine GPRs A0-A7
+     * in the NACL shared memory area to process the ECALL.
     */
     VIRTUAL_SUPERVISOR_ENV_CALL = 10,
     /* Refer to the privileged spec for details. */
@@ -1002,32 +906,29 @@ enum Exception {
     STORE_PAGE_FAULT = 15,
     GUEST_INSTRUCTION_PAGE_FAULT = 20,
     /*
-     * The TVM encountered a load fault in a confidential, MMIO, or shared-memory
-     * region. The host should determine the fault address by retrieving the
-     * `htval` from `tvm_vcpu_hypervisor_csrs` and `stval` from `tvm_vcpu_supervisor_csrs`
-     * and combining them as follows: "(htval << 2) | (stval & 0x3)". The fault address
-     * can then be used to determine the type of memory region, and making the appropriate
-     * call (example: sbi_tee_host_add_tvm_zero_pages() to add a demand-zero confidential
-     * page if applicable), and then calling sbi_tee_host_run_tvm_vcpu to resume execution at
-     * the following instruction.
-    */
+     * The TVM encountered a load fault in a confidential, MMIO, or shared memory region. The
+     * host should determine the fault address by retrieving the `htval` and `stval` CSRs and
+     * combining them as follows: "(htval << 2) | (stval & 0x3)". The fault address can then
+     * be used to determine the type of memory region, and making the appropriate call 
+     * (example: sbi_tee_host_add_tvm_zero_pages() to add a demand-zero confidential page if
+     * applicable), and then calling sbi_tee_host_run_tvm_vcpu() to resume execution at the 
+     * following instruction.
+     */
     GUEST_LOAD_PAGE_FAULT = 21,
     /* 
-     * The TVM executed an instruction that caused an exit. The host should decode the
-     * instruction by examining `stval` from `tvm_vcpu_supervisor_csrs`, and determine
-     * the further course of action, and calling then calling sbi_tee_host_run_tvm_vcpu
-     * if appropriate to resume execution at the following instruction.
-    */
+     * The TVM executed an instruction that caused an exit. The host should decode the instruction
+     * by examining `htinst` CSR and determine the further course of action, and then calling
+     * sbi_tee_host_run_tvm_vcpu() if appropriate to resume execution at the following instruction.
+     */
     VIRTUAL_INSTRUCTION = 22,
     /*
-     * The TVM encountered a store fault in a confidential, MMIO, or shared-memory
-     * region. The host should determine the fault address by retrieving the
-     * `htval` from `tvm_vcpu_hypervisor_csrs` and `stval` from `tvm_vcpu_supervisor_csrs`
-     * and combining them as follows: "(htval << 2) | (stval & 0x3)". The fault address
-     * can then be used to determine the type of memory region, and making the appropriate
-     * call (example: sbi_tee_host_add_tvm_zero_pages() to add a demand-zero confidential
-     * page if applicable), and then calling sbi_tee_host_run_tvm_vcpu to resume execution at
-     * the following instruction.
+     * The TVM encountered a store fault in a confidential, MMIO, or shared memory region. The
+     * host should determine the fault address by retrieving the `htval` and `stval` CSRs and
+     * combining them as follows: "(htval << 2) | (stval & 0x3)". The fault address can then be
+     * used to determine the type of memory region, and making the appropriate call
+     * (example: sbi_tee_host_add_tvm_zero_pages() to add a demand-zero confidential page if
+     * applicable), and then calling `sbi_tee_host_run_tvm_vcpu()` to resume execution at the following
+     * instruction.
      */
     GUEST_STORE_PAGE_FAULT = 23,
 };
