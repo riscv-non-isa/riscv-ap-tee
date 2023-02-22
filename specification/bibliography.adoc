@@ -31,5 +31,7 @@ https://trustedcomputinggroup.org/resource/tcg-glossary/
 * [[[R9]]] The RISC-V Advanced Interrupt Architecture Document v0.2.1-draft
 https://github.com/riscv/riscv-aia/releases[https://github.com/riscv/riscv-aia/releases]
 
+* [[[R10]]] The RISC-V Nested Acceleration ("NACL") extension
+TODO Add spec link once available[TODO]
 
 bibliography::[]
