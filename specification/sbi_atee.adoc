@@ -1436,25 +1436,16 @@ Both `cert_request_addr`, `request_data_addr` and `cert_addr_out` must be 4kB-al
 discover if a TSM is loaded and initialized else returns an error. If a TSM 
 is loaded and initialized, this operation is used to enumerate TSM 
 information such as: TEE-capable memory regions, Size of static memory to 
-allocate per TVM, Size of memory to allocate per TVM Virtual Hart and so on. 
+allocate per TVM, Size of memory to allocate per TVM Virtual Hart and so on.
 
-| <<sbi_tee_host_create_tvm, sbi_tee_host_create_tvm>> | TVM creation (static) 
-process where a set of TEE pages are assigned for a TVM to hold a TVM’s 
-global state. This routine also configures the global configuration that 
-applies to the TVM and affects all TVM hart settings. For example, features 
-enabled for this TVM, perfmon enabled, debug enabled 
-etc.                                                                         
-
-| <<sbi_tee_host_destroy_tvm, sbi_tee_host_destroy_tvm>> | TVM shutdown verifies VMM 
-has stopped all virtual hart execution for the TVM. The TVM virtual hart 
-may not be entered after this point. The VMM may start reclaiming TVM 
-memory after this 
-point.                                                                       
-  
 | <<sbi_tee_host_convert_pages, sbi_tee_host_convert_pages>> | Begins the process 
 of converting memory 
 to be used as confidential memory. The region consists of one or more contiguous 
 4KB memory naturally aligned regions.
+
+| <<sbi_tee_host_reclaim_pages, sbi_tee_host_reclaim_pages>> | VMM may unassign
+memory for TVMs by destroying them. All confidential-unassigned memory may be
+reclaimed back as non-confidential using this interface.
 
 | <<sbi_tee_host_global_fence, sbi_tee_host_global_fence>> | This operation 
 initiates TLB version tracking of pages in the region being converted to confidential. 
@@ -1469,9 +1460,22 @@ this operation before it considers the TLB version updated. The last local fence
 completes the conversion of a memory region from non-confidential to confidential 
 for a set of TVM pages.
 
-| <<sbi_tee_host_reclaim_pages, sbi_tee_host_reclaim_pages>> | VMM may unassign 
-memory for TVMs by destroying them. All confidential-unassigned memory may be 
-reclaimed back as non-confidential using this interface.
+| <<sbi_tee_host_create_tvm, sbi_tee_host_create_tvm>> | TVM creation (static)
+process where a set of TEE pages are assigned for a TVM to hold a TVM’s
+global state. This routine also configures the global configuration that
+applies to the TVM and affects all TVM hart settings. For example, features
+enabled for this TVM, perfmon enabled, debug enabled
+etc.
+
+| <<sbi_tee_host_finalize_tvm, sbi_tee_host_finalize_tvm>> | This operation enables
+the VMM to finalize the measurement of a TVM (static). The TSM enforces that the TVM
+virtual harts cannot be entered unless the TVM measurement is committed
+via this operation.
+
+| <<sbi_tee_host_destroy_tvm, sbi_tee_host_destroy_tvm>> | TVM shutdown verifies VMM
+has stopped all virtual hart execution for the TVM. The TVM virtual hart
+may not be entered after this point. The VMM may start reclaiming TVM
+memory after this point.
 
 | <<sbi_tee_host_add_tvm_page_table_pages, sbi_tee_host_add_tvm_page_table_pages>> | Add 
 one or more page mappings to the G-stage translation structure for a TVM.
@@ -1498,6 +1502,20 @@ zero page for an existing mapping for a TVM page (post initialization).
 This operation adds a zero page into a mapping and keeps the mapping as 
 pending (i.e. access from the TVM will fault until the TVM accepts that GPA.
 
+| <<sbi_tee_host_create_tvm_vcpu, sbi_tee_host_create_tvm_vcpu>> | This operation 
+allows the VMM to assign TEE pages for a virtual hart context structure (VHCS) for a 
+specific TVM. This routine also initializes the hart-specific fields of 
+this structure. Note that a virtual hart context structure may consist of 
+more than one 4KB page. The number of pages are enumerated via the tsm_info call.
+
+| <<sbi_tee_host_run_tvm_vcpu, sbi_tee_host_run_tvm_vcpu>> | Enter or resume a TVM 
+virtual hart (on any physical hart). A resume operation is performed via a 
+flag passed to this operation. This operation activates a virtual-hart on a 
+physical hart, and may be performed only on a TVM virtual hart structure 
+that is assigned to the TVM and one that is not already active. The TSM 
+verifies if the operation is performed in the right state for that 
+virtual hart.
+
 | sbi_tee_host_page_relocate                     | Relocate a page for an 
 existing mapping for a TVM page. This operation allows the VMM to reassign 
 a new SPA for an existing TVM page mapping. The page mapping must be 
@@ -1516,25 +1534,6 @@ small page mappings. The affected mapping must be invalidated before the
 operation can succeed. The VMM must provide a free TEE-capable page to the 
 TSM to use as a new G-stage page table in the fragmented mapping.
 This interface specification is TBD.
-
-| <<sbi_tee_host_create_tvm_vcpu, sbi_tee_host_create_tvm_vcpu>> | This operation 
-allows the VMM to assign TEE pages for a virtual hart context structure (VHCS) for a 
-specific TVM. This routine also initializes the hart-specific fields of 
-this structure. Note that a virtual hart context structure may consist of 
-more than 1 4KB page. The number of pages are enumerated via the tsm_info call.
-
-| <<sbi_tee_host_finalize_tvm, sbi_tee_host_finalize_tvm>> | This operation enables a 
-VMM to finalize the measurement of a TVM (static). The TSM enforces that a 
-TVM virtual harts cannot be entered unless the TVM measurement is committed 
-via this operation.
-
-| <<sbi_tee_host_run_tvm_vcpu, sbi_tee_host_run_tvm_vcpu>> | Enter or resume a TVM 
-virtual hart (on any physical hart). A resume operation is performed via a 
-flag passed to this operation. This operation activates a virtual-hart on a 
-physical hart, and may be performed only on a TVM virtual hart structure 
-that is assigned to the TVM and one that is not already active. The TSM 
-verifies if the operation is performed in the right state for that 
-virtual hart.
 
 |===
 
