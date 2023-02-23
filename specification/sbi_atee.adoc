@@ -730,7 +730,7 @@ struct sbiret sbi_tee_host_add_tvm_measured_pages(unsigned long tvm_guest_id,
 
 -----
 Copies num_pages pages from non-confidential memory at `source_address` to confidential
-memory at `dest_addr`, then measures and maps the pages at `dest_addr` at the TVM physical
+memory at `dest_address`, then measures and maps the pages at `dest_address` at the TVM physical
 address space at `tvm_guest_gpa`. The mapping must lie within a region of confidential memory
 created with `sbi_tee_host_add_tvm_memory_region()`. The tsm_page_type parameter must
 be a legal value for enum type `tsm_page_type`.
@@ -1478,15 +1478,20 @@ one or more page mappings to the G-stage translation structure for a TVM.
 The pages to be used for the G-stage page table structures must have been converted
 (and tracked) by the TSM as TEE pages; otherwise this operation will not succeed.                                                                     
 
-| <<sbi_tee_host_add_tvm_measured_pages, sbi_tee_host_add_tvm_measured_pages>> | Add 
-a page for an existing mapping for a TVM page - this add_pre must be performed before 
-finalization of the TVM measurement via sbi_tee_host_finalize_tvm. For this 
-operation, the VMM must provide the page contents that get copied into 
-confidential memory pages for the TVM (and get tracked, encrypted etc). The 
-contents of these pages are also measured via the sbi_tee_host_add_tvm_measured_pages, 
-including the GPA at which the page is mapped. After the TVM msmt is 
-finalized via sbi_tee_host_finalize_tvm, no more pre-add pages are allowed by 
-the TSM for that TVM.
+| <<sbi_tee_host_add_tvm_measured_pages, sbi_tee_host_add_tvm_measured_pages>> | Copies the
+given number of pages from non-confidential memory at `source_address` to confidential
+memory at `dest_address`, then measures and maps the pages at `dest_address` in the TVM physical
+address space at `tvm_guest_gpa`. The mapping must lie within a region of confidential memory
+created with `sbi_tee_host_add_tvm_memory_region()`. This call must not be made after calling
+`sbi_tee_host_finalize_tvm()`.
+
+This operation is used to extend the static measurement for a TVM for added page contents.
+The operation performs a SHA384 hash extend to the measurement register managed 
+by the TSM on the whole page. The GPA at which the page is mapped is also part of the 
+measurement operation. The measurement process is a state machine, which means that the order
+in which measured pages are added to the TVM also affects the attestation evidence. The VMM must
+faithfully reproduce the state machine for the measurement process otherwise the attestation
+evidence verification by the relying party will fail and the TVM will not be considered trustworthy.
 
 | <<sbi_tee_host_add_tvm_zero_pages, sbi_tee_host_add_tvm_zero_pages>> | Add a 
 zero page for an existing mapping for a TVM page (post initialization). 
@@ -1517,16 +1522,6 @@ allows the VMM to assign TEE pages for a virtual hart context structure (VHCS) f
 specific TVM. This routine also initializes the hart-specific fields of 
 this structure. Note that a virtual hart context structure may consist of 
 more than 1 4KB page. The number of pages are enumerated via the tsm_info call.
-
-| <<sbi_tee_host_add_tvm_measured_pages, sbi_tee_host_add_tvm_measured_pages>> | This 
-operation is used to extend the static measurement for a TVM for added page contents.The 
-operation performs a SHA384 hash extend to the measurement register managed 
-by the TSM on a 256 byte block of the page. The page must be added to a 
-valid GPA mapping via the add_pre_init operation. The GPA of the page 
-mapped is part of the measurement operation.The measurement process is a 
-state machine that must be faithfully reproduced by the VMM otherwise the 
-attestation evidence verification by the relying party will fail and the 
-TVM will not be considered trustworthy. 
 
 | <<sbi_tee_host_finalize_tvm, sbi_tee_host_finalize_tvm>> | This operation enables a 
 VMM to finalize the measurement of a TVM (static). The TSM enforces that a 
