@@ -726,10 +726,6 @@ The `tvm_base_page_address` must lie within a region of confidential memory crea
 legal value for the `tsm_page_type` enum. Zero pages for non-present TVM-specified GPA
 ranges may be added only post TVM finalization, and are typically demand faulted on TVM access.
 
-Used by the VMM to add pages (eagerly or lazily) to a previously defined shared memory region. 
-Shared pages are not included in TVM measurements, and the VMM may not repurpose added pages 
-until after the TVM has terminated. 
-
 This call may be made only after calling `sbi_tee_host_finalize_tvm()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
