@@ -111,10 +111,11 @@ Environment and certificate Issuer. Each FWID consists of:* HashAlg (OID) –
 an algorithm identifier for the hash algorithm used to produce a digest 
 value.* Digest – a digest of the firmware, initialization values, or other 
 settings of the TCB component.
-| Flags        | Uint8        | Enumerates potentially simultaneous 
-operational states of the TCB component: (i) notConfigured, (ii) notSecure, 
-(iii) recovery, (iv) debug. A value of 1 (TRUE) means the operational mode 
-is active. A value of 0 (FALSE) means the operational state is not active. 
+| Flags        | Bit String   | A list of flags that enumerates potentially
+simultaneous operational states of the TCB component:
+(i) notConfigured, (ii) notSecure, (iii) recovery, (iv) debug.
+A value of 1 (TRUE) means the operational mode is active.
+A value of 0 (FALSE) means the operational state is not active.
 If the flags field is omitted, all flags are assumed to be 0 
 (FALSE).
 | VendorInfo   | Octet String | Vendor supplied values that encode vendor, 
