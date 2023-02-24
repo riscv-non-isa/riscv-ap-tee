@@ -83,7 +83,7 @@ information.
 
 | CDI | Compound Device Identifier - This value represents the hardware, 
 software and firmware combination measured by the TCB elements transitively. 
-A CDI is the output of a DICE [2] and is passed to the entity  which is 
+A CDI is the output of a DICE <<R2>> and is passed to the entity  which is 
 measured by the previous TCB layer. The CDI is a secret that may be 
 certified to use for attestation protocols. 
 

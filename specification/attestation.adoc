@@ -85,7 +85,7 @@ Architecture which describes evidence as X.509 Certificate with an
 extension for *TCB Info Evidence <<R2>>. 
 
 The following key fields are present in that DiceTcbInfo (See OID in spec 
-[2]). The fields are listed here with the usage described specific to the 
+<<R2>>). The fields are listed here with the usage described specific to the 
 AP-TEE reference architecture.
 
 |=== 
@@ -128,7 +128,7 @@ associated with the Subject key. The certificate Subject and
 SubjectPublicKey identify the entity to which the DiceTcbInfo extension 
 applies. When this extension is used, the measurements in the evidence 
 usually describe the software/firmware (and configuration) which will 
-execute within the TCB. The AuthorityKeyIdentifier extension [2] MUST be 
+execute within the TCB. The AuthorityKeyIdentifier extension <<R2>> MUST be 
 supplied when the DiceTcbInfo extension is supplied. This allows the 
 Verifier to locate the signer’s certificate. The DiceTcbInfo extension 
 should be included with CRL entries that revoke the certificate that 
@@ -257,7 +257,7 @@ For example, for TVMs, this field may be set to zero.
 
 |===
 | *Field*                          | *Value*                           
-| extnID                           | OID from [2] for TcbEvidenceInfo  
+| extnID                           | OID from <<R2>> for TcbEvidenceInfo  
 | critical                         | TRUE                              
 | extnValue                        | A TcbEvidenceInfo (See above)     
 |===
