@@ -4,14 +4,14 @@
 * [[[R0]]] RISC-V Privileged specification
 https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf
 
-* [[[R1]]] IETF Remote ATtestation procedureS (RATS) Architecture (Draft).
-https://datatracker.ietf.org/doc/html/draft-ietf-rats-architecture-12
+* [[[R1]]] IETF RFC 9334 Remote ATtestation procedureS (RATS) Architecture
+https://datatracker.ietf.org/doc/rfc9334/
 
-* [[[R2]]] TCG DICE Attestation Architecture
-https://trustedcomputinggroup.org/wp-content/uploads/DICE-Attestation-Architecture-r23-final.pdf
+* [[[R2]]] TCG DICE Attestation Architecture, Version 1.00 Revision 0.23
+https://trustedcomputinggroup.org/resource/dice-attestation-architecture/
 
-* [[[R3]]] DMTF Security Protocol and Data Model (SPDM) Specification
-https://www.dmtf.org/sites/default/files/standards/documents/DSP0274_1.2.0WIP.89.pdf
+* [[[R3]]] DMTF DSP0274 Security Protocol and Data Model (SPDM) Specification, Version 1.2.1
+https://www.dmtf.org/dsp/DSP0274
 
 * [[[R4]]] TCG Reference Integrity Manifest (RIM) Information Model
 https://trustedcomputinggroup.org/resource/tcg-reference-integrity-manifest-rim-information-model/
@@ -25,8 +25,8 @@ https://github.com/riscv/riscv-debug-spec/blob/master/riscv-debug-stable.pdf
 * [[[R7]]] RISC-V Zero-Trust Platform Security Model
 https://docs.google.com/document/d/1TRHhsGiB5W4K8M7I4e-f40mOPErTb9sv/edit#heading=h.gjdgxs
 
-* [[[R8]]] Trusted Computing Group (TCG) Glossary v1.1-Rev-1.0
-https://trustedcomputinggroup.org/wp-content/uploads/TCG-Glossary-V1.1-Rev-1.0.pdf
+* [[[R8]]] Trusted Computing Group (TCG) Glossary, Version 1.1 Revision 1.0
+https://trustedcomputinggroup.org/resource/tcg-glossary/
 
 * [[[R9]]] The RISC-V Advanced Interrupt Architecture Document v0.2.1-draft
 https://github.com/riscv/riscv-aia/releases[https://github.com/riscv/riscv-aia/releases]
