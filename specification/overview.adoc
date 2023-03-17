@@ -35,7 +35,7 @@ non-confidential workloads, and the resource and scheduling management functions
 all workloads (confidential and non-confidential).
 
 In this scheme, compute resources like memory start off as 
-traditional untrusted resources in the non-confidential world, and are transtioned 
+traditional untrusted resources in the non-confidential world, and are transitioned 
 to their confidential analogue via the TSM. Once the conversion process is complete, 
 confidential memory may be assigned to a TVM via the TSM. A converted confidential 
 resource can be freely assigned to another TVM when it's no longer in use. 

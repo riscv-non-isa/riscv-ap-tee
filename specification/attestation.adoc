@@ -60,7 +60,7 @@ its measurements, vendor and version into measurement registers which can
 be attested to via the HW RoT-rooted keys. 
 
 The TSM must then provide an implementation of a TEE-Guest ABI (TG-ABI) 
-operation (sbi_tee_guest_get_evidence)  to enable a TVM to generate 
+operation (sbi_tee_guest_get_evidence) to enable a TVM to generate 
 attestation evidence that a relying party can verify using the certificate 
 chain. 
 
@@ -203,7 +203,7 @@ attestation key used to sign the relying party challenge.
 
 The Attestation key and certificate generation for TVMs may be performed 
 with a U-mode TSM component called the Owner Signing Authority Module 
-(OSAM) to enable a extension of the TCB to support interruptible signing 
+(OSAM) to enable an extension of the TCB to support interruptible signing 
 operations. The OSAM may execute as part of the TSM or may be executed in 
 the TSM U-mode to allow for the interruptibility models discussed in the 
 TSM operation section of this document.

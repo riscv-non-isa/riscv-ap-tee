@@ -58,7 +58,7 @@ the trusted (in TCB) intermediary between the VMM and the TVM. This
 module extends the TCB chain on the AP-TEE platform.
 
 | RoT | Isolated HW/SW subsystem with an immutable ROM firmware and 
-isolated compute and memory elements that forms the Trusted Compute Base 
+isolated compute and memory elements that form the Trusted Compute Base 
 of a TEE system. The RoT manages cryptographic keys and other security 
 critical functions such as system lifecycle and debug authorization. 
 The RoT provides trusted services to other software on the platform such 
