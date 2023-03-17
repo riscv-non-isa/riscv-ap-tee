@@ -43,7 +43,7 @@ are free to choose the format and structure of the memory tracking table/structu
 The TSM manages finer-granular (page-based) allocation from Confidential memory regions 
 (enforced by the memory tracking hardware) using the G stage page tables.
 
-Four aspects of memory isolation are impacted due this dynamic configurable confidential PMA: 
+Four aspects of memory isolation are impacted due to this dynamic configurable confidential PMA: 
 
 ==== Address Translation/Page Walk
 The figure 4 below describes a reference model for memory tracking lookup where 
@@ -333,7 +333,7 @@ TVMs are prevented from execution after that point.
 === TSM and TVM Isolation
 
 TSM (and all TVMs) memory is granted by the host OS/VMM but is isolated 
-(via access-control and/or confidentiality-protection)  by the HW and TCB 
+(via access-control and/or confidentiality-protection) by the HW and TCB 
 elements. The TSM, TVM and HW isolation methods used must be evident in the 
 attestation evidence provided for the TVM since it identifies the hardware 
 and the TSM-driver.

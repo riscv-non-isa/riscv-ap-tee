@@ -10,10 +10,10 @@ VMM-managed hart f/v registers* are expected to be saved/restored by the
 VMM before a TEECALL, and restored (similar to v/f register management 
 performed by the VMM for ordinary guest VMs). The TSM-driver saves OS/VMM 
 S/HS-mode CSRs and x registers on ECALLs into the HSSA on a TEECALL (per 
-the RISC-V SBI <<R5>> convention). The TSM-driver initializesTSM S/HS-mode 
+the RISC-V SBI <<R5>> convention). The TSM-driver initializes TSM S/HS-mode 
 CSRs from the TSSA on entry into the TSM (via TEECALL). Per-Hart TSM f/v 
 registers* state is managed (saved/restored) by the TSM in reserved memory 
-for the TSM (hence not shown below). 
+for the TSM (hence not shown below).
 
 |===
 | *HSSA (* **__TBD - specify initial values of TSSA state__** *)*   |
