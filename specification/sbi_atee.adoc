@@ -938,6 +938,101 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_tee_host_tvm_invalidate_pages]
+=== Function: TEE Host TVM Invalidate Pages (FID #16)
+[source, C]
+-----
+struct sbiret sbi_tee_host_tvm_invalidate_pages(unsigned long tvm_guest_id,
+                                                unsigned long gpa,
+                                                unsigned long length);
+-----
+
+Invalidates the pages in the specified range of guest physical address space and thus marks the
+pages as blocked from any further TVM accesses.
+
+For each page in the range, the TSM must verify that:
+
+* The page is currently marked present in the TVM’s page table.
+* The page is either mapped and uniquely owned by the TVM, or shared and owned by the host.
+
+After verifying these pre-conditions are met, the TSM then invalidates the pages. The host
+must complete a TVM TLB invalidation sequence, initiated by `sbi_tee_host_tvm_fence()`, in
+order to complete the invalidation.
+
+Guest page faults taken by the TVM on invalidated pages continue to be reported to the host.
+The pages remain invalid until the mappings are validated (marked present), removed, or
+become part of a huge page by promotion/demotion operation.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_tvm_invalidate_pages_errors]
+.TEE Host TVM Invalidate Pages
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `length` were invalid.
+| SBI_ERR_INVALID_ADDRESS | `gpa` was invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+[#sbi_tee_host_tvm_validate_pages]
+=== Function: TEE Host TVM Validate Pages (FID #17)
+[source, C]
+-----
+struct sbiret sbi_tee_host_tvm_validate_pages(unsigned long tvm_guest_id,
+                                             unsigned long gpa,
+                                             unsigned long length);
+-----
+
+Marks the invalidated pages in the specified range of guest physical address space as present.
+
+For each page in the range, the TSM must verify that the page was previously invalidated using
+`sbi_tee_host_tvm_invalidate_pages()`. After verifying the TSM will mark the pages as present and 
+restore the pages to their previous state.
+
+This ECALL may be used to revert an in-progress page removal or huge page promotion/demotion sequence.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_tvm_validate_pages_errors]
+.TEE Host TVM Validate Pages
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `length` were invalid.
+| SBI_ERR_INVALID_ADDRESS | `gpa` was invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+[#sbi_tee_host_tvm_remove_pages]
+=== Function: TEE Host TVM Remove Pages (FID #18)
+[source, C]
+-----
+struct sbiret sbi_tee_host_tvm_remove_pages(unsigned long tvm_guest_id,
+                                           unsigned long gpa,
+                                           unsigned long length);
+-----
+
+Removes mappings for invalidated pages in the specified range of guest physical address space. The range
+to be unmapped must already have been invalidated and fenced, and must lie within a removable region of
+the guest's physical address space. The TSM zeros out all PTEs within the specified range and returns the
+ownership of the pages to the host if previously owned by the TVM.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_tee_host_tvm_remove_pages_errors]
+.TEE Host TVM Remove Pages
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `length` were invalid.
+| SBI_ERR_INVALID_ADDRESS | `gpa` was invalid.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
 == TEE Interrupt Extension (EID #0x54454549)
 The TEE Interrupt extension supplements the TEE Host extension with hardware-assisted interrupt
 virtualization using the RISC-V Advanced Interrupt Architecture (AIA) on platforms which
@@ -1677,6 +1772,22 @@ since the previous call to `sbi_tee_host_tvm_fence()`. The TLB invalidation sequ
 completed when all vCPUs in the TVM that were running before the call to
 `sbi_tee_host_tvm_fence()` have taken a trap into the TSM, which the host can
 cause by sending an IPI to the physical CPUs on which the TVM's vCPUs are running.
+
+| <<sbi_tee_host_tvm_invalidate_pages, sbi_tee_host_tvm_invalidate_pages>> |
+Invalidates the pages in the specified range of guest physical address space and thus marks the
+pages as blocked from any further TVM accesses. Guest page faults taken by the TVM on invalidated
+pages continue to be reported to the host. The page remains invalid until the mapping is validated
+(marked present), removed, or becomes part of a huge page by promotion/demotion operation.
+
+| <<sbi_tee_host_tvm_validate_pages, sbi_tee_host_tvm_validate_pages>> |
+Marks the invalidated pages in the specified range of guest physical address space
+as present. This ECALL may also be used to revert an in-progress page removal or
+huge page promotion/demotion sequence.
+
+| <<sbi_tee_host_tvm_remove_pages, sbi_tee_host_tvm_remove_pages>> |
+Removes mappings for invalidated pages in the specified range of guest physical address space.
+The range to be unmapped must already have been invalidated and fenced, and must lie within a
+removable region of the guest's physical address space.
 
 | sbi_tee_host_page_relocate                     | Relocate a page for an 
 existing mapping for a TVM page. This operation allows the VMM to reassign 
