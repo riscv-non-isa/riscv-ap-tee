@@ -1114,7 +1114,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_tee_interrupt_unbind_aia_imsic_begin]
-=== Function: TEE Interrupt Bind AIA IMSIC Begin (FID #5)
+=== Function: TEE Interrupt Unbind AIA IMSIC Begin (FID #5)
 [source, C]
 -------
 struct sbiret sbi_tee_interrupt_unbind_aia_imsic_begin(unsigned long tvm_guest_id,
@@ -1139,7 +1139,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_tee_interrupt_unbind_aia_imsic_end]
-=== Function: TEE Interrupt Bind AIA IMSIC End (FID #6)
+=== Function: TEE Interrupt Unbind AIA IMSIC End (FID #6)
 [source, C]
 -------
 struct sbiret sbi_tee_interrupt_unbind_aia_imsic_end(unsigned long tvm_guest_id,
