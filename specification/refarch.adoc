@@ -31,8 +31,9 @@ by the TSM. Figure 3 below shows the abstract model of isolation:
 and Non-Confidential memory
 * Hart with Confidential mode qualifier =0 is allowed to access only Non-confidential Memory
 
-image:img_7.png[]  
-Figure 3: Confidential Memory conversion
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "Confidential Memory conversion"]
+image::img_7.png[]
 
 Memory with Confidential PMA may be associated with a unique memory encryption 
 key (and similar IO/fabric protection policies). 
@@ -51,8 +52,9 @@ the physical address derived from the first and guest stage nested page walk is
 looked up to derive a confidential | non-confidential physical memory attribute. 
 This lookup should be performed for the page sizes per the paging modes supported by the hart.
 
-image:img_8.png[]  
-Figure 4: Memory Tracking for Confidential PMA
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "Memory Tracking for Confidential PMA"]
+image::img_8.png[]
 	
 ==== Management of Confidential | Non-Confidential dynamic Physical Memory Attributes
 
@@ -208,8 +210,9 @@ different hart). This model of TSM operation requires additional
 concurrency controls on internal data structures and per-TVM global data 
 structures (such as the G-stage page table structures).
 
-image:img_3.png[]  
-Figure 3: TSM operation - Interruptible and non-reentrant TSM model shown.
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TSM operation - Interruptible and non-reentrant TSM model shown."]
+image::img_3.png[]
 
 A TSM entry triggered by an ECALL (with CoVE extension type) by the OS/VMM 
 leads to the following context-switch to the TSM (performed by the 

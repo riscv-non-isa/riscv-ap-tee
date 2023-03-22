@@ -1,3 +1,5 @@
+:imagesdir: ./images
+
 [[swlifecycle]]
 == TVM Lifecycle
 
@@ -273,8 +275,9 @@ since non-TEE mode accesses to MTT-tracked Confidential pages will fault (includ
 
 ==== Global and per-TVM TLB management
 
+[caption="Figure {counter:image}: ", reftext="Figure {counter:image}"]
+[title= "TLB management for memory conversion"]
 image:img_9.png[]
-Figure 6: TLB management for memory conversion
 
 The TSM tracks global TLB version for memory conversions and via the per-TVM and per-vcpu 
 control structures tracks TVM-scoped TLB versions. The TSM also maintains reference counts 

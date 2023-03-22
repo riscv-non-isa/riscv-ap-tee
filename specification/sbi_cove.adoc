@@ -281,14 +281,17 @@ invalidated pages continue to be reported to the host.
 Both sharing and unsharing operations are destructive, i.e. the contents of memory in the range to be
 converted are lost.
 
-image:tsm_detection_and_tvm_creation.svg[Figure 7]
-Figure 7: TSM Detection and TVM creation
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TSM Detection and TVM creation"]
+image::tsm_detection_and_tvm_creation.svg[]
 
-image:tvm_destruction_and_memory_reclamation.svg[Figure 8]
-Figure 8: TVM destruction and Memory reclamation
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TVM destruction and Memory reclamation"]
+image::tvm_destruction_and_memory_reclamation.svg[]
 
-image:tvm_runtime_execution.svg[Figure 9]
-Figure 9: TVM runtime execution
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TVM runtime execution"]
+image::tvm_runtime_execution.svg[]
 
 == COVE Host Extension (EID #0x434F5648 "COVH")
 

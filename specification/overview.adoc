@@ -20,8 +20,9 @@ the OS or VMM to maintain the role of resource manager even for the TVMs. The
 resources managed by the untrusted OS/VMM include memory, CPU, I/O resources
 and platform capabilities to execute the TVM workload.
 
-image:img_0.png[Figure 1]
-Figure 1: TEE TCB for VM workloads
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TEE TCB for VM workloads"]
+image::img_0.png[]
 
 As shown in figure 1, the architecture comprises a HS-mode software module 
 called the " *TEE Security Manager* " *(TSM)* that acts as the trusted 
@@ -119,8 +120,9 @@ modes of operation are also possible as TEE workloads. Importantly, the HW
 mechanisms needed for both cases are identical, and can be supported with 
 appropriate extensions of the COVG.
 
-image:img_1.png[]
-Figure 2: TEE TCB for application workloads (hosted via a TVM)
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TEE TCB for application workloads (hosted via a TVM)"]
+image::img_1.png[]
 
 The detailed architecture is described in the Section 
 <<refarch>>. Note that the architecture described

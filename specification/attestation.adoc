@@ -41,8 +41,9 @@ consider that Attester a trustworthy peer or not. The Verifier appraises
 evidence via appraisal policies and creates the Attestation Results to 
 support Relying Parties in their decision process.
 
-image:img_4.png[]
-Figure 4: Remote Attestation Framework (IETF RATS)
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title="Remote Attestation Framework (IETF RATS)"]
+image::img_4.png[]
 
 This TEE proposal uses the layered attestation model <<R1>> where the RoT 
 is the initial Attesting Environment. Claims are collected from or about 
@@ -67,8 +68,9 @@ chain.
 The TCB extension and evidence collection for a TVM attestation is shown 
 below:
 
-image:img_5.png[]
-Figure 5: Layered Attestation architecture for TVMs
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "Layered Attestation architecture for TVMs"]
+image::img_5.png[]
 
 It is expected that an implementation will provide implementation-specific 
 intrinsics to record measurements of the TSM into the firmware RoT for 
@@ -194,8 +196,9 @@ As a tangible example, the CDI private key for the TSM were used to sign a
 leaf certificate for an attestation key for the TVM, the certificate chain 
 may look like this:
 
-image:img_6.png[]
-Figure 6: Attestation Certificate generation
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "Attestation Certificate generation"]
+image::img_6.png[]
 
 This attestation certificate can be used in a challenge/response protocol 
 to a remote relying party which must verify the certificate chain for the 
