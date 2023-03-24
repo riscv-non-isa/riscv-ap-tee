@@ -1,312 +1,876 @@
 :imagesdir: ./images
 
 [[attestation]]
-== TVM Attestation
+== TVM Attestation and Measurements
 
-=== TCB Elements
+The CoVE TVM attestation framework allows for CoVE workload owners to assert
+the trustworthiness of the hardware and software environment their workload is
+running in.
 
-Elements considered to be in the TCB for AP-TEE workloads are summarized 
-below:
+Attestation relies on the ability for the SoC to generate a cryptographic evidence
+for a workload executing in a CoVE TVM. The workload executing in a TVM may
+request this cryptographic evidence to relay to a remote relying party which can
+then verify that the evidence is valid (per some appraisal policy), and thus attest
+to the trustworthiness of the TVM. The relying party can then accept to release
+secrets or attestation result tokens back to the trusted workload.
 
-Hardware/firmware 
+This section describes the CoVE attestation evidence content, format and
+generation interface.
 
-* CPU: All hardware logic, including MMU, caches 
-* SOC: All hardware subsystems including memory confidentiality, integrity 
-and replay-protection for volatile memory
-* RoT for TCB measurement, evidence reporting, attestation, sealing
-* IOMMU
-* (optional) Devices may be included in the TCB if the devices support 
-reporting evidence of their security posture.
+=== Measurements
 
-Software/firmware
+A CoVE workload measurement is a cryptographic hash of at least one of the
+TCB elements for the workload. Measurements can only be extended with additional
+data, by applying a cryptographic hash algorithm (`H~alg~`) to the current
+measurement value (`M~current~`):
 
-* TSM-driver that hosts a TEEI (with TH-ABI and TG-ABI security routines). 
-Note that since the TSM-driver operates in M-mode, all M-mode firmware is 
-included in the TCB for AP-TEE workloads.
-* TEE Security Manager (TSM) and user-mode TSM components
-* For confidential application/VM workloads, an AP-TEE-compatible 
-Runtime/guest OS may be included for portability (but is not required).
+:stem: asciimath
+[.center]
+[stem]
+++++
+M_{extended} = H_{alg}(M_{current} || NewData)
+++++
+
+Measurements must be stored in integrity protected measurement registers,
+either in the Hardware RoT of Measurement (RoTM) or in the TSM when it acts as
+an extended RoTM.
+
+In order to verify a workload environment trustworthiness, the remote
+attestation service must be able to compare the CoVE TCB measurements with a
+set of reference values. All components of what constitues the workload Trusted
+Computing Base (TCB) must be measured and included in the attestation evidence.
+
+==== TCB Elements
+
+Elements considered to be in the TCB for CoVE workloads are both hardware
+and software components.
+
+The overall workload TCB is a composition of 3 independent TCBs:
+
+1. The Platform TCB is made of all hardware and software TCB elements for
+the CoVE host platform. They are not confidential compute specific and
+measurements for those elements could be shared with e.g. a measured boot
+attestation.
+2. The TSM TCB elements are the confidential compute specific but TVM agnostic
+elements for the overall TCB.
+3. The TVM TCB is composed of the TVM specific elements.
+
+The TCB elements for each of them is summarized in the following table:
+
+.COVE Workload TCB Elements
+[cols="^1, ^5v, ^4v", options="header"]
+|===
+|TCB |Hardware Elements |Software Elements
+
+.4+.^|Platform
+    <| HW RoT for boot, measurement and storage
+ .4+<| All M-mode firmwares, including the TSM-driver
+    <| All CPU hardware logic, including MMU and caches
+    <| All SoC subsystems, including memory confidentiality, integrity and replay-protection for volatile memory
+    <| IOMMU and translation agents
+
+     | TSM
+     | N/A
+     | TEE Security Manager (TSM) and its U-mode components
+
+     | TVM
+     | Directly assigned, TEE-IO compliant devices
+     | All TVM measured pages
+|===
+
+==== TVM Measurements
+
+At a high level, a TVM measurement is separated into a set of static
+measurements and a dynamic one.
+
+===== Static Measurements
+
+TVM static measurements are generated from the CoVE workload TCB elements
+involved in the TVM construction. Any TCB element that directly or indirectly
+supports a TVM must be measured into the TVM static measurement registers. Once
+a TVM is finalized, i.e. after the `sbi_tee_host_finalize_tvm()` TH-ABI is
+called, the TVM static measurements must no longer be extended.
+
+Each TVM's static measurements are stored in dedicated measurement registers and
+a CoVE implementation must provide at least 1 and at most 8 of them. The
+static measurement registers cover platform, TSM & TVM specific TCB element
+measurements.
+
+Since they hold TCB elements measurements bound to the platform lifetime, the
+platform/TSM measurement registers may be stored in the hardware Root of Trust
+for Measurement (RTM). The TVM measurements must be maintained in TSM
+confidential memory with TVM bound life cycle, effectively making the TSM an
+extended RTM for the TVM.
+
+The static TCB measurement mechanism and storage layout is implementation
+specific. One such possible layout, based on a 6 static measurement registers
+CoVE implementation may look like the following table:
+
+.Static Measurements Layout Example (6 registers)
+[cols="^1,^3,^5,^1", options="header"]
+|===
+|Register |Usage |TCB Elements |Storage
+.4+.^| 0
+.4+.^| Platform Firmware
+    <| RoT Firmware
+.4+.^| RoT
+    <| All SoC Subsystems Firmwares
+    <| All Regular M-mode Firmwares
+    <| TSM-Driver
+
+
+     | 1
+     | Platform Configuration
+    <| All Firmware Manifests
+     | RoT
+
+     | 2
+     | TSM Software
+    <| TSM Binary
+     | RoT
+
+     | 3
+     | TSM Configuration
+    <| TSM Manifest
+     | RoT
+
+     | 4
+     | TVM Code and Static Data
+    <| TVM Measured Pages
+     | TSM
+
+     | 5
+     | TVM Configuration
+    <| TVM Entry Point and Initial Arguments
+     | TSM
+|===
+
+===== Dynamic Measurements
+
+After the TVM is finalized, static measurements are immutable and can no longer
+be modified. However, a TVM guest may want to measure some of its software
+components (Guest firmware, kernel OS, additional configuration parameters, etc)
+while it is booting or running.
+
+The TSM optionally provides an interface for TVM guests to extend their
+measurement into dynamic measurement registers. When supporting that feature,
+the TSM must store dynamic measurements separately from the TVM static ones. The
+TSM can use up to 8 dynamic measurement registers for that purpose.
+
+The TVM measurement extension interface is exposed through the optional TG-ABI
+`sbi_covg_extend_measurement()` FID.
 
 === Attestation
 
-The TCB described above is reported to relying parties via an attestation 
-mechanism and protocol.
+All above described TCB elements measurements are added to an attestation
+evidence and then reported to relying parties. The attestation mechanism
+and protocol that take place between the attester (i.e. the TVM) and the
+remote attestation service are out of this document scope.
 
-*Framework*
+In this section we describe the high level attestation model for CoVE,
+together with the attestation evidence content, format and generation process.
 
-The IETF RATS <<R1>> describes the following reference model for attestation. 
-In Remote Attestation, the Attester produces information about itself 
-(Evidence) to enable a remote peer (the Relying Party) to decide whether to 
-consider that Attester a trustworthy peer or not. The Verifier appraises 
-evidence via appraisal policies and creates the Attestation Results to 
-support Relying Parties in their decision process.
+==== Model
+
+The CoVE attestation model follows the IETF RATS <<R1>> Remote Attestation
+architecture. CoVE implementations perform the RATS Attester role, and each CoVE
+TCB component participates to the generation of a layered Attestation Evidence
+composed of TCB specific Claims. Moreover, the generated CoVE Evidence freshness
+is established through the inclusion on a cryptographic nonce in the TVM Claims
+Set. This is enforced by the `sbi_covg_get_evidence` intrinsic signature.
+
+In Remote Attestation, the Attester produces information about itself
+(Evidence) to enable a remote peer (the Relying Party) to decide whether to
+consider that Attester a trustworthy peer or not.
+The Verifier authenticates the Evidence with Endorser provided trust anchors
+(Endorsements), compares it against Reference Values and appraises it via
+appraisal policies. It eventually creates Attestation Results to support
+Relying Parties in their decision process.
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
-[title="Remote Attestation Framework (IETF RATS)"]
-image::img_4.png[]
+[title="Remote Attestation Framework (IETF RATS)", pdfwidth=75%]
+image::rats-arch.svg[]
 
-This TEE proposal uses the layered attestation model <<R1>> where the RoT 
-is the initial Attesting Environment. Claims are collected from or about 
-each layer. The corresponding claims can be structured in a nested fashion 
-that reflects the nesting of the Attester's layers. The previous layer 
-acts as the Attesting Environment for the next layer. Claims about a RoT 
-typically are asserted by an Endorser.
+==== Layered Evidence
 
-The following are the key requirements for attestation mapped to this 
-AP-TEE architecture:
+The CoVE Attestation Evidence is a collection of Claims representing the
+overall workload TCB and state, which includes those of the platform, TSM
+and TVM. It uses the DICE<<DICE>> layered attestation model where each TCB layer
+collects Claims about the layers it loads, acting as the Attesting Environment
+for them. As the root TCB layer, the hardware RoT is the initial CoVE Attesting
+Environment and its own Claims are asserted by an Endorser.
 
-In order for the TCB (described above) to be enforced by the architecture, 
-the TSM driver measures the untrusted-host-supplied TSM binary and records 
-its measurements, vendor and version into measurement registers which can 
-be attested to via the HW RoT-rooted keys. 
+In the DICE model, each TCB layer computes the Compound Device Identifier (CDI)
+for the layer it loads. CDIs are secrets that must not leave the CoVE TCB. The
+root TCB layer, i.e. the hardware RoT, is factory provisioned with a Unique
+Device Secret (UDS) that serves as the original secret from which all other CDIs
+are directly or indirectly derived. As such, the TVM CDI is rooted into the
+provisioned and platform manufacturer endorsed UDS.
+The CDI for the current TCB layer is a cryptographic derivation of a combination
+of the Attesting Environment CDI (i.e. the loading TCB layer) and the current
+TCB layer measurements:
 
-The TSM must then provide an implementation of a TEE-Guest ABI (TG-ABI) 
-operation (sbi_tee_guest_get_evidence) to enable a TVM to generate 
-attestation evidence that a relying party can verify using the certificate 
-chain. 
+:stem: asciimath
+[.center]
+[stem]
+++++
+CDI_{0} = KDF(UDS_{Len},\ UDS\ ||\ H_{alg}(Meas(TCB_{0}))
+++++
+:stem: asciimath
+[.center]
+[stem]
+++++
+CDI_{N} = KDF(CDI_{Len},\ CDI_{N-1}\ ||\ H_{alg}(Meas(TCB_{N}))
+++++
 
-The TCB extension and evidence collection for a TVM attestation is shown 
+Asymmetric key pairs can be derived from a CDI in order to generate the
+attestation key for a DICE layer. This key can then be used to attest of the
+next TCB layer.
+
+:stem: asciimath
+[.center]
+[stem]
+++++
+(UDS\_PrivKey,\ UDS\_PubKey) = AsymKDF(UDS)
+++++
+:stem: asciimath
+[.center]
+[stem]
+++++
+(CDI\_PrivKey_{N},\ CDI\_PubKey_{N}) = AsymKDF(CDI_{N})
+++++
+
+A fixed length TCB layer identifier called `CDI_ID` can be derived from its
+attestation key:
+
+:stem: asciimath
+[.center]
+[stem]
+++++
+UDS\_ID = KeyDerivationFunction(ID_{Len}, UDS\_PubKey)
+++++
+:stem: asciimath
+[.center]
+[stem]
+++++
+CDI\_ID_{N} = KeyDerivationFunction(ID_{Len}, CDI\_PubKey_{N})
+++++
+
+When loading the next TCB layer, the attesting layer provides it with both its
+CDI and its attestation certificate.
+
+As the first step in the CoVE DICE chain, the hardware RoT is responsible for:
+
+1. Generating the Platform CDIs. This is the output of a KDF that takes the UDS
+and a combination of an extended cryptographic hash of all the Platform TCB
+software components.
+2. Generating the Platform attestation certificate. This is a nested EAT which
+Claims are described in <<Platform Token>>, and include all the Platform CDI
+inputs. It is signed by the RoT attestation key, which is derived from the UDS
+itself.
+3. Passing both the Platform CDI and certificate to the TSM-driver
+
+The next step in the DICE chain is the TSM-driver. It is responsible for
+generating the TSM CDI and attestation certificate and follow similar steps as
+the above described ones to do so. The generated TSM attestation certificate is
+composed of both the hardware RoT generated Platform Token and the TSM-driver
+created TSM Token (See <<TSM Token>>). It is signed by the Platform CDI-derived
+attestation key.
+
+As the following step in the DICE chain, the TSM generates and provision any TVM
+it creates with its CDI. TVM CDIs are derived from the TSM CDI and the TVM
+specific measurements. However, unlike the RoT and the TSM-driver, the TSM does
+not pass attestation certificates to its TVMs. For evidence freshness
+establishment reasons, TVMs asynchronously request their attestation certificates
+from the TSM, in the form of a TSM-signed Attestation Evidence.
+
+TVMs are the CoVE DICE chain leaves and they can obtain an Attestation Evidence
+from the TSM by calling the CoVE guest-ABI `sbi_covg_get_evidence()` FID. The TVM
+provides a challenge value to the TSM through this call, and that value must be
+included in the generated Evidence. This value allows relying parties to establish
+the Attestation Evidence freshness.
+
+The CoVE Evidence is composed of separated but cryptographically bound
+attestation tokens for each of the above-describe TCB layers (Platform, TSM and
+TVM). As described above, each TCB layer uses its DICE-derived attestation key
+to signs the next layer, creating a HW RoT-rooted signature chain.
+A Relying Party can then verify and authenticate the Evidence with platform
+owner or manufacturer provided Endorsements, like e.g. a Trust Anchor.
+
+The TCB extension and evidence collection for a TVM attestation is shown
 below:
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
 [title= "Layered Attestation architecture for TVMs"]
-image::img_5.png[]
+image::layered_attestation.svg[]
 
-It is expected that an implementation will provide implementation-specific 
-intrinsics to record measurements of the TSM into the firmware RoT for 
-measurement to support the layered RTMs and attestation of AP-TEE workloads. 
+It is expected that an implementation will provide implementation-specific
+intrinsics to record measurements of the TSM into the firmware RoT for
+measurement to support the CoVE layered RTMs attestation of CoVE workloads.
 
-*Attestation Evidence*
+==== Evidence Format
 
-Suitable evidence formats may be used by the Attester to present the 
-evidence that the TVM is executing as a TEE. The evidence should attest to 
-the above layered trust chain. The TSM must allow for attestation operation 
-(certifying TVM measurements) to be executed in an interruptible manner. 
-Once such evidence format is specified in the TCG DICE Attestation 
-Architecture which describes evidence as X.509 Certificate with an 
-extension for *TCB Info Evidence <<R2>>. 
+The CoVE Attestation Evidence uses the IETF Entity Attestation Token
+(<<EAT>>), formatted as an untagged, unprotected Concise Binary Object
+Representation (<<CBOR>>) Web Token (<<UCCS>>). A CoVE EAT profile is proposed
+to narrow the EAT specification for the CoVE use case to enable interoperability.
 
-The following key fields are present in that DiceTcbInfo (See OID in spec 
-<<R2>>). The fields are listed here with the usage described specific to the 
-AP-TEE reference architecture.
+The UCCS is composed of one EAT submodule Claims-Set map where the map values
+are attestation tokens for the TVM, TSM and Platform Claims.
 
-|=== 
-| *Field*      | *Type*       |  *Description*
-| Vendor       | UTF8String   | The entity that created the TCB component.
-| Model        | UTF8String   | The product name associated with the TCB 
-component.
-| Version      | UTF8String   | The revision string associated with the TCB 
-component.
-| SVN          | Integer      | The security version number associated with 
-the TCB component - the SVN makes parsing of the TCB simpler to 
-differentiate updates that affect security from non-security related 
-updates.
-| Layer        | Integer      | The DICE layer associated with this 
-measurement of the TCB component.
-| Index        | Integer      | A value that enumerates measurement of 
-assets within the TCB component and DICE layer.
-| FWIDs        | List of FWID | A list of FWID values resulting from 
-applying the hashAlg function over the object being measured (recommended 
-components should cover: code, config, static data of a specific TCB binary 
-component). FWIDs are computed by the DICE layer that is the Attesting 
-Environment and certificate Issuer. Each FWID consists of:* HashAlg (OID) – 
-an algorithm identifier for the hash algorithm used to produce a digest 
-value.* Digest – a digest of the firmware, initialization values, or other 
-settings of the TCB component.
-| Flags        | Bit String   | A list of flags that enumerates potentially
-simultaneous operational states of the TCB component:
-(i) notConfigured, (ii) notSecure, (iii) recovery, (iv) debug.
-A value of 1 (TRUE) means the operational mode is active.
-A value of 0 (FALSE) means the operational state is not active.
-If the flags field is omitted, all flags are assumed to be 0 
-(FALSE).
-| VendorInfo   | Octet String | Vendor supplied values that encode vendor, 
-model, or device specific state
-| Type         | Octet String | A machine readable description of the 
-measurement                                                                  
-|===
+The TVM EAT is a CWT tagged CBOR formatted token, wrapped with a
+COSE_Sign1 <<COSE>> envelope. It is signed by the TSM attestation key and must
+contain a TVM provided challenge, e.g. a Relying Party provided nonce for
+establishing Evidence freshness.
 
-This extension defines attestation evidence about the DICE layer that is 
-associated with the Subject key. The certificate Subject and 
-SubjectPublicKey identify the entity to which the DiceTcbInfo extension 
-applies. When this extension is used, the measurements in the evidence 
-usually describe the software/firmware (and configuration) which will 
-execute within the TCB. The AuthorityKeyIdentifier extension <<R2>> MUST be 
-supplied when the DiceTcbInfo extension is supplied. This allows the 
-Verifier to locate the signer’s certificate. The DiceTcbInfo extension 
-should be included with CRL entries that revoke the certificate that 
-originally included the said DiceTcbInfo extension. 
+The TSM EAT is a CWT tagged CBOR formatted token, wrapped with a
+COSE_Sign1 <<COSE>> envelope. It is signed by the Platform attestation key and
+must include the DICE derived public key for the TSM.
 
-For TVM attestation, the following TCB Evidence Info will be sequenced 
-using the above DiceTcbInfo structure. Multiple evidences may be provided 
-via the *MultiDiceTcbInfo* extension:
+The Platform EAT is a CWT tagged CBOR formatted token, wrapped with a
+COSE_Sign1 <<COSE>> envelope. It is signed by the RoT attestation key and must
+include the DICE derived public key for the Platform.
 
-* Cryptographic hash of the RoT FW binary and configuration, along with its 
-SVN and other fields; 
-* Cryptographic hash of the TSM-driver binary and configuration, along with 
-its SVN and other fields ; 
-* Cryptographic hash of the TSM binary and configuration, with its SVN and 
-other fields; 
-* Cryptographic hash of the OSAM (described below) binary and 
-configuration, with its SVN and other fields - this is applicable for 
-remote attestation only;
-  ** If OSAM is a 3rd party - the certifying entity will need a separate 
-evidence entry. 
-* Cryptographic hash of the TVM static binaries and configuration, along 
-with its SVN and other fields.
-* The TVM may additionally extend cryptographic measurements for other 
-workload binaries and configuration loaded dynamically subsequent to boot 
-via the TG-ABI.
-
-The TVM TCB Evidence Info is managed by the TSM and is combined with the 
-TSM’s TCB Evidence info that is in turn managed by the TSM-driver. The 
-TSM-driver provides a TEEI security routine to enable the TSM and 
-transitively the TVM to generate an Attestation CDI (Composite Device 
-Identifier) and key to participate in an Attestation certificate-based 
-protocol for remote (and local) attestation.
-
-We recommend at least the following CDIs to be supported for AP-TEE 
-workloads:
-
-. Attestation CDI - This CDI is derived from the combination of the input 
-values listed above and is expected to change across software updates or 
-configuration changes of these components. This CDI is meant for remote 
-attestation and is mandatory for AP-TEE implementations.
-. Versioned Sealing CDI - This CDI is also derived from the combination of 
-the input values listed above seeded with a component security version 
-number. This Versioned Sealing CDI allows for the sealing key to be bound 
-to a version chain of the TCB components. This CDI is appropriate for 
-sealing and is recommended for AP-TEE implementations.
-
-For remote attestation of a TVM, an X.509 Attestation certificate 
-(structure shown below) is provisioned or generated on-demand for the TVM 
-via the TSM. This process requires the generation of a CDI certificate 
-where the subject key pair is derived from the Attestation CDI value for 
-any layer (e.g. TSM-driver). The authority key pair which signs the 
-certificate (e.g. RoT) is derived from the UDS (for the RoT) or, after the 
-initial hardware to software transition, from the Attestation CDI value for 
-the current layer (e.g. TSM-driver). The DICE flow outputs the CDI values 
-and the generated certificate; the private key associated with the 
-certificate may be optionally passed along with the CDI values to avoid the 
-need for re-derivation by the target layer. The UDS-derived public key is 
-certified by an external authority during manufacturing to root the 
-certificate chain in a HW RoT. 
-
-As a tangible example, the CDI private key for the TSM were used to sign a 
-leaf certificate for an attestation key for the TVM, the certificate chain 
-may look like this:
+The CoVE layered Evidence structure is represented by the above described
+composition of cryptographically chained EAT tokens. Verifier can then attest
+of a CoVE workload trustworthiness by independenly inspecting each token,
+while being able to verify that the TCB represented by one token was used to
+generate the next one.
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
-[title= "Attestation Certificate generation"]
-image::img_6.png[]
+[title= "CoVE Attestation Evidence Format", pdfwidth=65%]
+image::attestation_token.svg[]
 
-This attestation certificate can be used in a challenge/response protocol 
-to a remote relying party which must verify the certificate chain for the 
-attestation key used to sign the relying party challenge. 
+The CoVE Attestation Evidence is defined by the following Concise Data
+Definition Language (CDDL):
 
-The Attestation key and certificate generation for TVMs may be performed 
-with a U-mode TSM component called the Owner Signing Authority Module 
-(OSAM) to enable an extension of the TCB to support interruptible signing 
-operations. The OSAM may execute as part of the TSM or may be executed in 
-the TSM U-mode to allow for the interruptibility models discussed in the 
-TSM operation section of this document.
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "CoVE Attestation Evidence CDDL"]
+[source,cddl]
+----
+submodule-label = 266 ; EAT Submodule
 
-*TVM* *Attestation:*
+protected-cove-token-header-map = {
+  alg => int    ; See https://www.iana.org/assignments/cose/cose.xhtml
+  ? kid => bstr ; Optional, only needed for the platform token
+}
 
-X.509 CDI Certificates are used to enable Attestation certificates derived 
-from the TSM CDI for each TVM hosted on the platform. All standard fields 
-of a CDI certificate are described in the following table. This certificate 
-can be generated given a CDI_Public key and the DICE input values.
+unprotected-cove-token-header-map = {
+  * int / tstr => any
+}
 
+signed-cove-token = #6.18(COSE-Sign1-cove-token)
+COSE-Sign1-cove-token = [
+  protected: bstr .cbor protected-cove-token-header-map
+  unprotected: unprotected-cove-token-header-map
+  payload: bstr .cbor platform-token / tsm-token / tvm-token
+  signature: bstr
+]
+
+; One EAT Submodule
+; Each token is a nested, signed CWT
+riscv-cove-token = {
+   submodule-label => {
+      "platform" => signed-cove-token
+      "tsm" => signed-cove-token
+      "tvm" => signed-cove-token
+   }
+}
+----
+
+===== Platform Token
+
+The Platform Token is a nested EAT token in the Evidence and contains a map of
+Claims. The map is wrapped in a `COSE_Sign1` envelope and composed of the
+following claims:
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "Platform Claims Map"]
+[source,cddl]
+----
+platform-token = #6.61(platform-token-map)
+
+platform-token-map = {
+   riscv-cove-eat-profile ; EAT Profile
+   platform-public-key      ; Platform public key
+   platform-manufacturer-id ; Platform manufacturer identifier
+   platform-state           ; Platform operational state
+   platform-sw-components   ; Platform SW components
+}
+----
+
+All above described Claims must be present in the Platform Token.
+
+====== EAT Profile Claim
+
+The platform EAT profile claim describes the EAT profile that the CoVE
+platform implements. The profile should include a description of all three
+tokens (platform, TSM and TVM) as they are bound together.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "EAT Profile Claim"]
+[source,cddl]
+----
+riscv-cove-eat-profile-label = 265 ; EAT profile
+riscv-cove-eat-profile-doc = "https://riscv.org/TBD"
+
+riscv-cove-eat-profile = (
+   riscv-cove-eat-profile-label => riscv-cove-eat-profile-doc
+)
+----
+
+====== Platform Public Key Claim
+
+The platform public key claim identifies the platform public key that signs the
+TSM token. The value of the claim is a COSE_Key <<COSE>> structure encoded as a
+CBOR bytes string.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "Platform Public Key Claim"]
+[source,cddl]
+----
+platform-public-key-label = TBD
+riscv-cove-public-key-type = bytes .cbor COSE_Key
+
+platform-public-key = (
+   platform-public-key-label => riscv-cove-public-key-type
+)
+----
+
+====== Platform Manufacturer Identifier Claim
+
+The platform manufacturer identifier claim uniquely identifies the manufacturer
+for the CoVE implementation providing the Attestation Evidence.
+Verification services can use the value of this claim to obtain the manufacturer
+provided Endorsements for the platform implementation.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "Platform Manufacturer Identifier Claim"]
+[source,cddl]
+----
+platform-manufacturer-id-label = TBD
+platform-manufacturer-id-type = bytes .size 64
+
+platform-manufacturer-id = (
+   platform-manufacturer-id-label => platform-manufacturer-id-type
+)
+----
+
+====== Platform State Claim
+
+The platform state claim describes the operational state of the platform.
+The values for this claim can be:
+
+* `NotConfigured` - The platform requires additional information to operate
+* `Secured` - This is the default state under regular operation conditions
+* `Debug` - The platform can be debugged
+* `Recovery` - The platform is recovering from a failure
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "Platform State Claim"]
+[source,cddl]
+----
+platform-state-label = TBD
+platform-state-not-configured = 1
+platform-state-secured = 2
+platform-state-debug = 3
+platform-state-recovery = 4
+platform-state-type =
+                    platform-state-not-configured /
+                    platform-state-secured /
+                    platform-state-debug /
+                    platform-state-recovery
+
+platform-state = (
+   platform-state-label => platform-state-type
+)
+----
+
+====== Platform Software Components Claim
+
+The platform software components claim lists all software and firmware
+components that compose the CoVE platform TCB.
+
+Each component in the Claim is a map of the following values:
+
+* *Component type*: This is a human-readable string that represents the measured
+component.
+* *Component measurement*: This is the hash value of the component as it was
+loaded in memory.
+* *Component SVN*: This is the component Secure Version Number. The semantics of
+that value is defined by the component creator or vendor. The SVN can be
+generated from multiple SVNs.
+* *Component manifest*: This is the hash value of the component manifest that was
+used when loading and verifying the associated component. This field is
+_optional_. The format of the manifest for the component is out of scope of this
+specification.
+* *Component signer*: This is the hash value of a signing authority for the
+component.
+* *Hash algorithm identifier*: This describes which algorithm was used to generate the
+component measurement. It is recommended to use one of the IANA defined
+<<HashAlgorithmNames>>.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "Platform Software Components Claim"]
+[source,cddl]
+----
+platform-sw-components-label = TBD
+riscv-cove-sw-component = {
+   1 => text                 ; Component type
+   2 => riscv-cove-hash-type ; Component measurement value
+   3 => text                 ; Component Secure Version Number (SVN)
+ ? 4 => riscv-cove-hash-type ; Component manifest hash
+   5 => riscv-cove-hash-type ; Component signer public key hash value
+   6 => text                 ; Hash algorithm identifier
+}
+
+platform-sw-components = (
+   platform-sw-components-label => [ + riscv-cove-sw-component ]
+)
+----
+
+===== TSM Token
+
+The TSM Token is a nested EAT token in the Evidence and contains a map of
+Claims. The map is wrapped in a `COSE_Sign1` envelope and composed of the
+following claims:
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TSM Claims Map"]
+[source,cddl]
+----
+tsm-token = #6.61(tsm-token-map)
+
+tsm-token-map = {
+   tsm-public-key    ; TSM public key
+   tsm-sw-components ; TSM SW components
+}
+----
+
+All above described Claims must be present in the TSM Token.
+
+====== TSM Public Key Claim
+
+The TSM public key claim identifies the platform public key that signs the
+TVM token. The value of the claim is a COSE_Key <<COSE>> structure encoded as a
+CBOR bytes string.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TSM Public Key Claim"]
+[source,cddl]
+----
+tsm-public-key-label = TBD
+
+tsm-public-key = (
+   tsm-public-key-label => riscv-cove-public-key-type
+)
+----
+
+====== TSM Software Components Claim
+
+The TSM software components claim lists all software components that compose the
+CoVE TSM TCB.
+
+The TSM software components that influence the TSM TCB are the TSM-Driver and the
+TSM.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TSM Software Components Claim"]
+[source,cddl]
+----
+tsm-sw-components-label = TBD
+
+tsm-sw-components-type = [
+   tsm-driver
+   tsm
+]
+
+tsm-driver = (riscv-cove-sw-component)
+tsm = (riscv-cove-sw-component)
+
+tsm-sw-components = (
+   tsm-sw-components-label => tsm-sw-components-type
+)
+----
+
+===== TVM Token
+
+The TVM Token is a nested EAT token in the Evidence and contains a map of
+Claims. The map is wrapped in a `COSE_Sign1` envelope and composed of the
+following claims:
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TVM Claims Map"]
+[source,cddl]
+----
+tvm-token = #6.61(tvm-token-map)
+
+tvm-token-map = {
+   tvm-challenge            ; A TVM guest provided challenge
+ ? tvm-identity             ; TVM identity
+   tvm-public-key           ; TVM public key
+   tvm-static-measurements  ; TVM static measurements
+ ? tvm-dynamic-measurements ; TVM dynamic measurements
+}
+----
+
+The TVM dynamic measurements Claim is optional, all other above described Claims
+must be present in the TVM Token.
+
+====== TVM Challenge Claim
+
+The TVM challenge claim is a `sbi_covg_get_evidence()` caller provided value.
+The semantics of this Claim is TVM implementation specific, but it is generally
+used for demonstrating Evidence freshness to a Relying Party.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TVM Challenge Claim"]
+[source,cddl]
+----
+tvm-challenge-label = 10 ; EAT nonce
+tvm-challenge-type = bytes .size 64
+
+tvm-challenge = (
+   tvm-challenge-label => tvm-challenge-type
+)
+----
+
+====== TVM Identity Claim
+
+The TVM identity claim value is a `sbi_tee_host_finalize_tvm()` provided
+argument. It is an optional claim and is not included in the TVM token when
+the TVM identity argument is set to 0.
+
+It is used by the host TVM creator (e.g. the host VMM) to bind a TVM to an
+identity or more generically a specific piece of data (e.g. an Attestation
+Service public key, a configuration blob, etc) through its hash value.
+
+TVM identity allows for untrusted hosts to provide a TVM with unmeasured but
+attestable pieces of data. A Relying Party can then verify the TVM measurements
+separately from the host provided TVM identity.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TVM Identity Claim"]
+[source,cddl]
+----
+tvm-identity-label = TBD
+tvm-identity-type = bytes .size 64
+
+tvm-identity = (
+   tvm-identity-label => tvm-identity-type
+)
+----
+
+====== TVM Public Key Claim
+
+The TVM public key claim value is a a `sbi_covg_get_evidence()` caller provided
+value. In other words, the TVM guest provides its own, generally ephemeral
+public key to the TSM to be included into the Evidence. A Relying Party will
+use that public key to encrypt secrets that are released to the trusted TVM.
+
+The value of the TVM public key claim is a COSE_Key <<COSE>> structure encoded
+as a CBOR bytes string.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TVM Public Key Claim"]
+[source,cddl]
+----
+tvm-public-key-label = TBD
+
+tvm-public-key = (
+   tvm-public-key-label => riscv-cove-public-key-type
+)
+----
+
+====== TVM Static Measurements Claim
+
+The TVM static measurements claim value is the list of all static measurements
+for the TVM. The list must contain at most 8 entries.
+
+Each measurement in the list is a map of the following values:
+
+* *Measurement register index*: This describes the measurement register index
+used by the TSM to store the measurement value. This can be mapped to well known
+measurement register indexes like e.g. the TCG<<TCG_Client>> defined ones.
+* *Measurement value*: This is the measurement value.
+* *Hash algorithm identifier*: This describes which algorithm was used to
+generate the component measurement. It is recommended to use one of the IANA
+registered hash algorithm name<<Hash_Algorithm_Names>>.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TVM Static Measurements Claim"]
+[source,cddl]
+----
+tvm-static-measurements-label = TBD
+riscv-cove-measurement = {
+   1 => uint                   ; Measurement register index
+   2 => riscv-cove-hash-type ; Measurement value
+   3 => text                   ; Hash algorithm identifier
+}
+
+tvm-static-measurements = (
+   tvm-static-measurements-label => [ 1*8 riscv-cove-measurement ]
+)
+----
+
+====== TVM Dynamic Measurements Claim
+
+The TVM dynamic measurements claim value is the list of all dynamic measurements
+for the TVM. The list must contain at most 8 entries.
+
+By calling into the `sbi_covg_extend_measurement()` SBI FID, a TVM guest can
+extend TVM measurements after the TVM is finalized. The extended measurement
+values are stored into a set of dynamic measurement registers.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TVM Dynamic Measurements Claim"]
+[source,cddl]
+----
+tvm-dynamic-measurements-label = TBD
+
+tvm-dynamic-measurements = (
+   tvm-dynamic-measurements-label => [ 1*8 riscv-cove-measurement ]
+)
+----
+
+==== Evidence Generation
+
+TVM guest Attesters can request from the TSM to generate an Evidence that attest
+to their own layered TCB layers, by calling into the TG-ABI
+`sbi_covg_get_evidence()` FID.
+
+The `sbi_covg_get_evidence()` returns an attestation certificate that includes
+the UCCS EAT formatted CoVE Attestation Evidence described in the previous
+sections of this document.
+
+The attestation key and certificate generation for the TVM may be performed
+by the TSM directly or with a U-mode TSM component, to allow for the
+interruptibility models discussed in the TSM operation section of this document.
+
+The CoVE attestation certificate can either be X.509<<X509>> or CBOR
+formatted, depending on the `format` argument passed by the Attester to
+`sbi_covg_get_evidence()`. CoVE implementations must support at least one
+certificate format, and describe all supported formats through the
+`AttestationCapabilities` structure returned by the `sbi_covg_get_attcaps()`
+SBI call.
+
+The CoVE attestation certificate issuer is the TSM and is represented by the
+TSM `CDI_ID` lowercase hexadecimal encoded string.
+
+The CoVE attestation certificate subject is the TVM and is represented by the
+TVM `CDI_ID` lowercase hexadecimal encoded string.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "CoVE Attestation Evidence Certificate",scalewidth=75%]
+image::attestation_certificate.svg[]
+
+===== CBOR Attestation Certificate
+
+CBOR formatted CoVE Attestation certificates are COSE_Sign1 protected CWTs,
+signed with the TSM attestation key. The algorithm used to sign the certificate
+is described by the COSE_Sign1 envelope. It is recommended to use an EdDSA
+scheme with SHA-512, e.g. Ed25519.
+
+The CBOR certificate COSE_Sign1 payload is a CWT which claim set is composed of
+the CoVE evidence token and 2 additional claims:
+
+* *Issuer* is the certificate issuer representation, i.e. the TSM `CDI_ID`.
+* *Subject* is the certificate subject representation, i.e. the TVM `CDI_ID`.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "CoVE CBOR Attestation Certificate"]
+[source,cddl]
+----
+; COSE_Sign1 wrapped certificate payload
+riscv-cove-certificate = #6.18(riscv-cove-certificate-payload)
+
+; The payload is a CWT
+riscv-cove-certificate-payload = #6.61(riscv-cove-claims)
+
+issuer-label = 1 ; CWT iss
+subject-label = 2 ; CWT sub
+evidence-label = TBD
+
+riscv-cove-claims = (
+   issuer-label => text                 ; Certificate issuer
+   subject-label => text                ; Certificate subject
+   evidence-label => riscv-cove-token ; Evidence token
+)
+----
+
+===== X.509 Attestation Certificate
+
+X.509 formatted CoVE Attestation certificates are leaf certificates that
+follow the DICE<<DICE>> X.509 certificate extension format. They are signed by
+the TSM attestation key and contain a DICE defined custom extension for carrying
+the attestation evidence as an unprotected CWT Claim Set<<UCCS>>.
+
+The X.509 custom extension value is generated by wrapping the CoVE attestation
+evidence into a tagged UCCS.
+
+The TSM generated certificate fields, standard and custom extensions, along with
+the UCCS formatted evidence are described below:
+
+.COVE X.509 Attestation Certificate Fields
+[options=header]
 |===
-| *Field*  | *Description* 
-| signatureAlgorithm | id-ecdsa-with-SHA256 per RFC 5758 recommended. 
-Other signatureAlgorithms may be used.
-| signatureValue | 64 byte ECDSA signature, using UDS_Private or a previous 
-CDI_Private as the signing key
-| version | v3
-| serialNumber | CDI_ID in ASN.1 INTEGER form
-| signature | id-ecdsa-with-SHA256 per RFC 5758
-| issuer | “<UDS_ID> or <CDI_ID>” UDS_ID, CD_ID are hex encoded lower case
-| validity | The validity values are populated as follows: notBefore can be 
-any time known to be in the past, and notAfter is set to the standard 
-value used to indicate no well-known expiry date, “99991231235959Z” per 
-RFC 5280.  
-| subject | “<CDI_ID>” where CDI_ID is hex encoded lower case
-| subjectPublicKeyInfo | When using ECDSA, per RFC 5480 (id-ecPublicKey)
-| issuerUniqueID | Not used
-| subjectUniqueID | Not used
-| extensions | Standard extensions are included as well as a custom TCG 
-extension which holds information about the measurements used to derive 
-CDI values. Both are described 
-below.                                                  
+| *Field*              | *Description*
+| signatureAlgorithm   | `id-ecdsa-with-SHA512`<<X509_DSA>> is recommended.
+                         Other signature algorithms may be used.
+
+| signatureValue       | 64 bytes ECDSA signature, using the TSM `CDI_PriKey` as
+                         the signing key
+
+| version              | v3
+| serialNumber         | The TSM `CDI_ID` in ASN.1 INTEGER form
+| signature            | `id-ecdsa-with-SHA512`<<X509_DSA>> is recommended.
+                         Other signature algorithms may be used.
+
+| issuer               | The TSM `CDI_ID`
+| validity             | The validity values are populated as follows:
+                         `notBefore` can be any time known to be in the past,
+                         and `notAfter` is set to the standard value used to
+                         indicate no well-known expiry date, “99991231235959Z”
+                         per RFC 5280.
+
+| subject              | The TVM `CDI_ID`
+| subjectPublicKeyInfo | When using EcDSA, per RFC 5480 (id-ecPublicKey)
+| issuerUniqueID       | Not used
+| subjectUniqueID      | Not used
+| extensions           | Standard extensions are included as well as a custom
+                         TCG DICE extension which holds the CoVE attestation
+                         evidence. Both are described below.
 |===
 
-*CDI Standard Extensions*
-
+.COVE X.509 Attestation Certificate Standard Extensions
+[options=header]
 |===
-| *Extension* | *Critical* | *Description*
-| authorityKeyIdentifier | non-critical | Contains only keyIdentifier set 
-to UDS_ID or previous CDI_ID
-| subjectKeyIdentifier | non-critical | Set to CDI_ID
-| keyUsage | critical | Contains only keyCertSign. Other CDI certificates 
-may be generated for other purposes for the TVM.
-| basicConstraints | critical | The cA field is set to TRUE. The 
-pathLenConstraint field is normally not included, but may be included 
-and set to zero if it is known that no additional DICE layers exist. 
-For example, for TVMs, this field may be set to zero.  
-|===
+| *Extension*            | *Critical*   | *Description*
+| authorityKeyIdentifier | non-critical | Contains only keyIdentifier set
+                                          to UDS_ID or previous CDI_ID
 
-*CDI Custom Extension Fields*
+| subjectKeyIdentifier   | non-critical | Set to CDI_ID
+| keyUsage               | critical     | Contains only `keyCertSign`.
+                                          Other CDI certificates may be
+                                          generated for other purposes for the
+                                          TVM.
 
-|===
-| *Field*                          | *Value*                           
-| extnID                           | OID from <<R2>> for TcbEvidenceInfo  
-| critical                         | TRUE                              
-| extnValue                        | A TcbEvidenceInfo (See above)     
+| basicConstraints       | critical     | The `cA` field is set to TRUE.
+                                          The `pathLenConstraint` is set to 0.
 |===
 
-The TSM can issue an Attestation certificate to the TVM which includes the 
-TVM TcbInfo, and can transfer that certificate to the TVM during 
-initialization via a guest firmware mechanism (e.g. device tree or UEFI HOB). 
-Alternately, the TSM can provide an interface to sign TVM TcBInfo and 
-additional data (such as runtime measurements done by the TVM) at runtime via 
-the sbi_tee_guest_get_evidence interface to generate additional TVM Attestation 
-certificates.
+.COVE X.509 Attestation Certificate Custom Extension Fields
+[options=header]
+|===
+| *Field*    | *Value*
+| extnID     | OID from <<DICE>> for `UccsEvidence`
+| critical   | TRUE
+| extnValue  | The CoVE UCCS X.509 extension (See CDDL below)
+|===
 
-*sbi_tee_guest_get_evidence*: invoked by TVM - this TEEI operation is 
-serviced by the TSM.
-
-Inputs/outputs
-
-* Input: virtual address to 4KB buffer containing a CSR (Certificate 
-Signing Request) and additional parameters (nonce)
-* Input/output:virtual address to 4KB aligned buffer where TSM certificate 
-will be returned
-
-Validation
-
-* Set result register to indicate failure
-* Verify VA where TVM Attestation certificate will be returned is 4KB 
-aligned and read/write else fault
-* Verify TVM provided CSR <size TBD> is contained within a 4KB page and 
-read accessible else fault
-
-Setup
-
-* Create TVM attestation structure in a temporary buffer in per-hart 
-confidential memory
-* Populate TVM TcbEvidenceInfo per the TVM measurements recorded by the TSM
-* Copy additional data from CSR <TBD>
-
-Process
-
-* Compute attestation certificate (per certificate fields and extensions 
-described above) using TSM as the DICE for TVM
-
-Outputs
-
-* Copy out attestation structure to TSM verified memory region
-* Set result register to indicate success
-
-
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "CoVE UCCS X.509 extension"]
+[source,cddl]
+----
+riscv-cove-x509-ext = #6.601(riscv-cove-token) ; Unprotected CBOR Web Token
+----
