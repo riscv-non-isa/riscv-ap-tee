@@ -1,37 +1,64 @@
 [bibliography]
 == Bibliography
 
-* [[[R0]]] RISC-V Privileged specification
+* [[[R0,0]]] RISC-V Privileged specification
 https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf
 
-* [[[R1]]] IETF RFC 9334 Remote ATtestation procedureS (RATS) Architecture
+* [[[R1,1]]] IETF RFC 9334 Remote ATtestation procedureS (RATS) Architecture
 https://datatracker.ietf.org/doc/rfc9334/
 
-* [[[R2]]] TCG DICE Attestation Architecture, Version 1.00 Revision 0.23
+* [[[DICE,2]]] TCG DICE Attestation Architecture, Version 1.00 Revision 0.23
 https://trustedcomputinggroup.org/resource/dice-attestation-architecture/
 
-* [[[R3]]] DMTF DSP0274 Security Protocol and Data Model (SPDM) Specification, Version 1.2.1
+* [[[R3,3]]] DMTF DSP0274 Security Protocol and Data Model (SPDM) Specification, Version 1.2.1
 https://www.dmtf.org/dsp/DSP0274
 
-* [[[R4]]] TCG Reference Integrity Manifest (RIM) Information Model
+* [[[R4,4]]] TCG Reference Integrity Manifest (RIM) Information Model
 https://trustedcomputinggroup.org/resource/tcg-reference-integrity-manifest-rim-information-model/
 
-* [[[R5]]] RISC-V Supervisor Binary Interface
+* [[[R5,5]]] RISC-V Supervisor Binary Interface
 https://github.com/riscv-non-isa/riscv-sbi-doc[riscv-non-isa/riscv-sbi-doc]
 
-* [[[R6]]] RISC-V Debug Specification Standard
+* [[[R6,6]]] RISC-V Debug Specification Standard
 https://github.com/riscv/riscv-debug-spec/blob/master/riscv-debug-stable.pdf
 
-* [[[R7]]] RISC-V Zero-Trust Platform Security Model
+* [[[R7,7]]] RISC-V Zero-Trust Platform Security Model
 https://docs.google.com/document/d/1TRHhsGiB5W4K8M7I4e-f40mOPErTb9sv/edit#heading=h.gjdgxs
 
-* [[[R8]]] Trusted Computing Group (TCG) Glossary, Version 1.1 Revision 1.0
+* [[[R8,8]]] Trusted Computing Group (TCG) Glossary, Version 1.1 Revision 1.0
 https://trustedcomputinggroup.org/resource/tcg-glossary/
 
-* [[[R9]]] The RISC-V Advanced Interrupt Architecture Document v0.2.1-draft
+* [[[R9,9]]] The RISC-V Advanced Interrupt Architecture Document v0.2.1-draft
 https://github.com/riscv/riscv-aia/releases[https://github.com/riscv/riscv-aia/releases]
 
-* [[[R10]]] The RISC-V Nested Acceleration ("NACL") extension
+* [[[R10,10]]] The RISC-V Nested Acceleration ("NACL") extension
 TODO Add spec link once available[TODO]
+
+* [[[EAT,11]]] IETF Entity Attestation Token (EAT)
+https://github.com/ietf-rats-wg/eat[https://github.com/ietf-rats-wg/eat]
+
+* [[[CBOR,12]]] Concise Binary Object Representation
+https://datatracker.ietf.org/doc/rfc8949/[https://datatracker.ietf.org/doc/rfc8949/]
+
+* [[[CWT,13]]] CBOR Web Token
+https://datatracker.ietf.org/doc/rfc8392/[https://datatracker.ietf.org/doc/rfc8392/]
+
+* [[[UCCS,14]]] Unprotected CWT Claims Sets
+https://datatracker.ietf.org/doc/draft-ietf-rats-uccs/[https://datatracker.ietf.org/doc/draft-ietf-rats-uccs/]
+
+* [[[COSE,15]]] CBOR Object Signing and Encryption
+https://datatracker.ietf.org/doc/rfc9052/[https://datatracker.ietf.org/doc/rfc9052/]
+
+* [[[Hash_Algorithm_Names,16]]] IANA Hash Function Textual Names
+https://www.iana.org/assignments/hash-function-text-names/hash-function-text-names.xhtml[https://www.iana.org/assignments/hash-function-text-names/hash-function-text-names.xhtml]
+
+* [[[TCG_Client,17]]] TCG PC Client Platform Profile
+https://trustedcomputinggroup.org/wp-content/uploads/TCG_PCClient_PFP_r1p05_v23_pub.pdf
+
+* [[[X509,18]]] X.509 Certificate Profile
+https://www.rfc-editor.org/rfc/rfc5280[https://www.rfc-editor.org/rfc/rfc5280]
+
+* [[[X509_DSA,19]]] X.509 Algorithms for DSA and ECDSA
+https://datatracker.ietf.org/doc/rfc5758/[https://datatracker.ietf.org/doc/rfc5758/]
 
 bibliography::[]
