@@ -15,7 +15,7 @@ hardware-attested trusted execution environment called TEE Virtual machines (TVM
 The TVMs are supported by a hardware-rooted, attestable TCB and are run-time-isolated from 
 the host OS/VMM and other platform software not in the TCB of the TVM. TVMs 
 are protected from a broad set of software-based and hardware-based threats 
-per the threat model described in <<4_1_adversary_model>>. The design enables 
+per the threat model described in <<threatmodel>>. The design enables
 the OS or VMM to maintain the role of resource manager even for the TVMs. The 
 resources managed by the untrusted OS/VMM include memory, CPU, I/O resources 
 and platform capabilities to execute the TVM workload.
@@ -123,7 +123,7 @@ image:img_1.png[]
 Figure 2: TEE TCB for application workloads (hosted via a TVM)
 
 The detailed architecture is described in the Section 
-<<5_reference_architecture_details>>. Note that the architecture described 
+<<refarch>>. Note that the architecture described
 above may have various implementations, however the goal of this specification 
 is to propose a reference architecture and ratify a normative TEEI as a RISC-V non-ISA 
 specification.
