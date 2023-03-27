@@ -58,7 +58,7 @@ being executed using the sbi_tee_host_add_tvm_zero_pages.
 Lastly, the VMM can assign memory to the TVM to hold virtual hart state via 
 sbi_tee_host_create_tvm_vcpu. Before the VMM can start 
 executing the TVM virtual harts, the VMM must finalize the static 
-measurement of the TVM via bi_tee_host_finalize_tvm. The TSM prevents any 
+measurement of the TVM via sbi_tee_host_finalize_tvm. The TSM prevents any
 TVM virtual harts from being entered until the TVM initialization is 
 finalized. 
 
