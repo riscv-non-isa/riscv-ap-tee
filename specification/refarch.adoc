@@ -137,10 +137,10 @@ initialization. The THCS structure definition is part of the TEEI and may
 be extended by an implementation, with the minimum state shown in the 
 structure. Isolating and establishing the execution state of the TSM is the 
 responsibility of the TSM-driver. Saving and restoring the execution 
-state of the TSM (for interrupted routines) is performed by the TSM. The 
-operating modes of the TSM are described in Section 5.2. Saving and 
-restoring the TVM execution state in the TVM virtual-harts (called the 
-VHCS) is the responsibility of the TSM and is held in TEE-capable memory 
+state of the TSM (for interrupted routines) is performed by the TSM. The
+operating modes of the TSM are described in <<TSM operation and properties>>.
+Saving and restoring the TVM execution state in the TVM virtual-harts (called
+the VHCS) is the responsibility of the TSM and is held in TEE-capable memory
 assigned to the TVM by the VMM.
 
 === TSM operation and properties
