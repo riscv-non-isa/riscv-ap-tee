@@ -132,7 +132,7 @@ access-control-restricted by the TSM-driver to allow only the TSM to access
 this memory. The per-hart TSM state is used to start TSM execution from a 
 known-good state for security routines invoked by the OS/VMM. The per-hart 
 TSM state should be stored in pages that form a TSM Hart Control Structure 
-(THCS - See Appendix A) which is initialized as part of the TSM memory 
+(THCS - See <<appendix_a>>) which is initialized as part of the TSM memory
 initialization. The THCS structure definition is part of the TEEI and may 
 be extended by an implementation, with the minimum state shown in the 
 structure. Isolating and establishing the execution state of the TSM is the 
@@ -161,7 +161,7 @@ the TSM handles the cases delegated to it by the TSM-driver (via mideleg).
 The TSM saves the TVM state and invokes the TSM-driver via an ECALL (TEERET 
 with reason) to initiate the return of execution control to the OS/VMM if 
 required. The TSM-driver restores the context for the OS/VMM via the 
-per-hart control sub-structure THCS.hssa (See Appendix A). This canonical 
+per-hart control sub-structure THCS.hssa (See <<appendix_a>>).This canonical
 flow is shown in figure 3.
 
 Beyond the basic operation described above, the following different 
@@ -226,12 +226,12 @@ AP-TEE mode = 1 for the hart via M-mode CSR (implementation-specific)
 * Locate the per-hart THCS (located within TSM-driver memory data region)
 * Save operating VMM csr context into the THCS.hssa (Hart Supervisor State 
 Area) fields : sstatus, stvec, scounteren, sscratch, satp (and other x 
-state other than a0, a1 - see <<9_appendix_a_thcs_and_vhcs>>). Note that 
+state other than a0, a1 - see <<appendix_a>>). Note that
 any v/f register state must be saved by the caller.
 * Save THCS.hssa.pc as mepc+4 to ensure that a subsequent resumption 
 happens from the pc past the TEECALL
 * Establish the TSM operating context from the THCS.tssa (TSM Supervisor 
-State Area) fields (See Appendix A)
+State Area) fields (See <<appendix_a>>)
 * Set scause to indicate TEECALL
 * Disable interrupts via sie=0. 
   ** For a preemptable TSM, interrupts do not stay disabled - the TSM may 
@@ -315,7 +315,7 @@ SW/Timer/External, bus error, high temp, RAS etc. are not delegated and
 delivered to M-mode/TSM-driver. Under these circumstances the saving of the 
 state is the TSM-driver responsibility. Also since scrubbing the TVM state 
 is the TSM responsibility, the TSM-driver may pend an S-mode interrupt to 
-the TSM to allow cleanup on such events. See Appendix B for a table of 
+the TSM to allow cleanup on such events. See <<appendix_b>> for a table of
 interrupt causes and handling requirements.
 
 The TSM may not need to program stimecmp on its own, though it may verify 
