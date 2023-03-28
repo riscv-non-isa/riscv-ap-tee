@@ -39,7 +39,7 @@ jobs:
       run: echo "name=$NAME" >> $GITHUB_OUTPUT
     - name: Set outputs.pdf-name
       id: step2
-      run: echo "pdf-name=$NAME.pdf" >> $GITHUB_OUTPUT
+      run: echo "pdf-name=./specification/$NAME.pdf" >> $GITHUB_OUTPUT
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
