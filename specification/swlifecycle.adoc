@@ -91,12 +91,12 @@ VS-stage address translation (this is existing). G-stage address
 translation is enforced via the TSM-managed hgatp with the listed 
 recommendations in <<TSM and TVM Isolation>>. 
 
-For virtual-IO operations, the TVM code may either use non-confidential memory regions 
-that are populated by the host using sbi_tee_host_add_tvm_shared_pages or may 
-explicitly request TVM memory to be converted to non-confidential (via 
-sbi_tee_guest_share_memory_region) and then explicitly copy data from confidential 
-to non-confidential memory, and lastly signal service requests to the host VMM 
-(via sbi_tee_guest_host_invoke). When direct device assignment is supported (which 
+For virtual-IO operations, the TVM code must register virtual-IO memory regions
+for trap and emulation by the host using `sbi_tee_guest_add_mmio_region()`. Any
+read/write by the TVM from/to this memory region will result in a guest page-fault into
+TSM and TSM will forward the fault to the host. TSM will also communicate additional
+information such as faulting instruction, faulting address and the GPR value (in case of
+store instruction) to the host. When direct device assignment is supported (which 
 is expected to require IOMMU changes for AP-TEE), trusted devices may DMA directly 
 into TVM confidential memory. 
 
