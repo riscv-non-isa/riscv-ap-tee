@@ -408,8 +408,8 @@ to the guest. IPI emulation must be provided by the hypervisor. MRIFs are only
 constrained by the amount of available DRAM, however.
 
 While it is possible to support execution of a TVM virtual hart using either a 
-guest interrupt file or an MRIF, the architecture described below constrains TVM 
-virtual harts to only using guest interrupt files while they are actively executing 
+guest interrupt file or an MRIF, the architecture describes below constraints for the
+TVM virtual harts to only use guest interrupt files while they are actively executing 
 in order to simplify the duties of the TSM. Inactive (swapped out) TVM virtual harts 
 may use an MRIF, however, and an MRIF is required when migrating a TVM virtual hart 
 between physical harts. In either case the page of physical memory corresponding to 
@@ -542,9 +542,10 @@ TSM must provide a mechanism whereby only allow-listed interrupts may be trigger
 
 *sbi_tee_guest_allow_external_interrupt*
 
-Registers an MSI (address + data pair) that the OS/VMM is allowed to trigger. The MSI 
-address must be the address of one of the TVM's virtual hart's IMSIC in the TVM's guest 
-physical address space. Generates a TVM exit to notify the OS/VMM of the interrupt vector.
+Registers an interrupt ID that the OS/VMM is allowed to trigger. Passing an interrupt ID of
+-1 allows the injection of all external interrupts. TVM vCPUs are started with all external
+interrupts completely denied by default. Generates a TVM exit to notify the OS/VMM of the
+interrupt vector.
 
 *sbi_tee_interrupt_inject_tvm_cpu*
 
