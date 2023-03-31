@@ -34,7 +34,7 @@ mechanism and protocol.
 
 *Framework*
 
-The IETF RATS [x] describes the following reference model for attestation. 
+The IETF RATS <<R1>> describes the following reference model for attestation. 
 In Remote Attestation, the Attester produces information about itself 
 (Evidence) to enable a remote peer (the Relying Party) to decide whether to 
 consider that Attester a trustworthy peer or not. The Verifier appraises 
