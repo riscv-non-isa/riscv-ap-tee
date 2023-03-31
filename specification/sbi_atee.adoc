@@ -1490,13 +1490,13 @@ struct AttestationCapabilities {
 |===
 
 
-[#sbi_tee_guest_drtm_extend]
+[#sbi_tee_guest_measurement_extend]
 === Function: TEE Guest Measurement Extend (FID #7)
 [source, C]
 -------
-struct sbiret sbi_tee_guest_drtm_extend(unsigned long tvm_gpa_buf_address,
-                                        unsigned long buffer_len,
-                                        Unsigned long msmt_index);
+struct sbiret sbi_tee_guest_measurement_extend(unsigned long tvm_gpa_buf_address,
+                                               unsigned long buffer_len,
+                                               Unsigned long msmt_index);
 -------
 This intrinsic is used by a TVM component to act as an extended root of trust of measurement 
 for the TVM to extend runtime measurements beyond the static measurements performed by the TSM. 
@@ -1509,8 +1509,8 @@ is generated via sbi_tee_guest_get_evidence.
 Both `tvm_gpa_buf_addr` and `region_len` must be 4kB-aligned.
 msmt_index must be a valid index per the attestation capabilities reported via `sbi_tee_guest_get_attcaps`.
 
-[#table_sbi_tee_guest_drtm_extend_errors]
-.TEE Guest Drtm Extend
+[#table_sbi_tee_guest_measurement_extend_errors]
+.TEE Guest Measurement Extend
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1784,9 +1784,8 @@ intrinsic is used by a TVM to get attestation capabilities supported by the TSM.
 the capabilities enumerated are then used to extend measurements and/or get 
 evidence to support attestation.                                                 
 
-| <<sbi_tee_guest_drtm_extend, sbi_tee_guest_drtm_extend>>   | This 
-intrinsic is used by a TVM component 
-to act as a dynamic root of trust of measurement (DRTM) for the TVM to 
+| <<sbi_tee_guest_measurement_extend, sbi_tee_guest_measurement_extend>>   | This 
+intrinsic is used by a TVM component to build the chain of trust for the TVM to 
 extend runtime measurements. These measurements are managed by the TSM in 
 the TVM global structure (To be specified TBD). These measurements are used 
 in the TcbEvidenceInfo when the TVM attestation certificate is generated 

@@ -267,7 +267,7 @@ The TSM can issue an Attestation certificate to the TVM which includes the
 TVM TcbInfo, and can transfer that certificate to the TVM during 
 initialization via a guest firmware mechanism (e.g. device tree or UEFI HOB). 
 Alternately, the TSM can provide an interface to sign TVM TcBInfo and 
-additional data (such as DRTM measurements done by the TVM) at runtime via 
+additional data (such as runtime measurements done by the TVM) at runtime via 
 the sbi_tee_guest_get_evidence interface to generate additional TVM Attestation 
 certificates.
 
