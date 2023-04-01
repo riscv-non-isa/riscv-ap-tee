@@ -1498,7 +1498,7 @@ struct sbiret sbi_tee_guest_measurement_extend(unsigned long tvm_gpa_buf_address
                                                unsigned long buffer_len,
                                                Unsigned long msmt_index);
 -------
-This intrinsic is used by a TVM component to act as an extended root of trust of measurement 
+This intrinsic is used by a TVM component to build the chain of trust of measurement 
 for the TVM to extend runtime measurements beyond the static measurements performed by the TSM. 
 The measurements for each TVM always contain the same chain of TCB elements rooted in the HW RoT.
 
@@ -1785,7 +1785,7 @@ the capabilities enumerated are then used to extend measurements and/or get
 evidence to support attestation.                                                 
 
 | <<sbi_tee_guest_measurement_extend, sbi_tee_guest_measurement_extend>>   | This 
-intrinsic is used by a TVM component to build the chain of trust for the TVM to 
+intrinsic is used by a TVM component to build the chain of trust of measurement for the TVM to 
 extend runtime measurements. These measurements are managed by the TSM in 
 the TVM global structure (To be specified TBD). These measurements are used 
 in the TcbEvidenceInfo when the TVM attestation certificate is generated 
