@@ -1548,36 +1548,98 @@ The possible error codes returned in sbiret.error are:
 struct sbiret sbi_covg_get_attcaps(unsigned long tvm_gpa_cap_addr,
                                         unsigned long caps_size);
 -------
-This intrinsic is used by a TVM component to get the SBI implementation attestation capabilities. 
-The attestation capabilities let the CoVE implementations expose which hash algorithm is being used 
-for measurements, which evidence formats are supported. The attestation capabilities structure 
-also contains a map of all measurement registers the TVM can extend.
+This intrinsic is used by a TVM component to get the SBI implementation
+attestation capabilities.
 
-Both `tvm_cap_addr` and `caps_size` must be 4kB-aligned.
+The attestation capabilities let the CoVE implementations expose which hash
+algorithm is being used for measurements, which attestation certificate formats
+are supported, and the number of dedicated measurement registers for the TVM
+static and dynamic measurements.
+
+The attestation capabilities structure also contains a map of all TVM
+measurement registers, both static and dynamic ones. Only dynamic ones can be
+extended by the TVM guest at runtime.
+
+Both `tvm_cap_addr` and `caps_size` must be page aligned.
 
 [source, C]
 -------
 enum HashAlgorithm {
     /* SHA-384 */
-    Sha384,
+    Sha_384,
     /* SHA-512 */
-    Sha512
+    Sha_512
+    /* SHA3-384 */
+    Sha3_384,
+    /* SHA3-512 */
+    Sha3_512,
 };
+
+// CBOR formatted attestation certificate
+#define ATTESTATION_CERTIFICATE_CBOR (1 << 0)
+
+// X.509 formatted attestation certificate,
+// with a TCG DICE compliant extension (UCCS).
+#define ATTESTATION_CERTIFICATE_X509 (1 << 1)
+
+#define MAX_STATIC_MEASUREMENT_REGISTERS 8
+#define MAX_DYNAMIC_MEASUREMENT_REGISTERS 8
+#define MAX_MEASUREMENT_REGISTERS (MAX_STATIC_MEASUREMENT_REGISTERS \
+                                  + MAX_DYNAMIC_MEASUREMENT_REGISTERS)
 
 struct AttestationCapabilities {
     /* The TCB Secure Version Number. */
     uint64_t tcb_svn;
+
     /* The supported hash algorithm */
     enum HashAlgorithm hash_algorithm;
-    /* The supported evidence formats. This is a bitmap */
-    uint32_t evidence_formats;
+
+    /*
+     * The supported attesation certificate formats.
+     * This is a bitmap of ATTESTATION_CERTIFICATE_* flags.
+     */
+    uint32_t certificate_formats;
+
     /* Number of static measurement registers */
     uint_8 static_measurements;
-    /* Number of runtime measurement registers */
-    uint_8 runtime_measurements;
+
+    /* Number of dynamic measurement registers */
+    uint_8 dynamic_measurements;
+
     /* Array of all measurement register descriptors */
     MeasurementRegisterDescriptor[MAX_MEASUREMENT_REGISTERS] msmt_regs;
 };
+
+enum MeasurementType {
+     /* Static measurement */
+     Static,
+
+     /* Dynamic measurement */
+     Dynamic,
+}
+
+#define UNMAPPED_TCG_PCR 0xff
+
+struct MeasurementRegisterDescriptor {
+       /*
+        * The hash function algorithm used for that register.
+        * This must match the AttestationCapabilities `hash_algorithm` field
+        * value.
+        */
+       enum HashAlgorithm hash_algorithm;
+
+       /* Static or dynamic measurement register */
+       enum MeasurementType  measurement_type;
+
+       /*
+        * This is the TCG PCR index this measurement maps to, as defined in
+        * https://trustedcomputinggroup.org/wp-content/uploads/TCG_PCClient_PFP_r1p05_v23_pub.pdf
+        * Implementations not mapping their measurement registers  to TCG
+        * PCR indexes must use UNMAPPED_TCG_PCR for this value.
+        */
+       uint8_t tcg_pcr_index;
+};
+
 -------
 
 [#table_sbi_covg_get_attcaps]
@@ -1594,70 +1656,78 @@ struct AttestationCapabilities {
 |===
 
 
-[#sbi_covg_measurement_extend]
-=== Function: COVE Guest Measurement Extend (FID #7)
+[#sbi_covg_extend_measurememt]
+=== Function: COVE Guest Extend Measurement (FID #7)
 [source, C]
 -------
-struct sbiret sbi_covg_measurement_extend(unsigned long tvm_gpa_buf_address,
-                                               unsigned long buffer_len,
-                                               Unsigned long msmt_index);
+struct sbiret sbi_covg_extend_measurement(unsigned long msmt_buf_addr,
+                                               unsigned long msmt_buf_len,
+                                               unsigned long msmt_index);
 -------
-This intrinsic is used by a TVM component to build the chain of trust of measurement 
-for the TVM to extend runtime measurements beyond the static measurements performed by the TSM. 
-The measurements for each TVM always contain the same chain of TCB elements rooted in the HW RoT.
+This intrinsic is used by a TVM component to extend the TVM dynamic set of
+measurements with one additional data blob. The hash function algorithm used to
+generate the measurement data must match the `sbi_covg_get_attcaps`
+reported one.
 
-The TVM static measurements are managed by the TSM in the TVM global structure. 
-These measurements are used in the TcbEvidenceInfo when the TVM attestation certificate 
-is generated via sbi_covg_get_evidence.
+TVMs can call this function at any time after being finalized. The extended
+dynamic measurement register value will be included in all following attestation
+certificates generated via `sbi_covg_get_evidence` calls.
 
-Both `tvm_gpa_buf_addr` and `region_len` must be 4kB-aligned.
-msmt_index must be a valid index per the attestation capabilities reported via `sbi_covg_get_attcaps`.
+`msmt_buf_addr` must be page aligned and must point to a digest generated by
+the hash function algorithm reported via `sbi_covg_get_attcaps`.
+`msmt_buf_len` must be equal to the hash function output length, which is a
+characteristic of the selected hash function algorithm.
+`msmt_index` must be a valid dynamic measurement register index, per the
+attestation capabilities reported via `sbi_covg_get_attcaps`.
 
-[#table_sbi_covg_measurement_extend_errors]
-.COVE Guest Measurement Extend
+[#table_sbi_covg_extend_msmt_errors]
+.COVE Guest Dynamic Measurement Extension
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
-                            This implies an exit to the host, and a subsequent resume of execution.
-| SBI_ERR_INVALID_ADDRESS | `tvm_gpa_buf_addr` was invalid.
-| SBI_ERR_INVALID_PARAM   | `region_len` was invalid, or the entire range doesn't
-                            span a `CONFIDENTIAL_MEMORY_REGION`
+                            This implies an exit to the host, and a subsequent
+                            resume of execution.
+| SBI_ERR_INVALID_ADDRESS | `msmt_buf_addr` was invalid.
+| SBI_ERR_INVALID_PARAM   | The `msmt_index` value is invalid.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
-
-
 
 [#sbi_covg_get_evidence]
 === Function: COVE Guest Get Evidence (FID #8)
 [source, C]
 -------
-struct sbiret sbi_covg_get_evidence(uint64_t cert_request_addr, 
-                                         uint64_t cert_request_size,
-                                         uint64_t request_data_addr,
-                                         enum EvidenceFormat evidence_format,
-                                         uint64_t cert_addr_out,
-                                         uint64_t cert_size);
+struct sbiret sbi_covg_get_evidence(unsigned long pub_key_addr,
+                                         unsigned long pub_key_size,
+                                         unsigned long challenge_data_addr,
+                                         unsigned long cert_format,
+                                         unsigned long cert_addr_out,
+                                         unsigned long cert_size);
 -------
-If the `sbi_covg_get_attcaps` enumerates attestation services provided by the TSM, then 
-this intrinsic is used by a TVM to get attestation evidence to report to a (remote) relying party. 
-This may take the form of a request for an attestation certificate or a TSM-signed TVM 
-measurement (using an attestation certificate specific to the TVM).
+If the `sbi_covg_get_attcaps` enumerates attestation services provided by
+the TSM, then this intrinsic is used by a TVM to get an attestation evidence to
+report to a remote relying party.
 
-Get attestation evidence from a Certificate Signing Request (CSR) 
-per https://datatracker.ietf.org/doc/html/rfc2986. The caller passes the CSR and its length 
-through the first 2 arguments. The third argument is the address where the caller 
-places a data blob that will be included in the generated certificate. 
-Typically, this is a cryptographic nonce. The fourth argument is the evidence 
-format: DiceTcbInfo (0), DiceMultiTcbInfo (1) or OpenDice (2). The fifth argument 
-is the address where the generated certificate will be placed. The evidence is 
-formatted an x.509 DiceTcbInfo certificate extension
+This intrisic returns an attestation certificate at the address passed as its
+fifth argument (`cert_addr_out`). The certificate is signed by the TSM
+attestation key, and includes the TVM attestation evidence. The TSM attestion
+key is also included in the reported TSM token.
 
-It is supported by the TSM to provide HW-key-signed measurements of the TVM and the TSM. 
-The attestation key used to sign the evidence is provisioned into the TVM by the TSM. 
-The TSM certificate is provisioned by the FW TCB (TSM-driver and HW RoT).
+The caller passes the TVM public key address as the first argument
+(`pub_key_addr`). This key will be included in the generated certificate and
+represents the TSM-certified TVM identity.
 
-Both `cert_request_addr`, `request_data_addr` and `cert_addr_out` must be 4kB-aligned.
+The third argument (`challenge_data_addr`) points to the attestation challenge
+blob, typically a relying party generated nonce used for demonstrating the
+attestation evidence fresheness.
+
+The fourth argument (`cert_format`) is the caller's selected attestation
+certificate format. This must be one of the supported `ATTESTATION_CERTIFICATE_*`
+flag, per the attestation capabilities reported via `sbi_covg_get_attcaps`.
+
+All addresses (`pub_key_addr`, `challenge_data_addr` and `cert_addr_out`) must be
+page aligned, and both `pub_key_addr` and `challenge_data_addr` must point to
+confidential memory.
 
 [#table_sbi_covg_get_evidence_errors]
 .COVE Guest Get Evidence
@@ -1665,15 +1735,52 @@ Both `cert_request_addr`, `request_data_addr` and `cert_addr_out` must be 4kB-al
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
-                            This implies an exit to the host, and a subsequent resume of execution.
+                            This implies an exit to the host, and a subsequent
+                            resume of execution.
 | SBI_ERR_INVALID_ADDRESS | One of the addresses provided was invalid.
-| SBI_ERR_INVALID_PARAM   | `cert_size` or `cert_request_size` was invalid, or the entire range doesn't
-                            span a `CONFIDENTIAL_MEMORY_REGION`
+| SBI_ERR_INVALID_PARAM   | `pub_key_size`, `cert_size` or `cert_format` was
+                            invalid, or the entire range doesn't span a
+                            `CONFIDENTIAL_MEMORY_REGION`
+| SBI_ERR_BUSY            | The attestation certificate could not be generated
+                            due to some resources being busy. The request may be
+                            retried.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#sbi_covg_read_measurement]
+=== Function: COVE Guest Read Measurement (FID #9)
+[source, C]
+-------
+struct sbiret sbi_covg_read_measurememt(unsigned long msmt_buf_addr_out,
+                                             unsigned long msmt_buf_size,
+                                             unsigned long msmt_index);
+-------
+This intrisic returns a the TVM measurement register value for the `msmt_index`
+measurement register. TVMs can read both static and dynamic measurement register
+values back.
 
+`sbi_covg_read_measurement` returns the register value at `msmt_buf_addr_out` and
+`msmt_buf_size` must be large enough to accomodate for the hash function
+algorithm output length, as reported by `sbi_covg_get_attcaps`.
 
+`msm_index` must be one of the `sbi_covg_get_attcaps` reported measurement
+register indexes.
+
+`msmt_buf_addr_out` must be page aligned.
+
+[#table_sbi_covg_read_measurement_errors]
+.COVE Guest Read Measurement
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+                            This implies an exit to the host, and a subsequent
+                            resume of execution.
+| SBI_ERR_INVALID_ADDRESS | `msmt_buf_addr_out` was invalid.
+| SBI_ERR_INVALID_PARAM   | `msmt_buf_size` was invalid, or the entire range
+                            doesn't span a `CONFIDENTIAL_MEMORY_REGION`
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
 
 == Summary Listing of CoVE functions 
 
@@ -1901,23 +2008,25 @@ an `interrupt_id` of -1 denies injection of all external interrupts.
 
 | <<sbi_covg_get_attcaps, sbi_covg_get_attcaps>>   | This 
 intrinsic is used by a TVM to get attestation capabilities supported by the TSM.
-the capabilities enumerated are then used to extend measurements and/or get 
-evidence to support attestation.                                                 
+the capabilities enumerated are then used to extend measurements and/or get
+evidence to support attestation.
 
-| <<sbi_covg_measurement_extend, sbi_covg_measurement_extend>>   | This 
-intrinsic is used by a TVM component to build the chain of trust of measurement for the TVM to 
-extend runtime measurements. These measurements are managed by the TSM in 
-the TVM global structure (To be specified TBD). These measurements are used 
-in the TcbEvidenceInfo when the TVM attestation certificate is generated 
-via sbi_covg_get_evidence. This interface specification is TBD.                                                 
+| <<sbi_covg_extend_measurement, sbi_covg_extend_measurement>> | This
+intrinsic is used by a TVM component to extend the TVM dynamic set of
+measurement with one additional data blob. The hash function algorithm used to
+generate the measurement data must match the `sbi_covg_get_attcaps`
+reported one.
 
-| <<sbi_covg_get_evidence, sbi_covg_get_evidence>>      | This 
-intrinsic is used by a TVM to get 
-attestation evidence to report to a (remote) relying party. It is supported 
-by the TSM to provide HW-key-signed measurements of the TVM and the TSM. 
-The attestation key used to sign the evidence is provisioned into the TVM 
-by the TSM. The TSM certificate is provisioned by the FW TCB (TSM-driver 
-and HW RoT). This interface specification is TBD.                                                                   
+| <<sbi_covg_get_evidence, sbi_covg_get_evidence>>      | This
+intrinsic is used by a TVM to get an attestation evidence to
+report to a remote relying party. It returns an attestation certificate signed
+by the TSM attestation key, and includes the TVM attestation evidence. The TSM
+attestion key is also included in the reported TSM token.
+
+| <<sbi_covg_read_measurement, sbi_covg_read_measurement>>      | This
+intrisic returns a the TVM measurement register value for the `msmt_index`
+measurement register. TVMs can read both static and dynamic measurement register
+values back.
 
 | sbi_covg_enable_debug      | This intrinsic is supported by the TSM to 
 enable the TVM to request for debugging to be enabled for the TVM (TSM 
