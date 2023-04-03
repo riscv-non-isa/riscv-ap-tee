@@ -567,13 +567,37 @@ The possible error codes returned in `sbiret.error` are shown below.
 ------
 struct sbiret sbi_covh_finalize_tvm(unsigned long tvm_guest_id,
                                         unsigned long entry_sepc,
-                                        unsigned long entry_arg);
+                                        unsigned long entry_arg,
+                                        unsigned long tvm_identity_addr);
 ------
 Transitions the TVM specified by `tvm_guest_id` from the `TVM_INITIALIZING` state to a `TVM_RUNNABLE`
 state. Also, sets the entry point (`ENTRY_PC`) using `entry_sepc` and boot argument (`ENTRY_ARG`) 
 using `entry_arg` for the boot VCPU. Both `entry_sepc` and `entry_arg` are included in the measurement
-of the TVM. 'entry_sepc' is the address in TVM binary to start the boot VCPU from and `entry_arg` is 
+of the TVM. `entry_sepc` is the address in TVM binary to start the boot VCPU from and `entry_arg` is
 the address of guest fdt and is passed as an argument to the boot VCPU in `a1` GPR. 
+
+`tvm_identity_addr` points to a 64 bytes buffer containing a host-defined TVM
+identity. This piece of data can be used to bind TVMs to a host-defined identity
+(e.g. an attestation service public key, a guest configuration file hash, an
+attestation policy description, etc). Although this piece of data is included in
+the TVM attestation certificate as a dedicated TVM claim (`tvm-identity`), it is
+*not* included in the TVM measurements.
+That allows for the host to optionally personalize cryptographically identical
+TVMs through an attestable and verifiable identity.
+
+The semantics of this piece of data is defined by the host and can be ignored
+by both the guest and the attestation services. However, when being used, the
+TVM identity can be leveraged as follows:
+
+1. The host passes some information to the guest through e.g. some out-of-band VM orchestration mechanisms. This could be e.g. the hash value for a policy file the guest is expected to apply at runtime.
+2. The guest compares the passed host data with the `tvm-identity` attestation certificate claim and can decide to use it or not depending on this local verification process.
+3. When requesting a confidential resource, the relying party can check that the host provided identity data is trustworthy and that the guest measurements are for a TCB that may have used it.
+4. The relying party can choose to release the resource to the guest based on this verifiable TVM identity.
+
+Giving TVMs an identity is optional and the TSM must not include a TVM identity
+claim in the TVM attestation token when `tvm_identity_addr` is set to 0.
+When a TVM identity is provided, the `tvm_identity_addr` must be different than 0
+and 64B-aligned.
 
 The TSM enforces that a TVM virtual harts cannot be entered unless the TVM measurement is committed 
 via this operation. No additional measured pages may be added after this operation is successfully completed.
@@ -586,8 +610,8 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 | Error code            | Description
 | SBI_SUCCESS           | The operation completed successfully.
-| SBI_ERR_INVALID_PARAM | `tvm_guest_id` was invalid, or the
-                          TVM wasn't in the `TVM_INITIALIZING` state.
+| SBI_ERR_INVALID_PARAM | `tvm_guest_id` or `tvm_identity_addr` was invalid, or
+                          the TVM wasn't in the `TVM_INITIALIZING` state.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
  
