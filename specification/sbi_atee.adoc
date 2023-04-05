@@ -1114,7 +1114,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_tee_interrupt_unbind_aia_imsic_begin]
-=== Function: TEE Interrupt Bind AIA IMSIC Begin (FID #5)
+=== Function: TEE Interrupt Unbind AIA IMSIC Begin (FID #5)
 [source, C]
 -------
 struct sbiret sbi_tee_interrupt_unbind_aia_imsic_begin(unsigned long tvm_guest_id,
@@ -1139,7 +1139,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_tee_interrupt_unbind_aia_imsic_end]
-=== Function: TEE Interrupt Bind AIA IMSIC End (FID #6)
+=== Function: TEE Interrupt Unbind AIA IMSIC End (FID #6)
 [source, C]
 -------
 struct sbiret sbi_tee_interrupt_unbind_aia_imsic_end(unsigned long tvm_guest_id,
@@ -1270,15 +1270,15 @@ The possible error codes returned in `sbiret.error` are shown below.
 == TEE Guest Extension (EID 0x54454547)
 The TEE Guest extension supplements the TEE Host extension, and allows TVMs to communicate with TSM.
 A typical use case for this extension is to relay information to the host. TEE-Guest calls cause a
-trap to the TSM which may exit to the host with `scause` set to ECALL, a6 set to FID, `a0`-`a5` set
-to ECALL args.
+trap to the TSM. TSM should do any processing required and then must forward the ECALL to the host with
+`scause` set to ECALL, `a7` set to EID, `a6` set to FID, `a0`-`a5` set to ECALL args.
 
 [#sbi_tee_guest_add_mmio_region]
 === Function: TEE Guest Add MMIO Region (FID #0)
 [source, C]
 -------
 struct sbiret sbi_tee_guest_add_mmio_region(unsigned long tvm_gpa_addr,
-                                              unsigned long region_len);
+                                            unsigned long region_len);
 -------
 Marks the specified range of TVM physical address space starting at `tvm_gpa_addr` as used for emulated
 MMIO. Upon return, all accesses by the TVM within the range are trapped and may be emulated by the host.

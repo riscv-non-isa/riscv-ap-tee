@@ -1,5 +1,5 @@
 HEADER_SOURCE := header.adoc
-PDF_RESULT := riscv-aptee-spec.pdf
+PDF_RESULT ?= riscv-ap-tee.pdf
 
 all: build
 

@@ -11,22 +11,35 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      prerelease:
-        description: 'Generate a pre-release.'
-        required: false 
-        type: boolean
+  workflow_call:
+    outputs:
+      name:
+        description: "The base name of the pdf file (without .pdf extensions)"
+        value: ${{ jobs.build.outputs.name }}
+      pdf-name:
+        description: "The name of the pdf file (with .pdf extensions)"
+        value: ${{ jobs.build.outputs.pdf-name }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     env:
+      NAME: riscv-ap-tee
       APT_PACKAGES_FILE: ${{ github.workspace }}/dependencies/apt_packages.txt
       BUNDLE_GEMFILE: ${{ github.workspace }}/dependencies/Gemfile
       BUNDLE_BIN: ${{ github.workspace }}/bin
       NPM_PACKAGE_FOLDER: ${{ github.workspace }}/dependencies
+    outputs:
+      name: ${{ steps.step1.outputs.name }}
+      pdf-name: ${{ steps.step2.outputs.pdf-name }}
     steps:
+    - name: Set outputs.name
+      id: step1
+      run: echo "name=$NAME" >> $GITHUB_OUTPUT
+    - name: Set outputs.pdf-name
+      id: step2
+      run: echo "pdf-name=./specification/$NAME.pdf" >> $GITHUB_OUTPUT
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
@@ -57,20 +70,11 @@ jobs:
     - name: Generate PDF
       run: |
         PATH=${PATH}:${BUNDLE_BIN}:$(npm bin) \
-        make
-      working-directory: ./specification
+        PDF_RESULT=${{ env.NAME }}.pdf \
+        make -C specification
     - name: Archive PDF result
       uses: actions/upload-artifact@v3
       with:
-        name: riscv-aptee-spec.pdf
-        path: ./specification/riscv-aptee-spec.pdf
+        name: ${{ env.NAME }}.pdf
+        path: ./specification/${{ env.NAME }}.pdf
         retention-days: 7
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: ./specification/riscv-aptee-spec.pdf
-        tag_name: ${{ github.ref_name }}
-        name: Release ${{ github.ref_name }}
-        draft: false
-        prerelease: true
-
