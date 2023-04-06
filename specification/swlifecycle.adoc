@@ -112,7 +112,7 @@ confidential, the VMM may add zero pages for those mappings.
 
 During execution and typically during TVM initialization, the TVM code can 
 extend the runtime measurement registers by invoking the 
-`sbi_tee_guest_drtm_extend()` - this allows the TVM to measure the next stage of 
+`sbi_tee_guest_measurement_extend()` - this allows the TVM to measure the next stage of 
 kernel or application modules that are loaded in the TVM.  
 
 Also during execution, a remote relying party may challenge the TVM to 
@@ -268,7 +268,8 @@ VMM performs a local fence operation on each hart via the `sbi_tee_host_local_fe
 * At the last fence operation, TSM verifies that TLB fence was completed for all 
 harts for the batch of pages selected for conversion, and marks those mappings as 
 usable as confidential memory.
-* At this point non-TEE mode software cannot create new TLB entries to donated pages - since non-TEE mode accesses to MTT-tracked Confidential pages will fault (including implicit accesses)
+* At this point non-TEE mode software cannot create new TLB entries to donated pages - 
+since non-TEE mode accesses to MTT-tracked Confidential pages will fault (including implicit accesses)
 
 ==== Global and per-TVM TLB management
 
