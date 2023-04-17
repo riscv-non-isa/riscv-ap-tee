@@ -5,7 +5,7 @@ The following table describes the interrupt handling delegation for an
 interruptible and non-preemptable TSM.
 
 |===
-| *Interrupt*|*Exception Code*|*Description*|*If AP-TEE and mode/Handled by;*
+| *Interrupt*|*Exception Code*|*Description*|*If CoVE and mode/Handled by;*
 | 1          |0               | Reserved    | */M(TSM-driver)
 | 1          | 1              | Supervisor software interrupt | VU(TVM)/VS
 (TVM); VU(TVM)/VS(TVM); U(TSM)/HS(TSM); HS(TSM)/ M(TSM-driver)
