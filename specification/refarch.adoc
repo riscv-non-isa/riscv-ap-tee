@@ -6,7 +6,7 @@
 We describe the capabilities of the platform to support memory isolation 
 requirements for confidentiality of workloads in TVMs. We then describe 
 the properties of the TSM, its instantiation, isolation and operational model 
-for the TVM lifecycle. The description in this section refers to the reference 
+for the TVM life cycle. The description in this section refers to the reference 
 architecture in Figure 1.
 
 === CoVE Memory Isolation
@@ -433,24 +433,22 @@ If a TVM runs in this default mode (opted out of performance monitoring),
 on a transition to the TVM, the TSM-driver enforces this via inhibiting the 
 counters (using mcountinhibit). 
 
-If the TVM has opted-in to performance monitoring, the TSM must invoke the 
-TSM-driver to establish a TVM-specific performance monitoring controls 
-(counters, event selectors). For any counters that the TVM will use, the 
-TSM will assign those to the TVM via the TSM-driver and inhibit counting in 
-HS/M mode. The TSM is free to use any 
-counters that are not delegated. If the TSM is not using any counters and 
-any of the TVMs opt-in to use hpm then the TSM may delegate the LCOFI 
-interrupt (via hideleg[13]=1) for that TVM. The delegated TVM counters 
-naturally inhibit counting in S/HS and M. The TSM-driver must save and 
-clear counter/event selector values as control transitions to the VMM or a 
-different TVM that is using hpm. On a transition back to the host OS/VMM, 
-the TSM-driver must restore the saved hardware performance monitoring event 
-triggers and counter enables. 
-
 The TVM may opt-in to use performance monitoring either at initialization 
-or post-init. For TVMs that have performance monitoring enabled, the 
-TSM-driver may implement a service for the TSM to allow dynamically saving 
-and restoring performance monitoring controls when a TVM is executing - 
-this can reduce the performance overhead for the TSM-driver to only perform 
-the save/restore of the controls when required by the TVM.
+or post-init.
 
+If the TVM has opted-in to performance monitoring, the TSM may invoke the 
+SBI PMU extension (via TSM-driver) or Supervisor counter delegation extension to
+establish a TVM-specific performance monitoring controls (counters, event selectors). 
+However, the TVM must use SBI PMU extension unless TSM supports full trap & emulate
+support for the hpmcounter related ISA extensions. The TSM will assign a virtual
+counter to the TVM for the events requested to be monitored by the TVM in either
+approach. The TSM needs to manage a mapping between the virtual and physical counters
+as well. It must not delegate the LCOFI interrupt (via hideleg[13]=1) for the TVM
+and use the interrupt filtering mechanism defined in the Advanced Interrupt
+Architecture (AIA) to inject the LCOFI interrupt when the physical counter corresponding
+to the virtual counter overflows. The physical counters naturally inhibit counting 
+in S/HS and M. The TSM must save and  clear counter/event selector values as control
+transitions to the VMM or a different TVM that is using hpm. On a transition back to
+the host OS/VMM, the TSM must restore the saved hardware performance monitoring event 
+triggers and counter enables. If the TSM uses the SBI PMU extension instead of Supervisor
+counter delegation, the TSM-driver needs to perform the save/restore on behalf of the TSM. 
