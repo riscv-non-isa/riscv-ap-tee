@@ -36,7 +36,7 @@ endif::[]
 :footnote:
 :xrefstyle: short
 
-= Application-Processor Trusted Execution Environment (AP-TEE) for Confidential Computing on RISC-V platforms 
+= Confidential VM Extension (CoVE) for Confidential Computing on RISC-V platforms 
 Editor - Ravi Sahita; RISC-V AP-TEE Task Group
 
 // Preamble
