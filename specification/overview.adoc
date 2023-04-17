@@ -10,14 +10,14 @@ components are in the TCB. This aspect is ill-suited for Confidential Computing 
 that rely on HW-Attested Trusted Execution Environments, and strive to minimize the 
 TCB footprint.
 
-This specification describes the AP-TEE architecture which describes a new class of 
-hardware-attested trusted execution environment called TEE Virtual machines (TVM). 
-The TVMs are supported by a hardware-rooted, attestable TCB and are run-time-isolated from 
-the host OS/VMM and other platform software not in the TCB of the TVM. TVMs 
-are protected from a broad set of software-based and hardware-based threats 
+This specification describes the CoVE architecture which describes a new class of
+hardware-attested trusted execution environment called TEE Virtual Machines (TVM).
+The TVMs are supported by a hardware-rooted, attestable TCB and are run-time-isolated from
+the host OS/VMM and other platform software not in the TCB of the TVM. TVMs
+are protected from a broad set of software-based and hardware-based threats
 per the threat model described in <<threatmodel>>. The design enables
-the OS or VMM to maintain the role of resource manager even for the TVMs. The 
-resources managed by the untrusted OS/VMM include memory, CPU, I/O resources 
+the OS or VMM to maintain the role of resource manager even for the TVMs. The
+resources managed by the untrusted OS/VMM include memory, CPU, I/O resources
 and platform capabilities to execute the TVM workload.
 
 image:img_0.png[Figure 1]
@@ -49,7 +49,7 @@ accesses by the TVM. The non-confidential TVM-defined regions include those for
 shared-pages and MMIO. 
 
 The TSM implements a set of TEE "flows" that are accessed via a *Trusted Execution Environment Interface 
-(TEEI)* ABI hosted by a Trusted Security Manager Driver ( *TSM Driver* ) 
+(TEEI)* ABI hosted by a TEE Security Manager Driver ( *TSM Driver* ) 
 component operating in the M-mode of the CPU. The TSM itself operates in 
 HS-mode (priv=01; V=0) of the CPU and enables the OS/VMM (also in HS-mode) to 
 create TVMs, assign resources to TVMs, manage/execute and destroy a TVM - 
@@ -59,13 +59,13 @@ specification minimizes ISA changes to introduce a scalable architecture for
 hosting TEE workloads. More than one TVM may be hosted by the host OS/VMM. 
 Each TVM may consist of the guest firmware, a guest OS and applications.
 
-As shown in figure 1, the M-mode firmware is in the TCB of all AP-TEE 
+As shown in figure 1, the M-mode firmware is in the TCB of all CoVE
 workloads hosted on the platform. The TSM-driver (operating in M-mode) uses 
 the hardware capabilities to provide:
 
 * Isolation of memory associated with TEEs (including the TSM). We describe 
 *TEE- capable memory* as memory that provides access-control, confidentiality 
-and integrity suitable for use for AP-TEE components. The TEEI operations for 
+and integrity suitable for use for CoVE components. The TEEI operations for
 memory management are described in detail below. 
 * Context switching of the hart state on TEE/Non-TEE transitions.
 * A machine agnostic ABI as part of the TEEI, to allow lower privileged 
@@ -75,11 +75,11 @@ The TSM-driver delegates parts of the TEE management functions to the TSM,
 specifically isolation across TEE-capable memory assigned to TVMs. The TSM is 
 designed to be portable across AP-TEE class platforms and interact with the 
 machine specific capabilities in the platform through the TEEI. The TSM 
-provides an ABI to the OS/VMM which has two aspects: A *TH-ABI* that includes 
-functions to manage the lifecycle of the TVM, such as creating, adding pages 
+provides an ABI to the OS/VMM which has two aspects: A set of host ABIs known as *COVH*
+that includes functions to manage the lifecycle of the TVM, such as creating, adding pages 
 to a TVM, scheduling a TVM for execution, etc. in an OS/platform agnostic 
-manner. The TSM also provides an ABI to the TVM contexts: A *TG-ABI* to enable 
-the TVM workload to request attestation functions, memory management  
+manner. The TSM also provides an ABI to the TVM contexts: A set of guest ABIs known as 
+*COVG* that enablse the TVM workload to request attestation functions, memory management  
 functions or paravirtualized IO functions.
 
 In order to isolate the TVMs from the host OS/VMM and non-confidential VMs, 
@@ -90,15 +90,15 @@ TSM code and data. This region must be access-controlled from all software
 outside the TCB, and may be additionally protected against physical access via 
 cryptographic mechanisms. Access to the TSM- memory-region and execution of 
 code from the TSM-memory-region (the TSM flows) is predicated in hardware via 
-an *AP-TEE mode bit* maintained per hart. This mode is enabled per-hart via 
+an *Confidential mode bit* maintained per hart. This mode is enabled per-hart via 
 TEECALL and disabled via TEERET for operations described in the TEEI. Access 
-to TEE-assigned memory is allowed for the hart when the AP-TEE mode is set. 
-This per-hart AP-TEE mode bit is used by the processor to enforce 
+to TEE-assigned memory is allowed for the hart when the Confidential mode is set. 
+This per-hart Confidential mode bit is used by the processor to enforce 
 access-control properties on instructions restricted for use by the TSM. This 
 bit is cached in other micro-architectural states to enforce the isolation for 
 TEE (TSM, TVM) resources (such as memory, IO, CSRs, TLB, paging structure 
-caches etc). The implementation of this mode bit is not specified by this 
-document, and may be implemented via an M-mode CSR for example.
+caches etc). The implementation details of this mode bit is out of scope for
+this specification. 
 
 The TSM functionality is explicitly limited to support the necessary security 
 primitives to ensure that the OS/VMM and non-confidential VMs do not violate 
@@ -117,7 +117,7 @@ guest OS runtime may be used; whereas in the VM TEE case, an enlightened
 guest OS is in the TVM TCB. Other software models that map to the VU/VS 
 modes of operation are also possible as TEE workloads. Importantly, the HW 
 mechanisms needed for both cases are identical, and can be supported with 
-appropriate extensions of the TG-ABI.
+appropriate extensions of the COVG.
 
 image:img_1.png[]
 Figure 2: TEE TCB for application workloads (hosted via a TVM)
@@ -125,5 +125,5 @@ Figure 2: TEE TCB for application workloads (hosted via a TVM)
 The detailed architecture is described in the Section 
 <<refarch>>. Note that the architecture described
 above may have various implementations, however the goal of this specification 
-is to propose a reference architecture and ratify a normative TEEI as a RISC-V non-ISA 
-specification.
+is to propose a reference architecture and ratify a normative COVE as a RISC-V
+non-ISA specification.
