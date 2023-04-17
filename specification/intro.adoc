@@ -2,4 +2,4 @@
 
 == Introduction
 
-This document describes a scalable Application-Processor Trusted Execution Environment (AP-TEE) interface proposal for RISC-V-based platforms. This AP-TEE interface specification enables application workloads that require confidentiality to reduce the Trusted Computing Base (TCB) to a minimal TCB, specifically, keeping the host OS/VMM and other software outside the TCB. The proposed specification supports an architecture that can be used for Application and Virtual Machine workloads, while minimizing changes to the RISC-V ISA and privilege modes.
+This document describes Confidential VM Extension (CoVE) interface proposal to provide a scalable Trusted Execution Environment(TEE) in virtualized workloads on RISC-V-based platforms. This CoVE interface specification enables application workloads that require confidentiality to reduce the Trusted Computing Base (TCB) to a minimal TCB, specifically, keeping the host OS/VMM and other software outside the TCB. The proposed specification supports an architecture that can be used for Application and Virtual Machine workloads, while minimizing changes to the RISC-V ISA and privilege modes.
