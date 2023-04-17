@@ -125,13 +125,13 @@ host software is considered out of scope.
 === TVM Security Requirements to address threat model 
 
 |===
-| Category  |  Security Criteria  |  AP-TEE Requirement |  Example methods to meet requirement | Description/Example | RVI HC/SIG/TG owner 
+| Category  |  Security Criteria  |  CoVE Requirement |  Example methods to meet requirement | Description/Example | RVI HC/SIG/TG owner 
 
 | Memory Footprint | Stolen/reserved memory | Implementation-specific | Minimize reserved memory | Recording meta data of secure memory | AP-TEE TG to specify
 
 | Memory Assignment | Ability to make memory confidential or non-confidential | Required | MMU, MPU, PMA/MTT extension | Confidential memory should be dynamically allocated/unallocated as required | "AP-TEE to specify priv. architecture" 
 
-| TEE CPU State Protection | State Isolation | Required | AP-TEE qualifier and privilege levels M S HS U | Prevent untrusted code from arbitrarily accessing/modifying TEE CPU state | AP-TEE TG to specify 
+| TEE CPU State Protection | State Isolation | Required | Confidential qualifier and privilege levels M S HS U | Prevent untrusted code from arbitrarily accessing/modifying TEE CPU state | AP-TEE TG to specify 
 
 | Memory Confidentiality | Memory isolation (read)     | Required                | cryptography and/or MMU, MPU, PMA/MTT extension | Prevent untrusted components from reading TEE memory       | AP-TEE TG specify 
 | Memory Confidentiality | Cipher text read prevention | Required                | cryptography and/or MMU, MPU, PMA/MTT extension | Prevent untrusted code from accessing encrypted TEE memory | AP-TEE TG specify 
@@ -152,16 +152,16 @@ host software is considered out of scope.
 
 | Secure IRQ | Trusted Interrupts | Required | Secure interrupt files, MMU, MPU, PMA/MTT extension | Prevent IRQ injections that violate priority or masking | AIA AP-TEE to specify 
 
-| Secure Timetamp | Trusted timestamps | Required | AP-TEE mode qualifier for CSR accesses | Ensure TEE have consistent timestamp view | AP-TEE TG specify 
+| Secure Timetamp | Trusted timestamps | Required | Confindential mode qualifier for CSR accesses | Ensure TEE have consistent timestamp view | AP-TEE TG specify 
 
-| Debug & Profile | Trusted performance monitoring unit       | Required | AP-TEE mode qualifier for perf. mon. counter controls | Ensure TEEs get correct PMU info; prevent data leakage due to PMU information (fingerprint attacks) | AP-TEE, Performance Mon. SIG to specify 
-| Debug & Profile | Debug support                             | Required | AP-TEE mode qualifier for Sdtrig controls             | Support debug trigger registers for TVM                                                             | AP-TEE, Debug TG to specify
+| Debug & Profile | Trusted performance monitoring unit       | Required | Confidential mode qualifier for perf. mon. counter controls | Ensure TEEs get correct PMU info; prevent data leakage due to PMU information (fingerprint attacks) | AP-TEE, Performance Mon. SIG to specify 
+| Debug & Profile | Debug support                             | Required | Confidential mode qualifier for Sdtrig controls             | Support debug trigger registers for TVM                                                             | AP-TEE, Debug TG to specify
 | Debug & Profile | Authenticated debug (Production device)   | Required | Authorize debug via TEE RoT                           | Ensure hardware debug prob (e.g., JTAG SWD) is disabled in production                               | AP-TEE, Debug TG specify 
 
 | Availability | TVM DoS Protection            | Required                | VMM retains ability to interrupt TVM  | Prevent TVM from refusing to exit               | AP-TEE TG specify 
-| Availability | VMM DoS Protection            | Implementation-specific | Not in scope for AP-TEE               | Prevent untrusted code from refusing to run TEE | Not applicable 
+| Availability | VMM DoS Protection            | Implementation-specific | Not in scope for CoVE               | Prevent untrusted code from refusing to run TEE | Not applicable 
 
-| Side Channel | Protected address mapping (controlled side channel)         | Required                 | AP-TEE mode qualifier, cryptography, MMU/MPU, MTT | Similar to memory remapping attacks                                                                 | uSG SIG, AP-TEE to specify 
+| Side Channel | Protected address mapping (controlled side channel)         | Required                 | Confidential mode qualifier, cryptography, MMU/MPU, MTT | Similar to memory remapping attacks                                                                 | uSG SIG, AP-TEE to specify 
 | Side Channel | Micro-architectural side channels (branch prediction        | Required                 | uArch state flushing, entropy defenses            | Prevent attacks such as meltdown/spectre (it is difficult to defend agains such attacks in advance) | uSC SIG, AP-TEE specify
 | Side Channel | Control channels, single-step/zero-step attacks             | Required                 | uArch state flushing, entropy defenses            | Prevent interrupt/exception injection (combined with cache side channel to leak sensitive data)     | uSC SIG , AP-TEE specify
 | Side Channel | Architectural cache side channel                            | Implementation-specific  | uArch state flushing, entropy defenses            | Prevent shared resource contention, e.g. attacks prime probe                                        | uSG SIG, AP-TEE to specify
