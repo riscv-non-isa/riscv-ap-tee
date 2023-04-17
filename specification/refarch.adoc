@@ -9,27 +9,27 @@ the properties of the TSM, its instantiation, isolation and operational model
 for the TVM lifecycle. The description in this section refers to the reference 
 architecture in Figure 1.
 
-=== AP-TEE Memory Isolation
+=== CoVE Memory Isolation
 
 Memory isolation for TVMs are orchestrated by the TSM in two phases, 
 the conversion of memory to Confidential memory and the assignment of 
 confidential memory (and the enforcement of properties on its use) to TVMs. 
-Thus, AP-TEE requires new Physical Memory Attributes (PMAs): *Confidential* 
+Thus, CoVE requires new Physical Memory Attributes (PMAs): *Confidential* 
 and *Non-Confidential* (These are dynamic/programmable memory attributes 
 [priv ISA]). A TVM needs to access both types of memory:
 
 * Confidential memory - has Confidential PMA - used for TVM code, data
 * Non-Confidential memory - has Non-Confidential PMA - used for communication between TVM and untrusted host entities
 
-The TEEH implemented by the TSM provides interfaces to the VMM to convert / 
+The COVH ABIs implemented by the TSM provides interfaces to the VMM to convert / 
 donate memory to Confidential [Convert] and vice-versa [Reclaim]. 
 TVM memory is by default assigned from Confidential memory regions. 
 TVM may be assigned shared memory regions. Both properties are enforced 
 by the TSM. Figure 3 below shows the abstract model of isolation:
 
-* Hart with AP-TEE mode qualifier =1 is allowed to access Confidential 
+* Hart with Confidential mode qualifier =1 is allowed to access Confidential 
 and Non-Confidential memory
-* Hart with AP-TEE mode qualifier =0 is allowed to access only Non-confidential Memory
+* Hart with Confidential mode qualifier =0 is allowed to access only Non-confidential Memory
 
 image:img_7.png[]  
 Figure 3: Confidential Memory conversion
@@ -61,7 +61,7 @@ while the HW TCB enforces the confidential PMA for TVM accesses. The region size
 at which the memory tracking enforces confidential properties may be multiples of 
 the architectural page sizes supported by the hart MMU. Similarly, the IOMMU should 
 support a similar memory tracking lookup to enable direct device access into TVM memory 
-regions. For the AP-TEE reference architecture this TCB hence consists of the HW 
+regions. For the CoVE reference architecture this TCB hence consists of the HW 
 (MMU, IOMMU, Memory Controller) and the SW/FW elements - TSM-driver and the TSM. 
 The TSM is responsible for enforcing isolation of confidential memory pages among TVMs 
 (via G-stage translation) - pages assigned to the TVM may belong to C | NC PMA to 
@@ -94,7 +94,7 @@ the HW TCB via the proposed TEEI.
 
 === TSM initialization
 
-The AP-TEE architecture requires a hardware Root-of-trust for supporting 
+The CoVE architecture requires a hardware Root-of-trust for supporting 
 TCB measurement, reporting and storage <<R8>>. The Root-of-trust for 
 Measurement (RTM) is defined as the TCB component that performs a 
 measurement of an entity and protects it for subsequent reporting. The 
@@ -211,7 +211,7 @@ structures (such as the G-stage page table structures).
 image:img_3.png[]  
 Figure 3: TSM operation - Interruptible and non-reentrant TSM model shown.
 
-A TSM entry triggered by an ECALL (with AP-TEE service type) by the OS/VMM 
+A TSM entry triggered by an ECALL (with CoVE extension type) by the OS/VMM 
 leads to the following context-switch to the TSM (performed by the 
 TSM-driver):
 
@@ -222,7 +222,7 @@ the registers that are restored on resumed security operations.
 TSM-driver*
 
 * If trap is due to synchronous trap due to TEECALL/ TEERESUME then enable 
-AP-TEE mode = 1 for the hart via M-mode CSR (implementation-specific)
+Confidential mode = 1 for the hart via M-mode CSR (implementation-specific)
 * Locate the per-hart THCS (located within TSM-driver memory data region)
 * Save operating VMM csr context into the THCS.hssa (Hart Supervisor State 
 Area) fields : sstatus, stvec, scounteren, sscratch, satp (and other x 
@@ -260,7 +260,7 @@ any v/f register state must be restored by the caller.
 * TSM-driver passes TSM/TVM-specified register contents to the OS/VMM to 
 return status from TEERET (TSM sets a0, a1 registers always - other 
 registers may be selected by the TVM)
-* Clear AP-TEE-mode on hart (via implementation-specific M-mode CSR to 
+* Clear Confidential mode on hart (via implementation-specific M-mode CSR to 
 block non-TEE mode accesses to TEE-assigned memory.) 
 * MRET to resume execution in OS/VMM at mepc set to THCS.hssa.pc 
 (THCS.hssa.pc adjusted to refer to opcode after the ECALL that triggered 
@@ -344,9 +344,9 @@ implementation-specific:
 *a)* *Isolation from host software access* -  The CPU may enforce a 
 hardware-based access-control of TSM memory to prevent access from host 
 software (VMM and host OS) V=0, HS-mode untrusted code. TEE and TVM address 
-spaces are identified by an additional (implementation-defined) *AP-TEE 
+spaces are identified by an additional (implementation-defined) *Confidential 
 mode qualifier* to maintain the isolation during access and in internal 
-caches, e.g. Hart TLB lookup may be extended with the AP-TEE mode 
+caches, e.g. Hart TLB lookup may be extended with the Confidential mode 
 qualifier. TVM memory isolation must support sparse memory management 
 models and architectural page-sizes of 4KB, 64K, 2MB, 1GB (and optionally 
 512GB). For example, The hardware may provide a memory ownership tracking 
@@ -361,7 +361,7 @@ provide confidentiality, integrity and replay-protection. This may be
 achieved via a Memory Encryption Engine (MEE) to prevent TEE state being 
 exposed in volatile memory during execution. The use of an MEE and the 
 number of encryption domains supported is implementation-specific. For 
-example, The hardware may use the *AP-TEE mode qualifier* during execution 
+example, The hardware may use the *Confidential mode qualifier* during execution 
 (and memory access) to cryptographically isolate memory associated with a 
 TEE which may be encrypted and additionally cryptographically 
 integrity-protected using a MAC on the memory contents. The MAC may be 
