@@ -3,9 +3,3 @@
 == Introduction
 
 This document describes a scalable Application-Processor Trusted Execution Environment (AP-TEE) interface proposal for RISC-V-based platforms. This AP-TEE interface specification enables application workloads that require confidentiality to reduce the Trusted Computing Base (TCB) to a minimal TCB, specifically, keeping the host OS/VMM and other software outside the TCB. The proposed specification supports an architecture that can be used for Application and Virtual Machine workloads, while minimizing changes to the RISC-V ISA and privilege modes.
-
-[NOTE]
-====
-The following is a proposal being submitted by Rivos Inc. for the purposes of discussion and collaboration to eventually produce a RISC-V Standard. At this time, this is an initial proposal and is not an official draft of a RISC-V Specification.
-====
-
