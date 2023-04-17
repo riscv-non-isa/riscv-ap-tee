@@ -32,12 +32,15 @@ the socket-to-socket interface, and is managed as one system TCB.
 for interfacing with memory, accelerators, and other fixed-function logic. 
 Multiple APs may be used within a logical system.
  
+| Confidential VM Extension (CoVE)| A set of non-ISA RISC-V extensions that
+enables confidential computing on RISC-V platforms. 
+
 | AP-TEE | Application Processor- Trusted Execution Environment: An execution 
 mode that provides HW-isolation for workload assets when in use (user/ 
 supervisor code/ data) and provides HW-attestable confidentiality and 
 integrity protection against specific attack vectors per a specified 
-adversary and threat model. The term TEE and hardware-based TEE are also 
-used as synonyms of AP-TEE in this document.
+adversary and threat model. The term CoVE, TEE and hardware-based TEE are
+also used as synonyms of AP-TEE in this document.
  
 | Confidential Computing | The protection of data in use by performing 
 computation in a Hardware-based TEE.
