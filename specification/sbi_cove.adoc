@@ -1,23 +1,23 @@
 :imagesdir: ./images
 
 [[sbi_tee]]
-== Trusted Execution Environment (TEE) SBI extension proposal
-This section describes the normative Trusted Execution Environment (TEE) SBI extension proposal. 
-The proposal introduces three new extensions that will be described later:
+== Confidential VM Extension (CoVE) SBI extension proposal
+This section describes the normative Confidential VM Extension(CoVE) SBI extension
+proposal. The proposal introduces three new extensions that will be described later:
 
-* TEE Host Extension (EXT_TEE_HOST), 
-* TEE Interrupt Extension (EXT_TEE_INTERRUPT), and 
-* TEE Guest Extension (EXT_TEE_GUEST).
+* CoVE Host Extension (EXT_COVH) 
+* CoVE Interrupt Extension (EXT_COVI) 
+* CoVE Guest Extension (EXT_COVG)
 
-=== TEEI - TH-ABI runtime interface 
+=== TEEI - COVH runtime interface 
 ECALL invocation from VS (guest OS) causes traps that are handled by the 
 TSM module (enforced via `medeleg` configuration). The TSM then may provide
-intrinsics via the TG-ABI (TEE-Guest ABI) to the TVM to provide attestation 
+intrinsics via the COVG (CoVE-Guest ABI) to the TVM to provide attestation 
 and other trusted services. The TSM may allow the TEE (application or VM) 
-to request host (untrusted) services via the TH-ABI (TEE host-ABI).
+to request host (untrusted) services via the COVH (CoVE host-ABI).
 
-==== Operational model for the TEE Host Extension
-Executing confidential workloads in a TEE requires a sequence of one or more of the steps detailed below.
+==== Operational model for the CoVE Host Extension
+Executing confidential workloads in a CoVE requires a sequence of one or more of the steps detailed below.
 We'll assume that these steps are performed by an untrusted entity like the OS/VMM (host) in conjunction
 with the TSM.
 
@@ -40,12 +40,12 @@ with the TSM.
 . Reclaiming confidential memory for non-confidential VMs
 
 ===== Platform TSM detection and capability enumeration
-Platform support for the TSM can be detected by probing for the EXT_TEE_HOST extension, and then
-calling `sbi_tee_host_get_tsm_info()` to get information about the current status of the TSM. The
+Platform support for the TSM can be detected by probing for the EXT_COVH extension, and then
+calling `sbi_covh_get_tsm_info()` to get information about the current status of the TSM. The
 TSM must be in `TSM_READY` in order to process further ECALLs.
 
 ===== TVM creation
-TVMs are created using the sbi_tee_host_create_tvm(). This creates a TVM with state set to `TVM_INITIALIZING`.
+TVMs are created using the sbi_covh_create_tvm(). This creates a TVM with state set to `TVM_INITIALIZING`.
 The host must assign confidential memory for page tables, payload mapping, and VCPUs before it can be
 transitioned into a `TVM_RUNNABLE` state.
 
@@ -69,11 +69,11 @@ regions on the platform.
 
 This requires the host to make three separate ECALLs to the TSM:
 
-. `sbi_tee_host_convert_pages()`
-. `sbi_tee_host_global_fence()`
-. `sbi_tee_host_local_fence()`
+. `sbi_covh_convert_pages()`
+. `sbi_covh_global_fence()`
+. `sbi_covh_local_fence()`
 
-The memory conversion process is complete when sbi_tee_host_local_fence() is successfully completed
+The memory conversion process is complete when sbi_covh_local_fence() is successfully completed
 on the CPU/hart on the platform.
 
 Converted memory can be assigned to TVMs, but cannot be repurposed for non-confidential operations
@@ -86,18 +86,18 @@ The host can declare the TVM physical address ranges for mapping confidential me
 but no two regions can overlap. The region can be sparsely mapped; however, any sparsely mapped confidential page that's
 demand-paged following an access fault by the TVM can only be a demand-zero page.
 
-All ranges must be defined by calling `sbi_tee_host_finalize_tvm()`.
+All ranges must be defined by calling `sbi_covh_finalize_tvm()`.
 
 ===== Donating confidential pages for the TVM page-table pool
 The host must ensure that the TSM has sufficient confidential memory for mapping and managing TVM page-tables
-for the code and data payloads by calling `sbi_tee_host_add_tvm_page_table_pages()`.
+for the code and data payloads by calling `sbi_covh_add_tvm_page_table_pages()`.
 
 ===== Mapping TVM code and data payload to confidential TVM-pages
-The host can create a confidential page region by calling `sbi_tee_host_add_tvm_memory_region()`.
+The host can create a confidential page region by calling `sbi_covh_add_tvm_memory_region()`.
 The region can be sparsely populated, and since the host cannot directly access confidential memory, it must copy the TVM
-code and data payload from non-confidential memory to confidential memory by calling `sbi_tee_host_add_tvm_measured_pages()`.
+code and data payload from non-confidential memory to confidential memory by calling `sbi_covh_add_tvm_measured_pages()`.
 This operation requires the host to convert a sufficient number of non-confidential pages to confidential (by calling
-`sbi_tee_host_convert_pages()`, or by using converted pages that aren't currently assigned to a TVM. The TSM copies the 
+`sbi_covh_convert_pages()`, or by using converted pages that aren't currently assigned to a TVM. The TSM copies the 
 payload for the TVM from non-confidential pages to confidential pages, and extends the corresponding measurements for the
 TVM.
 
@@ -119,22 +119,22 @@ struct nacl_shmem {
     /* Scratch space. The layout of this scratch space is defined by the particular function being
      * invoked.
      *
-     * For the `sbi_tee_host_run_tvm_vcpu()` function in the TEE-H extension, the layout of this 
+     * For the `sbi_covh_run_tvm_vcpu()` function in the COVH extension, the layout of this 
      * scratch space matches the `tsm_shmem_scratch` struct given below.
      */
     uint64_t scratch[256];
     uint64_t _reserved[240];
     /* Bitmap indicating which CSRs in `csrs` the host wishes to sync.
      *
-     * Currently unused in the TEE-related extensions and will not be read or written by the TSM.
+     * Currently unused in the CoVE extensions and will not be read or written by the TSM.
      */
     uint64_t dirty_bitmap[16];
     /* Hypervisor and virtual-supervisor CSRs. The 12-bit CSR number is transformed into a 10-bit
      * index by extracting bits `{csr[11:10], csr[7:0]}` since `csr[9:8]` is always 2'b10 for HS
      * and VS CSRs.
      *
-     * These CSRs may be updated by `sbi_tee_host_run_tvm_vcpu()` in the TEE-Host extension. See
-     * the documentation of `sbi_tee_host_run_tvm_vcpu()` for more details.
+     * These CSRs may be updated by `sbi_covh_run_tvm_vcpu()` in the COVH extension. See
+     * the documentation of `sbi_covh_run_tvm_vcpu()` for more details.
      */
     uint64_t csrs[1024];
 };
@@ -146,7 +146,7 @@ struct tsm_shmem_scratch {
      * the requested action. To avoid leaking information from the TVM, the TSM must follow the
      * given rules.
      *
-     * The TSM will write to these registers upon return from `sbi_tee_host_run_tvm_vcpu()` when:
+     * The TSM will write to these registers upon return from `sbi_covh_run_tvm_vcpu()` when:
      *  - The vCPU takes a store guest page fault in an emulated MMIO region.
      *  - The vCPU makes an ECALL that is to be forwarded to the host.
      *
@@ -197,17 +197,17 @@ So that `a0` will be the only GPR used for MMIO emulation reducing the GPRs acce
 
 ===== VCPU creation
 The host must register CPUs/harts with the TSM before they can be used for TVM execution by calling
-`sbi_tee_host_create_tvm_vcpu()`. The NACL shared memory interface is used between the host and the
-TSM for processing TVM exits from `sbi_tee_host_run_tvm_vcpu()`.
+`sbi_covh_create_tvm_vcpu()`. The NACL shared memory interface is used between the host and the
+TSM for processing TVM exits from `sbi_covh_run_tvm_vcpu()`.
 
 ===== TVM execution
 Following the assignment of memory and VCPU resources, the host can transition the guest into a `TVM_RUNNABLE`
-state by calling `sbi_tee_host_finalize_tvm()`. The host must set up TVM Boot vCPU execution parameters like the
-entrypoint (`ENTRY_PC`) and boot argument (`ENTRY_ARG`) using arguments to `sbi_tee_host_finalize_tvm()`. Note that
+state by calling `sbi_covh_finalize_tvm()`. The host must set up TVM Boot vCPU execution parameters like the
+entrypoint (`ENTRY_PC`) and boot argument (`ENTRY_ARG`) using arguments to `sbi_covh_finalize_tvm()`. Note that
 some TEE calls are no longer permissible after this transition.
 
-The host can then call sbi_tee_host_run_tvm_vcpu()` to begin execution. The host must boot vCPU `0` first otherwise
-`sbi_tee_host_run_tvm_vcpu()` call will fail. TVM execution continues until there is an event like an interrupt, or
+The host can then call sbi_covh_run_tvm_vcpu()` to begin execution. The host must boot vCPU `0` first otherwise
+`sbi_covh_run_tvm_vcpu()` call will fail. TVM execution continues until there is an event like an interrupt, or
 fault that cannot be serviced by the TSM. Some interrupts and exceptions are resumable, and the host can determine
 specific reason by examining the `scause` CSR. The host can then examine the NACL shared memory if needed to determine
 further course of action. This may involve servicing exits caused by TVM-ECALLs that require host action (like adding
@@ -215,16 +215,16 @@ MMIO region or share memory with the host), TVM page-faults, virtual instruction
 
 ===== Mapping confidential demand-zero pages and non-confidential shared pages
 The host can handle TVM page-faults by determining whether it was caused by access to a confidential or
-non-confidential region. In the former case, it can use `sbi_tee_host_add_tvm_zero_pages()` to
+non-confidential region. In the former case, it can use `sbi_covh_add_tvm_zero_pages()` to
 populate the region with a previously converted confidential page. The TSM verifies that the confidential
 page isn't currently in use, and zeroes it out before assigning it to the TVM. Demand-zero pages have no bearing
 on the TVM measurement, and can be added at any point in time.
 
-The host can process non-confidential pages by calling `sbi_tee_host_add_shared_pages()`. Non-confidential
-shared memory regions are defined by the TVM using the EXT_TEE_GUEST extension.
+The host can process non-confidential pages by calling `sbi_covh_add_shared_pages()`. Non-confidential
+shared memory regions are defined by the TVM using the EXT_COVG extension.
 
 ===== Handling MMIO faults
-TVMs can define MMIO regions using the EXT_TEE_GUEST extension, and a runtime access to such a region causes
+TVMs can define MMIO regions using the EXT_COVG extension, and a runtime access to such a region causes
 a resumable exit from the TVM. The host can examine the exit code from `scause` CSR, and when the exception
 is a guest load/store page fault, the host will check if the fault address belongs to any of the registered MMIO
 emulation regions. The fault address information comes from `stval` and `htval` CSRs. After emulation, the host
@@ -236,37 +236,37 @@ The host can handle exits caused by virtual instruction by examining and decodin
 NACL shared memory region.
 
 ===== Management of secure interrupts
-The host can use the Tee Interrupt Extension (EXT_TEE_INTERRUPT) to manage secure TVM interrupts on
+The host can use the Tee Interrupt Extension (EXT_COVI) to manage secure TVM interrupts on
 platforms with AIA support.
 
 ===== TVM teardown
-The host can teardown a TVM by calling `sbi_tee_host_destroy_tvm()`. This automatically releases all
+The host can teardown a TVM by calling `sbi_covh_destroy_tvm()`. This automatically releases all
 confidential memory assigned to the TVM, and it can be repurposed for use with other TVMs. However,
 reclaiming the memory for use by non-confidential workloads requires an explicit call to
-`sbi_tee_host_reclaim_pages()`.
+`sbi_covh_reclaim_pages()`.
 
-==== Operational model for the TEE Guest Extension
+==== Operational model for the CoVE Guest Extension
 This interface is used by TVMs to communicate with TSM. Presently, this extension allows guests
 to define memory regions for MMIO emulation by host, share pages with the host and control interrupt
 injection by host.
 
 ===== TVM-defined MMIO regions
 TVM can register the physical address location as a non-confidential MMIO region at runtime to be emulated by the host.
-This is done by calling `sbi_tee_guest_add_mmio_region()`. This results in an exit to the host, and it can retrieve the
+This is done by calling `sbi_covg_add_mmio_region()`. This results in an exit to the host, and it can retrieve the
 information by checking the exit code from the TVM and examining the NACL shared memory region. The expectation
 is that the host will service a subsequent page-fault that results from a TVM-access to the non-confidential region.
 
 ===== TVM-defined Shared memory regions
 TVMs can choose to yield access to confidential memory at runtime and request shared (non-confidential) memory.
 The TVM must communicate its request to the host to convert confidential to non-confidential and vice-versa 
-explicitly via the `sbi_tee_guest_share_memory_region()` and `sbi_tee_guest_unshare_memory_region()`. This request
+explicitly via the `sbi_covg_share_memory_region()` and `sbi_covg_unshare_memory_region()`. This request
 results in an exit to the TSM which enforces the security properties on the mapping and exits to the VMM host.
 If the region of address space is populated, the host must first invalidate and remove the confidential pages.
 This requires the host to make three separate ECALLs to the TSM:
  
-. `sbi_tee_host_tvm_invalidate_pages()`
+. `sbi_covh_tvm_invalidate_pages()`
 . `tee_host_tvm_initiate_fence()`
-. `sbi_tee_host_tvm_remove_pages()`
+. `sbi_covh_tvm_remove_pages()`
 
 Upon completion, the host may reclaim the confidential pages that were previously mapped in the region using
 `tee_host_tsm_reclaim_pages()`. The host must then continue the TVM execution and insert shared pages into
@@ -275,7 +275,7 @@ the region of address space is unpopulated, the page removal ECALLs are not need
 shared pages into the region on the next page-fault.
 
 The calling TVM vCPU is considered blocked until the assignment-change is completed. Attempts to run it
-with `sbi_tee_host_run_tvm_vcpu()` will fail. Any guest page faults taken by other TVM vCPUs in the
+with `sbi_covh_run_tvm_vcpu()` will fail. Any guest page faults taken by other TVM vCPUs in the
 invalidated pages continue to be reported to the host.
 
 Both sharing and unsharing operations are destructive, i.e. the contents of memory in the range to be
@@ -290,7 +290,7 @@ Figure 8: TVM destruction and Memory reclamation
 image:tvm_runtime_execution.svg[Figure 9]
 Figure 9: TVM runtime execution
 
-== TEE Host Extension (EID #0x54454548)
+== COVE Host Extension (EID #0x434F5648 "COVH")
 
 === Listing of common enums
 The following enums are referenced by several functions described below.
@@ -319,11 +319,11 @@ enum tvm_state {
 };
 -------------------
 
-[#sbi_tee_host_get_tsm_info]
-=== Function: TEE Host Get TSM Info (FID #0)
+[#sbi_covh_get_tsm_info]
+=== Function: COVE Host Get TSM Info (FID #0)
 [source, C]
 -----
-struct sbiret sbi_tee_host_get_tsm_info(unsigned long tsm_info_address,
+struct sbiret sbi_covh_get_tsm_info(unsigned long tsm_info_address,
                                         unsigned long tsm_info_len);
 -----
 Writes up to `tsm_info_len` bytes of information at the physical memory address
@@ -354,7 +354,7 @@ struct tsm_info {
     uint32_t tsm_version;
     /*
      * The number of 4KiB pages which must be donated to the TSM for storing TVM
-     * state in sbi_tee_host_create_tvm_vcpu().
+     * state in sbi_covh_create_tvm_vcpu().
      */
     unsigned long tvm_state_pages;
     /* The maximum number of VCPUs a TVM can support. */
@@ -369,8 +369,8 @@ struct tsm_info {
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_get_tsm_info_errors]
-.TEE Host Get TSM Info
+[#table_sbi_covh_get_tsm_info_errors]
+.COVE Host Get TSM Info
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -392,19 +392,19 @@ A list of possible TSM states and the associated semantics appears below (TBD: S
 | TSM_READY          | TSM has been loaded & initialized, and is ready to accept ECALLs.
 |===
 
-[#sbi_tee_host_convert_pages]
-=== Function: TEE Host Convert Pages (FID #1)
+[#sbi_covh_convert_pages]
+=== Function: COVE Host Convert Pages (FID #1)
 [source, C]
 -----
-struct sbiret sbi_tee_host_convert_pages(unsigned long base_page_address,
+struct sbiret sbi_covh_convert_pages(unsigned long base_page_address,
                                          unsigned long num_pages);
 
 -----
 
 Begins the process of converting `num_pages` of non-confidential memory starting
 at `base_page_address` to confidential-memory. On success, pages can be assigned
-to TVMs only following subsequent calls to `sbi_tee_host_global_fence()` and
-`sbi_tee_host_local_fence()` that complete the conversion process. The implied
+to TVMs only following subsequent calls to `sbi_covh_global_fence()` and
+`sbi_covh_local_fence()` that complete the conversion process. The implied
 page size is 4KiB.
 
 The `base_page_address` must be page-aligned.
@@ -412,8 +412,8 @@ The `base_page_address` must be page-aligned.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_convert_pages_errors]
-.TEE Host Convert Pages
+[#table_sbi_covh_convert_pages_errors]
+.COVE Host Convert Pages
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -424,10 +424,10 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 
-=== Function: TEE Host Reclaim Pages (FID #2)
+=== Function: COVE Host Reclaim Pages (FID #2)
 [source, C]
 -------
-struct sbiret sbi_tee_host_reclaim_pages(unsigned long base_page_address,
+struct sbiret sbi_covh_reclaim_pages(unsigned long base_page_address,
                                          unsigned long num_pages);
 
 -------
@@ -438,7 +438,7 @@ size is 4KiB.
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_tee_tsm_reclaim_pages_errors]
-.TEE Host Reclaim Pages
+.COVE Host Reclaim Pages
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -448,21 +448,21 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_global_fence]
-=== Function: TEE Host Initiate Global Fence (FID #3)
+[#sbi_covh_global_fence]
+=== Function: COVE Host Initiate Global Fence (FID #3)
 [source, C]
 -----
-struct sbiret sbi_tee_host_global_fence(void);
+struct sbiret sbi_covh_global_fence(void);
 -----
 Initiates a TLB invalidation sequence for all pages marked for conversion via
-calls to `sbi_tee_host_convert_pages()`. The TLB invalidation sequence is completed
-when `sbi_tee_host_local_fence()` has been invoked on all other CPUs. An error is
+calls to `sbi_covh_convert_pages()`. The TLB invalidation sequence is completed
+when `sbi_covh_local_fence()` has been invoked on all other CPUs. An error is
 returned if a TLB invalidation sequence is already in progress.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_global_fence_errors]
-.TEE Host Initiate Fence
+[#table_sbi_covh_global_fence_errors]
+.COVE Host Initiate Fence
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -471,19 +471,19 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_local_fence]
-=== Function: TEE Host Local Fence (FID #4)
+[#sbi_covh_local_fence]
+=== Function: COVE Host Local Fence (FID #4)
 [source, C]
 -----
-struct sbiret sbi_tee_host_local_fence(void);
+struct sbiret sbi_covh_local_fence(void);
 -----
 Invalidates TLB entries for all pages pending conversion by an in-progress TLB
 invalidation operation on the local CPU.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_local_fence_errors]
-.TEE Host Local Fence
+[#table_sbi_covh_local_fence_errors]
+.COVE Host Local Fence
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code            | Description
@@ -491,11 +491,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_create_tvm]
-=== Function: TEE Host Create TVM (FID #5)
+[#sbi_covh_create_tvm]
+=== Function: COVE Host Create TVM (FID #5)
 [source, C]
 -----
-struct sbiret sbi_tee_host_create_tvm(unsigned long tvm_create_params_addr,
+struct sbiret sbi_covh_create_tvm(unsigned long tvm_create_params_addr,
                                       unsigned long tvm_create_params_len);
 -----
 Creates a confidential TVM using the specified parameters. The `tvm_create_params_addr`
@@ -507,7 +507,7 @@ TVM's global state. This routine also configures the global configuration that a
 to the TVM and affects all TVM virtual hart settings. For example, features enabled for this 
 TVM, perfmon enabled, debug enabled etc.
 
-Callers of this API should first invoke `sbi_tee_host_get_tsm_info()` to obtain information
+Callers of this API should first invoke `sbi_covh_get_tsm_info()` to obtain information
 about the parameters that should be used to populate `tvm_create_params`.
 
 [source, C]
@@ -522,7 +522,7 @@ struct tvm_create_params {
      * The base physical address of the confidential memory region to be used
      * to hold the TVM's state. Must be page-aligned and the number of
      * pages must be at least the value returned in tsm_info.vm_state_pages
-     * returned by the call to sbi_tee_host_get_tsm_info().
+     * returned by the call to sbi_covh_get_tsm_info().
      */
     unsigned long tvm_state_addr;
 };
@@ -531,24 +531,24 @@ struct tvm_create_params {
 *Returns* the *`tvm_guest_id`* in sbiret.value on success. The *`tvm_guest_id`* can be used
 to uniquely reference the TVM in invocations of the other functions that appear below. On
 success, the TVM will be in the `TVM_INITIALIZING` state, until a subsequent call to
-`sbi_tee_host_finalize_tvm()` is made to transition the TVM to a `TVM_RUNNABLE` state.
+`sbi_covh_finalize_tvm()` is made to transition the TVM to a `TVM_RUNNABLE` state.
 
 The list of possible TVM states appears below.
 
 [#table_sbi_tvm_states]
-.TEE TVM States
+.COVE TVM States
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | State              | Description
 | TVM_INITIALIZING   | The TVM has been created, but isn't yet ready to run.
 | TVM_RUNNABLE       | The TVM is in a runnable state, and can be executed by
-                     | calling `sbi_tee_host_run_tvm_vcpu()`.
+                     | calling `sbi_covh_run_tvm_vcpu()`.
 |===
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_create_tvm_errors]
-.TEE Host Create TVM Errors
+[#table_sbi_covh_create_tvm_errors]
+.COVE Host Create TVM Errors
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -558,11 +558,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_finalize_tvm]
-=== Function: TEE Host Finalize TVM (FID #6)
+[#sbi_covh_finalize_tvm]
+=== Function: COVE Host Finalize TVM (FID #6)
 [source, C]
 ------
-struct sbiret sbi_tee_host_finalize_tvm(unsigned long tvm_guest_id,
+struct sbiret sbi_covh_finalize_tvm(unsigned long tvm_guest_id,
                                         unsigned long entry_sepc,
                                         unsigned long entry_arg);
 ------
@@ -577,8 +577,8 @@ via this operation. No additional measured pages may be added after this operati
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_finalize_tvm_errors]
-.TEE Host Finalize TVM Errors
+[#table_sbi_covh_finalize_tvm_errors]
+.COVE Host Finalize TVM Errors
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code            | Description
@@ -588,18 +588,18 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
  
-[#sbi_tee_host_destroy_tvm]
-=== Function: TEE Host Destroy TVM (FID #7)
+[#sbi_covh_destroy_tvm]
+=== Function: COVE Host Destroy TVM (FID #7)
 [source, C]
 -------
-struct sbiret sbi_tee_host_destroy_tvm(unsigned long tvm_guest_id);
+struct sbiret sbi_covh_destroy_tvm(unsigned long tvm_guest_id);
 -------
 
-Destroys a confidential TVM previously created using *`sbi_tee_host_create_tvm()`*.  
+Destroys a confidential TVM previously created using *`sbi_covh_create_tvm()`*.  
 
 Confidential TVM memory is automatically un-assigned following successful destruction, and it
 can be assigned to other TVMs. Repurposing confidential memory for use by non-confidential
-TVMs requires an explicit call to *`sbi_tee_host_reclaim_pages()`* (described below).
+TVMs requires an explicit call to *`sbi_covh_reclaim_pages()`* (described below).
 
 TVM destroy verifies that the VMM has stopped all virtual harts execution for the TVM 
 otherwise this call will fail. The TVM virtual hart may not be entered after this point. 
@@ -607,8 +607,8 @@ The VMM may start reclaiming TVM memory after this call succeeds.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_destroy_tvm_errors]
-.TEE Host Destroy TVM Errors
+[#table_sbi_covh_destroy_tvm_errors]
+.COVE Host Destroy TVM Errors
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code            | Description
@@ -617,11 +617,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_add_tvm_memory_region]
-=== Function: TEE Host Add TVM Memory Region (FID #8)
+[#sbi_covh_add_tvm_memory_region]
+=== Function: COVE Host Add TVM Memory Region (FID #8)
 [source, C]
 -----
-struct sbiret sbi_tee_host_add_tvm_memory_region(unsigned long tvm_guest_id,
+struct sbiret sbi_covh_add_tvm_memory_region(unsigned long tvm_guest_id,
                                                  unsigned long tvm_gpa_addr,
                                                  unsigned long region_len);
 -----
@@ -631,12 +631,12 @@ for the mapping of confidential memory. The memory region length is specified by
 
 Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned, and the region must not
 overlap with a previously defined region. This call must not be made after calling
-`sbi_tee_host_finalize_tvm()`.
+`sbi_covh_finalize_tvm()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_add_tvm_memory_region_errors]
-.TEE Host Add TVM Memory Region
+[#table_sbi_covh_add_tvm_memory_region_errors]
+.COVE Host Add TVM Memory Region
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -647,11 +647,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_add_tvm_page_table_pages]
-=== Function: TEE Host Add TVM Page Table Pages (FID #9)
+[#sbi_covh_add_tvm_page_table_pages]
+=== Function: COVE Host Add TVM Page Table Pages (FID #9)
 [source, C]
 -----
-struct sbiret sbi_tee_host_add_tvm_page_table_pages(unsigned long tvm_guest_id,
+struct sbiret sbi_covh_add_tvm_page_table_pages(unsigned long tvm_guest_id,
                                                     unsigned long base_page_address,
                                                     unsigned long num_pages);
 -----
@@ -662,8 +662,8 @@ Page table pages may be added at any time, and a typical use case is in response
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_add_tvm_page_table_pages_errors]
-.TEE Host Add TVM Page Table Pages
+[#table_sbi_covh_add_tvm_page_table_pages_errors]
+.COVE Host Add TVM Page Table Pages
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -676,11 +676,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_add_tvm_measured_pages]
-=== Function: TEE Host Add TVM Measured Pages (FID #10)
+[#sbi_covh_add_tvm_measured_pages]
+=== Function: COVE Host Add TVM Measured Pages (FID #10)
 [source, C]
 -----
-struct sbiret sbi_tee_host_add_tvm_measured_pages(unsigned long tvm_guest_id,
+struct sbiret sbi_covh_add_tvm_measured_pages(unsigned long tvm_guest_id,
                                                   unsigned long source_address,
                                                   unsigned long dest_address,
                                                   unsigned long tsm_page_type,
@@ -691,10 +691,10 @@ struct sbiret sbi_tee_host_add_tvm_measured_pages(unsigned long tvm_guest_id,
 Copies num_pages pages from non-confidential memory at `source_address` to confidential
 memory at `dest_address`, then measures and maps the pages at `dest_address` at the TVM physical
 address space at `tvm_guest_gpa`. The mapping must lie within a region of confidential memory
-created with `sbi_tee_host_add_tvm_memory_region()`. The tsm_page_type parameter must
+created with `sbi_covh_add_tvm_memory_region()`. The tsm_page_type parameter must
 be a legal value for enum type `tsm_page_type`.
 
-This call must not be made after calling `sbi_tee_host_finalize_tvm()`.
+This call must not be made after calling `sbi_covh_finalize_tvm()`.
 
 This operation is used to extend the static measurement for a TVM for added page contents.
 The operation performs a SHA384 hash extend to the measurement register managed by the TSM on 
@@ -707,8 +707,8 @@ will not be considered trustworthy by the relying party.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_add_tvm_measured_pages_errors]
-.TEE Host Add TVM Measured Pages
+[#table_sbi_covh_add_tvm_measured_pages_errors]
+.COVE Host Add TVM Measured Pages
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -720,11 +720,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_add_tvm_zero_pages]
-=== Function: TEE Host Add TVM Zero Pages (FID #11)
+[#sbi_covh_add_tvm_zero_pages]
+=== Function: COVE Host Add TVM Zero Pages (FID #11)
 [source, C]
 -----
-struct sbiret sbi_tee_host_add_tvm_zero_pages(unsigned long tvm_guest_id,
+struct sbiret sbi_covh_add_tvm_zero_pages(unsigned long tvm_guest_id,
                                               unsigned long base_page_address,
                                               unsigned long tsm_page_type,
                                               unsigned long num_pages,
@@ -733,16 +733,16 @@ struct sbiret sbi_tee_host_add_tvm_zero_pages(unsigned long tvm_guest_id,
 Maps num_pages zero-filled pages of confidential memory starting at `base_page_address`
 into the TVM's physical address space starting at `tvm_base_page_address`.
 The `tvm_base_page_address` must lie within a region of confidential memory created with
-`sbi_tee_host_add_tvm_memory_region()`. The `tsm_page_type` parameter must be a
+`sbi_covh_add_tvm_memory_region()`. The `tsm_page_type` parameter must be a
 legal value for the `tsm_page_type` enum. Zero pages for non-present TVM-specified GPA
 ranges may be added only post TVM finalization, and are typically demand faulted on TVM access.
 
-This call may be made only after calling `sbi_tee_host_finalize_tvm()`.
+This call may be made only after calling `sbi_covh_finalize_tvm()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_add_tvm_zero_pages_errors]
-.TEE Host Add TVM Zero Pages Errors
+[#table_sbi_covh_add_tvm_zero_pages_errors]
+.COVE Host Add TVM Zero Pages Errors
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -752,11 +752,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_add_tvm_shared_pages]
-=== Function: TEE Host Add TVM Shared Pages (FID #12)
+[#sbi_covh_add_tvm_shared_pages]
+=== Function: COVE Host Add TVM Shared Pages (FID #12)
 [source, C]
 -----
-struct sbiret sbi_tee_host_add_tvm_shared_pages(unsigned long tvm_guest_id,
+struct sbiret sbi_covh_add_tvm_shared_pages(unsigned long tvm_guest_id,
                                                 unsigned long base_page_address,
                                                 unsigned long tsm_page_type,
                                                 unsigned long num_pages,
@@ -772,8 +772,8 @@ location of shared memory regions. They are typically demand faulted on TVM acce
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_add_tvm_shared_pages_errors]
-.TEE TEE Host Add TVM Shared Pages
+[#table_sbi_covh_add_tvm_shared_pages_errors]
+.COVE Host Add TVM Shared Pages
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -783,23 +783,23 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_create_tvm_vcpu]
-=== Function: TEE Host Create TVM VCPU (FID #13)
+[#sbi_covh_create_tvm_vcpu]
+=== Function: COVE Host Create TVM VCPU (FID #13)
 [source, C]
 -----
-struct sbiret sbi_tee_host_create_tvm_vcpu(unsigned long tvm_guest_id,
+struct sbiret sbi_covh_create_tvm_vcpu(unsigned long tvm_guest_id,
                                            unsigned long tvm_vcpu_id,
                                            unsigned long tvm_state_page_addr);
 -----
 Adds a VCPU with ID `vcpu_id` to the TVM specified by `tvm_guest_id`. `tvm_state_page_addr`
 must be page-aligned and point to a confidential memory region used to hold the TVM's vCPU
 state, and must be `tsm_info::tvm_state_pages` pages in length. This call must not be made
-after calling `sbi_tee_host_finalize_tvm()`.
+after calling `sbi_covh_finalize_tvm()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_create_tvm_vcpu_errors]
-.TEE Host Create TVM VCPU Errors
+[#table_sbi_covh_create_tvm_vcpu_errors]
+.COVE Host Create TVM VCPU Errors
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code            | Description
@@ -809,26 +809,26 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_run_tvm_vcpu]
-=== Function: TEE Host Run TVM VCPU (FID #14)
+[#sbi_covh_run_tvm_vcpu]
+=== Function: COVE Host Run TVM VCPU (FID #14)
 [source, C]
 -----
-struct sbiret sbi_tee_host_run_tvm_vcpu(unsigned long tvm_guest_id,
+struct sbiret sbi_covh_run_tvm_vcpu(unsigned long tvm_guest_id,
                                         unsigned long tvm_vcpu_id);
 -----
 Runs the VCPU specified by `tvm_vcpu_id` in the TVM specified by `tvm_guest_id`.
 The `tvm_guest_id` must be in a "runnable" state (requires a prior call
-to `sbi_tee_host_finalize_tvm()`). The function does not return unless the TVM exits with
+to `sbi_covh_finalize_tvm()`). The function does not return unless the TVM exits with
 a trap that cannot be handled by the TSM.
 
 *Returns* 0 on success in sbiret.value if the TVM exited with a resumable VCPU interrupt or exception,
-and non-zero otherwise. In the latter case, attempts to call `sbi_tee_host_run_tvm_vcpu()` with the
+and non-zero otherwise. In the latter case, attempts to call `sbi_covh_run_tvm_vcpu()` with the
 same `tvm_vcpu_id` will fail.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_run_tvm_vcpu_errors]
-.TEE Host Run TVM VCPU Errors
+[#table_sbi_covh_run_tvm_vcpu_errors]
+.COVE Host Run TVM VCPU Errors
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code            | Description
@@ -899,15 +899,15 @@ enum Exception {
      * host should determine the fault address by retrieving the `htval` and `stval` CSRs and
      * combining them as follows: "(htval << 2) | (stval & 0x3)". The fault address can then
      * be used to determine the type of memory region, and making the appropriate call 
-     * (example: sbi_tee_host_add_tvm_zero_pages() to add a demand-zero confidential page if
-     * applicable), and then calling sbi_tee_host_run_tvm_vcpu() to resume execution at the 
+     * (example: sbi_covh_add_tvm_zero_pages() to add a demand-zero confidential page if
+     * applicable), and then calling sbi_covh_run_tvm_vcpu() to resume execution at the 
      * following instruction.
      */
     GUEST_LOAD_PAGE_FAULT = 21,
     /* 
      * The TVM executed an instruction that caused an exit. The host should decode the instruction
      * by examining `htinst` CSR and determine the further course of action, and then calling
-     * sbi_tee_host_run_tvm_vcpu() if appropriate to resume execution at the following instruction.
+     * sbi_covh_run_tvm_vcpu() if appropriate to resume execution at the following instruction.
      */
     VIRTUAL_INSTRUCTION = 22,
     /*
@@ -915,32 +915,32 @@ enum Exception {
      * host should determine the fault address by retrieving the `htval` and `stval` CSRs and
      * combining them as follows: "(htval << 2) | (stval & 0x3)". The fault address can then be
      * used to determine the type of memory region, and making the appropriate call
-     * (example: sbi_tee_host_add_tvm_zero_pages() to add a demand-zero confidential page if
-     * applicable), and then calling `sbi_tee_host_run_tvm_vcpu()` to resume execution at the following
+     * (example: sbi_covh_add_tvm_zero_pages() to add a demand-zero confidential page if
+     * applicable), and then calling `sbi_covh_run_tvm_vcpu()` to resume execution at the following
      * instruction.
      */
     GUEST_STORE_PAGE_FAULT = 23,
 };
 -------
 
-[#sbi_tee_host_tvm_fence]
-=== Function: TEE Host Initiate TVM Fence (FID #15)
+[#sbi_covh_tvm_fence]
+=== Function: COVE Host Initiate TVM Fence (FID #15)
 [source, C]
 -----
-struct sbiret sbi_tee_host_tvm_fence(unsigned long tvm_guest_id);
+struct sbiret sbi_covh_tvm_fence(unsigned long tvm_guest_id);
 -----
 Initiates a TLB invalidation sequence for all pages that have been invalidated in the
-given TVM's address space since the previous call to `sbi_tee_host_tvm_fence()`. The TLB
+given TVM's address space since the previous call to `sbi_covh_tvm_fence()`. The TLB
 invalidation sequence is completed when all vCPUs in the TVM that were running prior to
-the call to `sbi_tee_host_tvm_fence()` have taken a trap into the TSM, which the host can
+the call to `sbi_covh_tvm_fence()` have taken a trap into the TSM, which the host can
 cause by sending an IPI to the physical CPUs on which the TVM's vCPUs are running. Note
 that the physical CPUs don't have to necessarily perform anything on those IPIs. An error is
 returned if a TLB invalidation sequence is already in progress for the TVM.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_tvm_fence_errors]
-.TEE Host Initiate TVM Fence
+[#table_sbi_covh_tvm_fence_errors]
+.COVE Host Initiate TVM Fence
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -949,11 +949,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_tvm_invalidate_pages]
-=== Function: TEE Host TVM Invalidate Pages (FID #16)
+[#sbi_covh_tvm_invalidate_pages]
+=== Function: COVE Host TVM Invalidate Pages (FID #16)
 [source, C]
 -----
-struct sbiret sbi_tee_host_tvm_invalidate_pages(unsigned long tvm_guest_id,
+struct sbiret sbi_covh_tvm_invalidate_pages(unsigned long tvm_guest_id,
                                                 unsigned long gpa,
                                                 unsigned long length);
 -----
@@ -967,7 +967,7 @@ For each page in the range, the TSM must verify that:
 * The page is either mapped and uniquely owned by the TVM, or shared and owned by the host.
 
 After verifying these pre-conditions are met, the TSM then invalidates the pages. The host
-must complete a TVM TLB invalidation sequence, initiated by `sbi_tee_host_tvm_fence()`, in
+must complete a TVM TLB invalidation sequence, initiated by `sbi_covh_tvm_fence()`, in
 order to complete the invalidation.
 
 Guest page faults taken by the TVM on invalidated pages continue to be reported to the host.
@@ -976,8 +976,8 @@ become part of a huge page by promotion/demotion operation.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_tvm_invalidate_pages_errors]
-.TEE Host TVM Invalidate Pages
+[#table_sbi_covh_tvm_invalidate_pages_errors]
+.COVE Host TVM Invalidate Pages
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -987,11 +987,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_tvm_validate_pages]
-=== Function: TEE Host TVM Validate Pages (FID #17)
+[#sbi_covh_tvm_validate_pages]
+=== Function: COVE Host TVM Validate Pages (FID #17)
 [source, C]
 -----
-struct sbiret sbi_tee_host_tvm_validate_pages(unsigned long tvm_guest_id,
+struct sbiret sbi_covh_tvm_validate_pages(unsigned long tvm_guest_id,
                                              unsigned long gpa,
                                              unsigned long length);
 -----
@@ -999,15 +999,15 @@ struct sbiret sbi_tee_host_tvm_validate_pages(unsigned long tvm_guest_id,
 Marks the invalidated pages in the specified range of guest physical address space as present.
 
 For each page in the range, the TSM must verify that the page was previously invalidated using
-`sbi_tee_host_tvm_invalidate_pages()`. After verifying the TSM will mark the pages as present and 
+`sbi_covh_tvm_invalidate_pages()`. After verifying the TSM will mark the pages as present and 
 restore the pages to their previous state.
 
 This ECALL may be used to revert an in-progress page removal or huge page promotion/demotion sequence.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_tvm_validate_pages_errors]
-.TEE Host TVM Validate Pages
+[#table_sbi_covh_tvm_validate_pages_errors]
+.COVE Host TVM Validate Pages
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1017,11 +1017,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_host_tvm_remove_pages]
-=== Function: TEE Host TVM Remove Pages (FID #18)
+[#sbi_covh_tvm_remove_pages]
+=== Function: COVE Host TVM Remove Pages (FID #18)
 [source, C]
 -----
-struct sbiret sbi_tee_host_tvm_remove_pages(unsigned long tvm_guest_id,
+struct sbiret sbi_covh_tvm_remove_pages(unsigned long tvm_guest_id,
                                            unsigned long gpa,
                                            unsigned long length);
 -----
@@ -1033,8 +1033,8 @@ ownership of the pages to the host if previously owned by the TVM.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_host_tvm_remove_pages_errors]
-.TEE Host TVM Remove Pages
+[#table_sbi_covh_tvm_remove_pages_errors]
+.COVE Host TVM Remove Pages
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1044,16 +1044,16 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-== TEE Interrupt Extension (EID #0x54454549)
-The TEE Interrupt extension supplements the TEE Host extension with hardware-assisted interrupt
+== COVE Interrupt Extension (EID #0x434F5649 "COVI")
+The CoVE Interrupt extension supplements the CoVE Host extension with hardware-assisted interrupt
 virtualization using the RISC-V Advanced Interrupt Architecture (AIA) on platforms which
 support it.
 
-[#sbi_tee_interrupt_init_tvm_aia]
-=== Function: TEE Interrupt Init TVM AIA (FID #0)
+[#sbi_covi_init_tvm_aia]
+=== Function: COVE Interrupt Init TVM AIA (FID #0)
 [source, C]
 -------
-struct sbiret sbi_tee_interrupt_init_tvm_aia(unsigned long tvm_guest_id,
+struct sbiret sbi_covi_init_tvm_aia(unsigned long tvm_guest_id,
                                              unsigned long tvm_aia_params_addr,
                                              unsigned long tvm_aia_params_len);
 -------
@@ -1063,7 +1063,7 @@ parameters in the `tvm_aia_params` structure at the non-confidential physical ad
 at `tvm_aia_params_addr`. The `tvm_aia_params_len` is the byte-length of the `tvm_aia_params`
 structure.
 
-This cannot be called after `sbi_tee_host_finalize_tvm()`.
+This cannot be called after `sbi_covh_finalize_tvm()`.
 
 The format and semantics of the `tvm_aia_params_addr` structure appears below.
 
@@ -1100,8 +1100,8 @@ struct tvm_aia_params {
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_interrupt_init_tvm_aia_errors]
-.TEE Interrupt Init TVM AIA
+[#table_sbi_covi_init_tvm_aia_errors]
+.COVE Interrupt Init TVM AIA
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1112,27 +1112,27 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_interrupt_set_tvm_aia_cpu_imsic_addr]
-=== Function: TEE Interrupt Set TVM AIA CPU IMSIC Addr (FID #1)
+[#sbi_covi_set_tvm_aia_cpu_imsic_addr]
+=== Function: COVE Interrupt Set TVM AIA CPU IMSIC Addr (FID #1)
 [source, C]
 -------
-struct sbiret sbi_tee_interrupt_set_tvm_aia_cpu_imsic_addr(unsigned long tvm_guest_id,
+struct sbiret sbi_covi_set_tvm_aia_cpu_imsic_addr(unsigned long tvm_guest_id,
                                                            unsigned long tvm_vcpu_id,
                                                            unsigned long tvm_vcpu_imsic_gpa);
 -------
 
 Sets the guest physical address of the specified VCPU’s virtualized IMSIC to `tvm_vcpu_imsic_gpa`.
 The `tvm_vcpu_imsic_gpa` must be valid for the AIA configuration that was set by
-`sbi_tee_interrupt_init_tvm_aia()`. No two VCPUs may share the same `tvm_vcpu_imsic_gpa`.
+`sbi_covi_init_tvm_aia()`. No two VCPUs may share the same `tvm_vcpu_imsic_gpa`.
 
-This can be called only after `sbi_tee_interrupt_init_tvm_aia()` and before `sbi_tee_host_finalize_tvm()`.
+This can be called only after `sbi_covi_init_tvm_aia()` and before `sbi_covh_finalize_tvm()`.
 All VCPUs in an AIA-enabled TVM must have their IMSIC configuration set prior to calling
-`sbi_tee_host_finalize_tvm()`.
+`sbi_covh_finalize_tvm()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_interrupt_set_tvm_aia_cpu_imsic_addr_errors]
-.TEE Interrupt Set TVM AIA CPU IMSIC Addr
+[#table_sbi_covi_set_tvm_aia_cpu_imsic_addr_errors]
+.COVE Interrupt Set TVM AIA CPU IMSIC Addr
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1143,21 +1143,21 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_interrupt_convert_tvm_aia_imsic]
-=== Function: TEE Interrupt Convert AIA IMSIC (FID #2)
+[#sbi_covi_convert_tvm_aia_imsic]
+=== Function: COVE Interrupt Convert AIA IMSIC (FID #2)
 [source, C]
 -------
-struct sbiret sbi_tee_interrupt_convert_aia_imsic(unsigned long imsic_page_addr);
+struct sbiret sbi_covi_convert_aia_imsic(unsigned long imsic_page_addr);
 -------
 
 Starts the process of converting the non-confidential guest interrupt file at
-`imsic_page_addr` for use with a TVM. This must be followed by calls to `sbi_tee_host_global_fence()`
-and `sbi_tee_host_local_fence()` before the interrupt file can be assigned to a TVM.
+`imsic_page_addr` for use with a TVM. This must be followed by calls to `sbi_covh_global_fence()`
+and `sbi_covh_local_fence()` before the interrupt file can be assigned to a TVM.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_tee_aia_tvm_convert_imsic_errors]
-.TEE Interrupt Convert AIA IMSIC
+.COVE Interrupt Convert AIA IMSIC
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1166,11 +1166,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_interrupt_reclaim_tvm_aia_imsic]
-=== Function: TEE Interrupt Reclaim TVM AIA IMSIC (FID #3)
+[#sbi_covi_reclaim_tvm_aia_imsic]
+=== Function: COVE Interrupt Reclaim TVM AIA IMSIC (FID #3)
 [source, C]
 -------
-struct sbiret sbi_tee_interrupt_reclaim_tvm_aia_imsic(unsigned long imsic_page_addr);
+struct sbiret sbi_covi_reclaim_tvm_aia_imsic(unsigned long imsic_page_addr);
 -------
 
 Reclaims the confidential TVM interrupt file at `imsic_page_addr`. The interrupt file
@@ -1179,7 +1179,7 @@ must not currently be assigned to a TVM.
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_tee_reclaim_tvm_aia_imsic_errors]
-.TEE Interrupt Reclaim TVM AIA IMSIC
+.COVE Interrupt Reclaim TVM AIA IMSIC
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1189,11 +1189,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_interrupt_bind_aia_imsic]
-=== Function: TEE Interrupt Bind AIA IMSIC (FID #4)
+[#sbi_covi_bind_aia_imsic]
+=== Function: COVE Interrupt Bind AIA IMSIC (FID #4)
 [source, C]
 -------
-struct sbiret sbi_tee_interrupt_bind_aia_imsic(unsigned long tvm_guest_id,
+struct sbiret sbi_covi_bind_aia_imsic(unsigned long tvm_guest_id,
                                                unsigned long tvm_vcpu_id,
                                                unsigned long imsic_mask);
 -------
@@ -1204,12 +1204,12 @@ file if necessary. Note that `imsic_mask` is in the same format as the `hgeie` a
 CSRs, that is bit N corresponds to guest interrupt file N-1 and bit `0` is always `0`. The
 number of bits set in `imsic_mask` must be equal to the number of interrupt files in the
 vCPU's virtualized IMSIC (i.e. 1 + `guests_per_hart`). The vCPU must currently be unbound.
-Upon completion, the vCPU is eligible to be run on this CPU with `sbi_tee_host_run_tvm_vcpu()`.
+Upon completion, the vCPU is eligible to be run on this CPU with `sbi_covh_run_tvm_vcpu()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_tee_bind_aia_imsic_errors]
-.TEE Interrupt Bind AIA IMSIC
+.COVE Interrupt Bind AIA IMSIC
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1219,23 +1219,23 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_interrupt_unbind_aia_imsic_begin]
-=== Function: TEE Interrupt Unbind AIA IMSIC Begin (FID #5)
+[#sbi_covi_unbind_aia_imsic_begin]
+=== Function: COVE Interrupt Unbind AIA IMSIC Begin (FID #5)
 [source, C]
 -------
-struct sbiret sbi_tee_interrupt_unbind_aia_imsic_begin(unsigned long tvm_guest_id,
+struct sbiret sbi_covi_unbind_aia_imsic_begin(unsigned long tvm_guest_id,
                                                        unsigned long tvm_vcpu_id);
 -------
 
 Begins the unbinding process for the specified vCPU from its guest interrupt files. The
 translations for the vCPU's virtualized IMSIC are invalidated, and a TLB flush sequence
-for the TVM must be completed before calling `sbi_tee_interrupt_unbind_aia_imsic_end()`
+for the TVM must be completed before calling `sbi_covi_unbind_aia_imsic_end()`
 to complete the unbinding process. Must be called on the physical CPU to which the vCPU is bound.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_tee_unbind_aia_imsic_begin_errors]
-.TEE Interrupt Unbind AIA IMSIC Begin
+.COVE Interrupt Unbind AIA IMSIC Begin
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1244,25 +1244,25 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_interrupt_unbind_aia_imsic_end]
-=== Function: TEE Interrupt Unbind AIA IMSIC End (FID #6)
+[#sbi_covi_unbind_aia_imsic_end]
+=== Function: COVE Interrupt Unbind AIA IMSIC End (FID #6)
 [source, C]
 -------
-struct sbiret sbi_tee_interrupt_unbind_aia_imsic_end(unsigned long tvm_guest_id,
+struct sbiret sbi_covi_unbind_aia_imsic_end(unsigned long tvm_guest_id,
                                                      unsigned long tvm_vcpu_id);
 -------
 
 Completes the unbinding process for the specified vCPU from its guest interrupt files after
 a TLB flush sequence for the TVM has been completed. The interrupt state is saved to the vCPU's
 software interrupt file and the guest interrupt files are free to be reclaimed via
-`sbi_tee_interrupt_reclaim_tvm_aia_imsic()` or bound to another vCPU via `sbi_tee_interrupt_unbind_aia_imsic_begin()`.
+`sbi_covi_reclaim_tvm_aia_imsic()` or bound to another vCPU via `sbi_covi_unbind_aia_imsic_begin()`.
 Must be called on the physical CPU to which the vCPU is bound. Upon success, the vCPU is 
 free to be bound to another physical CPU.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_tee_unbind_aia_imsic_end_errors]
-.TEE Interrupt Unbind AIA IMSIC End
+.COVE Interrupt Unbind AIA IMSIC End
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1271,11 +1271,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_interrupt_inject_tvm_cpu]
-=== Function: TEE Interrupt Inject TVM CPU (FID #7)
+[#sbi_covi_inject_tvm_cpu]
+=== Function: COVE Interrupt Inject TVM CPU (FID #7)
 [source, C]
 -------
-struct sbiret sbi_tee_interrupt_inject_tvm_cpu(unsigned long tvm_guest_id,
+struct sbiret sbi_covi_inject_tvm_cpu(unsigned long tvm_guest_id,
                                                unsigned long tvm_vcpu_id
                                                unsigned long interrupt_id);
 -------
@@ -1284,12 +1284,12 @@ Injects an external interrupt with the given `interrupt_id` into the specified v
 vCPU is presently bound to an IMSIC guest interrupt file, the interrupt is immediately
 injected by writing to the interrupt file. If it is not bound, the interrupt is recorded
 in the software and will be injected once the vCPU becomes bound. The specified interrupt ID
-must be valid and must have been allowed by the guest with `sbi_tee_guest_allow_external_interrupt()`.
+must be valid and must have been allowed by the guest with `sbi_covg_allow_external_interrupt()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_tee_interrupt_inject_tvm_cpu_errors]
-.TEE Interrupt Inject TVM CPU
+[#table_sbi_covi_inject_tvm_cpu_errors]
+.COVE Interrupt Inject TVM CPU
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1298,25 +1298,25 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_interrupt_rebind_aia_imsic_begin]
-=== Function: TEE Interrupt Rebind AIA IMSIC Begin (FID #8)
+[#sbi_covi_rebind_aia_imsic_begin]
+=== Function: COVE Interrupt Rebind AIA IMSIC Begin (FID #8)
 [source, C]
 -------
-struct sbiret sbi_tee_interrupt_rebind_aia_imsic_begin(unsigned long tvm_guest_id,
+struct sbiret sbi_covi_rebind_aia_imsic_begin(unsigned long tvm_guest_id,
                                                        unsigned long tvm_vcpu_id,
                                                        unsigned long imsic_mask);
 -------
 
 Begins the rebinding process for the specified vCPU to the current physical CPU and the specified
 confidential guest interrupt file. The host must complete a TLB invalidation sequence
-for the TVM before cloning the old interrupt file state using `sbi_tee_interrupt_rebind_aia_imsic_clone()`.
+for the TVM before cloning the old interrupt file state using `sbi_covi_rebind_aia_imsic_clone()`.
 Once cloned, the old file will be restored to the new guest interrupt file on 
-`sbi_tee_interrupt_rebind_aia_imsic_end()` invocation.
+`sbi_covi_rebind_aia_imsic_end()` invocation.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_tee_rebind_aia_imsic_begin_errors]
-.TEE Interrupt Rebind AIA IMSIC Begin
+.COVE Interrupt Rebind AIA IMSIC Begin
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1325,11 +1325,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_interrupt_rebind_aia_imsic_clone]
-=== Function: TEE Interrupt Rebind AIA IMSIC Clone (FID #9)
+[#sbi_covi_rebind_aia_imsic_clone]
+=== Function: COVE Interrupt Rebind AIA IMSIC Clone (FID #9)
 [source, C]
 -------
-struct sbiret sbi_tee_interrupt_rebind_aia_imsic_clone(unsigned long tvm_guest_id,
+struct sbiret sbi_covi_rebind_aia_imsic_clone(unsigned long tvm_guest_id,
                                                        unsigned long tvm_vcpu_id);
 -------
 
@@ -1340,7 +1340,7 @@ CPU. The guest interrupt file after this is free to be reclaimed or bound to ano
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_tee_rebind_aia_imsic_clone_errors]
-.TEE Interrupt Rebind AIA IMSIC Clone
+.COVE Interrupt Rebind AIA IMSIC Clone
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1349,22 +1349,22 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_interrupt_rebind_aia_imsic_end]
-=== Function: TEE Interrupt Rebind AIA IMSIC End (FID #10)
+[#sbi_covi_rebind_aia_imsic_end]
+=== Function: COVE Interrupt Rebind AIA IMSIC End (FID #10)
 [source, C]
 -------
-struct sbiret sbi_tee_interrupt_rebind_aia_imsic_end(unsigned long tvm_guest_id,
+struct sbiret sbi_covi_rebind_aia_imsic_end(unsigned long tvm_guest_id,
                                                      unsigned long tvm_vcpu_id);
 -------
 
 Completes the rebinding process for the specified vCPU from this physical CPU and its guest
 interrupt files. Must be called from the same physical CPU as
-`sbi_tee_interrupt_rebind_aia_imsic_begin()`.
+`sbi_covi_rebind_aia_imsic_begin()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_tee_rebind_aia_imsic_end_errors]
-.TEE Interrupt Rebind AIA IMSIC End
+.COVE Interrupt Rebind AIA IMSIC End
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1373,17 +1373,17 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-== TEE Guest Extension (EID 0x54454547)
-The TEE Guest extension supplements the TEE Host extension, and allows TVMs to communicate with TSM.
-A typical use case for this extension is to relay information to the host. TEE-Guest calls cause a
+== COVE Guest Extension (EID #0x434F5647 "COVG")
+The COVE Guest extension supplements the COVE Host extension, and allows TVMs to communicate with TSM.
+A typical use case for this extension is to relay information to the host. COVE-Guest calls cause a
 trap to the TSM. TSM should do any processing required and then must forward the ECALL to the host with
 `scause` set to ECALL, `a7` set to EID, `a6` set to FID, `a0`-`a5` set to ECALL args.
 
-[#sbi_tee_guest_add_mmio_region]
-=== Function: TEE Guest Add MMIO Region (FID #0)
+[#sbi_covg_add_mmio_region]
+=== Function: COVE Guest Add MMIO Region (FID #0)
 [source, C]
 -------
-struct sbiret sbi_tee_guest_add_mmio_region(unsigned long tvm_gpa_addr,
+struct sbiret sbi_covg_add_mmio_region(unsigned long tvm_gpa_addr,
                                             unsigned long region_len);
 -------
 Marks the specified range of TVM physical address space starting at `tvm_gpa_addr` as used for emulated
@@ -1392,8 +1392,8 @@ MMIO. Upon return, all accesses by the TVM within the range are trapped and may 
 Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned, and the region must not overlap with a
 previously defined region. This call will result in an exit to the host on success.
 
-[#table_sbi_tee_guest_add_mmio_region_errors]
-.TEE Guest Add MMIO Region
+[#table_sbi_covg_add_mmio_region_errors]
+.COVE Guest Add MMIO Region
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1403,11 +1403,11 @@ previously defined region. This call will result in an exit to the host on succe
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_guest_remove_mmio_region]
-=== Function: TEE Guest Remove MMIO Region (FID #1)
+[#sbi_covg_remove_mmio_region]
+=== Function: COVE Guest Remove MMIO Region (FID #1)
 [source, C]
 -------
-struct sbiret sbi_tee_guest_remove_mmio_region(unsigned long tvm_gpa_addr,
+struct sbiret sbi_covg_remove_mmio_region(unsigned long tvm_gpa_addr,
                                                unsigned long region_len);
 -------
 Removes the specified range of TVM physical address space starting at `tvm_gpa_addr` from the emulated
@@ -1416,8 +1416,8 @@ MMIO regions. Upon return, all accesses by the TVM within the range will result 
 Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned, and the region must not overlap with a
 previously defined region. This call will result in an exit to the host on success.
 
-[#table_sbi_tee_guest_remove_mmio_region_errors]
-.TEE Guest Remove MMIO Region
+[#table_sbi_covg_remove_mmio_region_errors]
+.COVE Guest Remove MMIO Region
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1427,11 +1427,11 @@ previously defined region. This call will result in an exit to the host on succe
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_guest_share_memory_region]
-=== Function: TEE Guest Share Memory Region (FID #2)
+[#sbi_covg_share_memory_region]
+=== Function: COVE Guest Share Memory Region (FID #2)
 [source, C]
 -------
-struct sbiret sbi_tee_guest_share_memory_region(unsigned long tvm_gpa_addr,
+struct sbiret sbi_covg_share_memory_region(unsigned long tvm_gpa_addr,
                                                 unsigned long region_len);
 -------
 Initiates the assignment-change of TVM physical address space starting at `tvm_gpa_addr` from 
@@ -1442,15 +1442,15 @@ host. The host then removes any confidential pages already populated in the regi
 non-confidential pages on page-faults.
 
 The calling TVM vCPU is considered blocked until the assignment-change is completed. 
-attempts to run it with `sbi_tee_host_run_tvm_vcpu()` will fail. Any guest page faults taken by other 
+attempts to run it with `sbi_covh_run_tvm_vcpu()` will fail. Any guest page faults taken by other 
 TVM vCPUs in the invalidated pages continue to be reported to the host.
 
 Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned. 
 
 The possible error codes returned in sbiret.error are:
 
-[#table_sbi_tee_guest_share_memory_region_errors]
-.TEE Guest Share Memory Region
+[#table_sbi_covg_share_memory_region_errors]
+.COVE Guest Share Memory Region
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1461,11 +1461,11 @@ The possible error codes returned in sbiret.error are:
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_guest_unshare_memory_region]
-=== Function: TEE Guest Unshare Memory Region (FID #3)
+[#sbi_covg_unshare_memory_region]
+=== Function: COVE Guest Unshare Memory Region (FID #3)
 [source, C]
 -------
-struct sbiret sbi_tee_guest_unshare_memory_region(unsigned long tvm_gpa_addr,
+struct sbiret sbi_covg_unshare_memory_region(unsigned long tvm_gpa_addr,
                                                   unsigned long region_len);
 -------
 Initiates the assignment-change of TVM physical address space starting at `tvm_gpa_addr` from
@@ -1475,13 +1475,13 @@ enforces the security properties on the mapping and exits to the VMM host. The h
 any non-confidential pages already populated in the region and inserts confidential pages on page-faults.
 
 The calling TVM vCPU is considered blocked until the assignment-change is completed. Attempts to run it
-with `sbi_tee_host_run_tvm_vcpu()` will fail. Any guest page faults taken by other TVM vCPUs in the
+with `sbi_covh_run_tvm_vcpu()` will fail. Any guest page faults taken by other TVM vCPUs in the
 invalidated pages continue to be reported to the host.
 
 Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned.
 
-[#table_sbi_tee_guest_unshare_memory_region_errors]
-.TEE Guest Unshare Memory Region
+[#table_sbi_covg_unshare_memory_region_errors]
+.COVE Guest Unshare Memory Region
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1493,11 +1493,11 @@ Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_guest_allow_external_interrupt]
-=== Function: TEE Guest Allow External Interrupt (FID #4)
+[#sbi_covg_allow_external_interrupt]
+=== Function: COVE Guest Allow External Interrupt (FID #4)
 [source, C]
 -------
-struct sbiret sbi_tee_guest_allow_external_interrupt(unsigned long interrupt_id);
+struct sbiret sbi_covg_allow_external_interrupt(unsigned long interrupt_id);
 -------
 Allows injection of the specified external interrupt ID into the calling TVM vCPU. Passing
 an `interrupt_id` of -1 allows the injection of all external interrupts. TVM vCPUs are started with
@@ -1505,8 +1505,8 @@ all external interrupts completely denied by default.
 
 The possible error codes returned in sbiret.error are:
 
-[#table_sbi_tee_guest_allow_external_interrupt_errors]
-.TEE Guest Allow External Interrupt
+[#table_sbi_covg_allow_external_interrupt_errors]
+.COVE Guest Allow External Interrupt
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1516,19 +1516,19 @@ The possible error codes returned in sbiret.error are:
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_guest_deny_external_interrupt]
-=== Function: TEE Guest Deny External Interrupt (FID #5)
+[#sbi_covg_deny_external_interrupt]
+=== Function: COVE Guest Deny External Interrupt (FID #5)
 [source, C]
 -------
-struct sbiret sbi_tee_guest_deny_external_interrupt(unsigned long interrupt_id);
+struct sbiret sbi_covg_deny_external_interrupt(unsigned long interrupt_id);
 -------
 Denies injection of the specified external interrupt ID into the calling TVM vCPU. Passing
 an `interrupt_id` of -1 denies injection of all external interrupts.
 
 The possible error codes returned in sbiret.error are:
 
-[#table_sbi_tee_guest_deny_external_interrupt_errors]
-.TEE Guest Deny External Interrupt
+[#table_sbi_covg_deny_external_interrupt_errors]
+.COVE Guest Deny External Interrupt
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1538,15 +1538,15 @@ The possible error codes returned in sbiret.error are:
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_tee_guest_get_attcaps]
-=== Function: TEE Guest Get Attestation Capabilities (FID #6)
+[#sbi_covg_get_attcaps]
+=== Function: COVE Guest Get Attestation Capabilities (FID #6)
 [source, C]
 -------
-struct sbiret sbi_tee_guest_get_attcaps(unsigned long tvm_gpa_cap_addr,
+struct sbiret sbi_covg_get_attcaps(unsigned long tvm_gpa_cap_addr,
                                         unsigned long caps_size);
 -------
 This intrinsic is used by a TVM component to get the SBI implementation attestation capabilities. 
-The attestation capabilities let the TEEI implementations expose which hash algorithm is being used 
+The attestation capabilities let the CoVE implementations expose which hash algorithm is being used 
 for measurements, which evidence formats are supported. The attestation capabilities structure 
 also contains a map of all measurement registers the TVM can extend.
 
@@ -1577,8 +1577,8 @@ struct AttestationCapabilities {
 };
 -------
 
-[#table_sbi_tee_guest_get_attcaps]
-.TEE Guest Get Attestation Capabilities
+[#table_sbi_covg_get_attcaps]
+.COVE Guest Get Attestation Capabilities
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1591,11 +1591,11 @@ struct AttestationCapabilities {
 |===
 
 
-[#sbi_tee_guest_measurement_extend]
-=== Function: TEE Guest Measurement Extend (FID #7)
+[#sbi_covg_measurement_extend]
+=== Function: COVE Guest Measurement Extend (FID #7)
 [source, C]
 -------
-struct sbiret sbi_tee_guest_measurement_extend(unsigned long tvm_gpa_buf_address,
+struct sbiret sbi_covg_measurement_extend(unsigned long tvm_gpa_buf_address,
                                                unsigned long buffer_len,
                                                Unsigned long msmt_index);
 -------
@@ -1605,13 +1605,13 @@ The measurements for each TVM always contain the same chain of TCB elements root
 
 The TVM static measurements are managed by the TSM in the TVM global structure. 
 These measurements are used in the TcbEvidenceInfo when the TVM attestation certificate 
-is generated via sbi_tee_guest_get_evidence.
+is generated via sbi_covg_get_evidence.
 
 Both `tvm_gpa_buf_addr` and `region_len` must be 4kB-aligned.
-msmt_index must be a valid index per the attestation capabilities reported via `sbi_tee_guest_get_attcaps`.
+msmt_index must be a valid index per the attestation capabilities reported via `sbi_covg_get_attcaps`.
 
-[#table_sbi_tee_guest_measurement_extend_errors]
-.TEE Guest Measurement Extend
+[#table_sbi_covg_measurement_extend_errors]
+.COVE Guest Measurement Extend
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1625,18 +1625,18 @@ msmt_index must be a valid index per the attestation capabilities reported via `
 
 
 
-[#sbi_tee_guest_get_evidence]
-=== Function: TEE Guest Get Evidence (FID #8)
+[#sbi_covg_get_evidence]
+=== Function: COVE Guest Get Evidence (FID #8)
 [source, C]
 -------
-struct sbiret sbi_tee_guest_get_evidence(uint64_t cert_request_addr, 
+struct sbiret sbi_covg_get_evidence(uint64_t cert_request_addr, 
                                          uint64_t cert_request_size,
                                          uint64_t request_data_addr,
                                          enum EvidenceFormat evidence_format,
                                          uint64_t cert_addr_out,
                                          uint64_t cert_size);
 -------
-If the `sbi_tee_guest_get_attcaps` enumerates attestation services provided by the TSM, then 
+If the `sbi_covg_get_attcaps` enumerates attestation services provided by the TSM, then 
 this intrinsic is used by a TVM to get attestation evidence to report to a (remote) relying party. 
 This may take the form of a request for an attestation certificate or a TSM-signed TVM 
 measurement (using an attestation certificate specific to the TVM).
@@ -1656,8 +1656,8 @@ The TSM certificate is provisioned by the FW TCB (TSM-driver and HW RoT).
 
 Both `cert_request_addr`, `request_data_addr` and `cert_addr_out` must be 4kB-aligned.
 
-[#table_sbi_tee_guest_get_evidence_errors]
-.TEE Guest Get Evidence
+[#table_sbi_covg_get_evidence_errors]
+.COVE Guest Get Evidence
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
@@ -1672,73 +1672,73 @@ Both `cert_request_addr`, `request_data_addr` and `cert_addr_out` must be 4kB-al
 
 
 
-== Summary Listing of TEEI
+== Summary Listing of CoVE functions 
 
-=== Summary of TEEI - TH-ABI
+=== Summary of CoVE Host Extension (COVH)
 
 |===
 
-| <<sbi_tee_host_get_tsm_info, sbi_tee_host_get_tsm_info>> | Used by the OS/VMM to 
+| <<sbi_covh_get_tsm_info, sbi_covh_get_tsm_info>> | Used by the OS/VMM to 
 discover if a TSM is loaded and initialized else returns an error. If a TSM 
 is loaded and initialized, this operation is used to enumerate TSM 
 information such as: TEE-capable memory regions, Size of static memory to 
 allocate per TVM, Size of memory to allocate per TVM Virtual Hart and so on.
 
-| <<sbi_tee_host_convert_pages, sbi_tee_host_convert_pages>> | Begins the process 
+| <<sbi_covh_convert_pages, sbi_covh_convert_pages>> | Begins the process 
 of converting memory 
 to be used as confidential memory. The region consists of one or more contiguous 
 4KB memory naturally aligned regions.
 
-| <<sbi_tee_host_reclaim_pages, sbi_tee_host_reclaim_pages>> | VMM may unassign
+| <<sbi_covh_reclaim_pages, sbi_covh_reclaim_pages>> | VMM may unassign
 memory for TVMs by destroying them. All confidential-unassigned memory may be
 reclaimed back as non-confidential using this interface.
 
-| <<sbi_tee_host_global_fence, sbi_tee_host_global_fence>> | This operation 
+| <<sbi_covh_global_fence, sbi_covh_global_fence>> | This operation 
 initiates TLB version tracking of pages in the region being converted to confidential. 
 The TSM enforces that the VMM performs invalidation of all harts (via IPIs and 
-subsequent sbi_tee_host_local_fence) to remove any cached mappings to the memory 
-regions that were previously selected for conversion via the sbi_tee_host_convert_pages. 
+subsequent sbi_covh_local_fence) to remove any cached mappings to the memory 
+regions that were previously selected for conversion via the sbi_covh_convert_pages. 
 
-| <<sbi_tee_host_local_fence, sbi_tee_host_local_fence>> |  This operation 
+| <<sbi_covh_local_fence, sbi_covh_local_fence>> |  This operation 
 completes the TLB version tracking of pages in the region being converted to 
 confidential. The TSM tracks that all available physical harts have executed 
 this operation before it considers the TLB version updated. The last local fence 
 completes the conversion of a memory region from non-confidential to confidential 
 for a set of TVM pages.
 
-| <<sbi_tee_host_create_tvm, sbi_tee_host_create_tvm>> | TVM creation (static)
+| <<sbi_covh_create_tvm, sbi_covh_create_tvm>> | TVM creation (static)
 process where a set of TEE pages are assigned for a TVM to hold a TVM’s
 global state. This routine also configures the global configuration that
 applies to the TVM and affects all TVM hart settings. For example, features
 enabled for this TVM, perfmon enabled, debug enabled
 etc.
 
-| <<sbi_tee_host_finalize_tvm, sbi_tee_host_finalize_tvm>> | This operation enables
+| <<sbi_covh_finalize_tvm, sbi_covh_finalize_tvm>> | This operation enables
 the VMM to finalize the measurement of a TVM (static). The TSM enforces that the TVM
 virtual harts cannot be entered unless the TVM measurement is committed
 via this operation.
 
-| <<sbi_tee_host_destroy_tvm, sbi_tee_host_destroy_tvm>> | TVM shutdown verifies VMM
+| <<sbi_covh_destroy_tvm, sbi_covh_destroy_tvm>> | TVM shutdown verifies VMM
 has stopped all virtual hart execution for the TVM. The TVM virtual hart
 may not be entered after this point. The VMM may start reclaiming TVM
 memory after this point.
 
-| <<sbi_tee_host_add_tvm_memory_region, sbi_tee_host_add_tvm_memory_region>> | Adds a
+| <<sbi_covh_add_tvm_memory_region, sbi_covh_add_tvm_memory_region>> | Adds a
 memory region to the TVM at the specified range of guest physical address space. The
 memory range is confidential to the guest and may only be populated with confidential
 pages.
 
-| <<sbi_tee_host_add_tvm_page_table_pages, sbi_tee_host_add_tvm_page_table_pages>> | Add 
+| <<sbi_covh_add_tvm_page_table_pages, sbi_covh_add_tvm_page_table_pages>> | Add 
 one or more page mappings to the G-stage translation structure for a TVM.
 The pages to be used for the G-stage page table structures must have been converted
 (and tracked) by the TSM as TEE pages; otherwise this operation will not succeed.                                                                     
 
-| <<sbi_tee_host_add_tvm_measured_pages, sbi_tee_host_add_tvm_measured_pages>> | Copies the
+| <<sbi_covh_add_tvm_measured_pages, sbi_covh_add_tvm_measured_pages>> | Copies the
 given number of pages from non-confidential memory at `source_address` to confidential
 memory at `dest_address`, then measures and maps the pages at `dest_address` in the TVM physical
 address space at `tvm_guest_gpa`. The mapping must lie within a region of confidential memory
-created with `sbi_tee_host_add_tvm_memory_region()`. This call must not be made after calling
-`sbi_tee_host_finalize_tvm()`.
+created with `sbi_covh_add_tvm_memory_region()`. This call must not be made after calling
+`sbi_covh_finalize_tvm()`.
 
 This operation is used to extend the static measurement for a TVM for added page contents.
 The operation performs a SHA384 hash extend to the measurement register managed 
@@ -1748,23 +1748,23 @@ in which measured pages are added to the TVM also affects the attestation eviden
 faithfully reproduce the state machine for the measurement process otherwise the attestation
 evidence verification by the relying party will fail and the TVM will not be considered trustworthy.
 
-| <<sbi_tee_host_add_tvm_zero_pages, sbi_tee_host_add_tvm_zero_pages>> | Add a 
+| <<sbi_covh_add_tvm_zero_pages, sbi_covh_add_tvm_zero_pages>> | Add a 
 zero page for an existing mapping for a TVM page (post initialization). 
 This operation adds a zero page into a mapping and keeps the mapping as 
 pending (i.e. access from the TVM will fault until the TVM accepts that GPA.
 
-| <<sbi_tee_host_add_tvm_shared_pages, sbi_tee_host_add_tvm_shared_pages>> | Maps
+| <<sbi_covh_add_tvm_shared_pages, sbi_covh_add_tvm_shared_pages>> | Maps
 the given number of pages of non-confidential memory into the TVM's physical address space.
 The guest physical address must lie within a region of non-confidential memory previously
 defined by the TVM via the guest interface to the TSM.
 
-| <<sbi_tee_host_create_tvm_vcpu, sbi_tee_host_create_tvm_vcpu>> | This operation 
+| <<sbi_covh_create_tvm_vcpu, sbi_covh_create_tvm_vcpu>> | This operation 
 allows the VMM to assign TEE pages for a virtual hart context structure (VHCS) for a 
 specific TVM. This routine also initializes the hart-specific fields of 
 this structure. Note that a virtual hart context structure may consist of 
 more than one 4KB page. The number of pages are enumerated via the tsm_info call.
 
-| <<sbi_tee_host_run_tvm_vcpu, sbi_tee_host_run_tvm_vcpu>> | Enter or resume a TVM 
+| <<sbi_covh_run_tvm_vcpu, sbi_covh_run_tvm_vcpu>> | Enter or resume a TVM 
 virtual hart (on any physical hart). A resume operation is performed via a 
 flag passed to this operation. This operation activates a virtual-hart on a 
 physical hart, and may be performed only on a TVM virtual hart structure 
@@ -1772,42 +1772,42 @@ that is assigned to the TVM and one that is not already active. The TSM
 verifies if the operation is performed in the right state for that 
 virtual hart.
 
-| <<sbi_tee_host_tvm_fence, sbi_tee_host_tvm_fence>> | Initiates a TLB invalidation
+| <<sbi_covh_tvm_fence, sbi_covh_tvm_fence>> | Initiates a TLB invalidation
 sequence for all pages that have been invalidated in the given TVM's address space
-since the previous call to `sbi_tee_host_tvm_fence()`. The TLB invalidation sequence is
+since the previous call to `sbi_covh_tvm_fence()`. The TLB invalidation sequence is
 completed when all vCPUs in the TVM that were running before the call to
-`sbi_tee_host_tvm_fence()` have taken a trap into the TSM, which the host can
+`sbi_covh_tvm_fence()` have taken a trap into the TSM, which the host can
 cause by sending an IPI to the physical CPUs on which the TVM's vCPUs are running.
 
-| <<sbi_tee_host_tvm_invalidate_pages, sbi_tee_host_tvm_invalidate_pages>> |
+| <<sbi_covh_tvm_invalidate_pages, sbi_covh_tvm_invalidate_pages>> |
 Invalidates the pages in the specified range of guest physical address space and thus marks the
 pages as blocked from any further TVM accesses. Guest page faults taken by the TVM on invalidated
 pages continue to be reported to the host. The page remains invalid until the mapping is validated
 (marked present), removed, or becomes part of a huge page by promotion/demotion operation.
 
-| <<sbi_tee_host_tvm_validate_pages, sbi_tee_host_tvm_validate_pages>> |
+| <<sbi_covh_tvm_validate_pages, sbi_covh_tvm_validate_pages>> |
 Marks the invalidated pages in the specified range of guest physical address space
 as present. This ECALL may also be used to revert an in-progress page removal or
 huge page promotion/demotion sequence.
 
-| <<sbi_tee_host_tvm_remove_pages, sbi_tee_host_tvm_remove_pages>> |
+| <<sbi_covh_tvm_remove_pages, sbi_covh_tvm_remove_pages>> |
 Removes mappings for invalidated pages in the specified range of guest physical address space.
 The range to be unmapped must already have been invalidated and fenced, and must lie within a
 removable region of the guest's physical address space.
 
-| sbi_tee_host_page_relocate                     | Relocate a page for an 
+| sbi_covh_page_relocate                     | Relocate a page for an 
 existing mapping for a TVM page. This operation allows the VMM to reassign 
 a new SPA for an existing TVM page mapping. The page mapping must be 
 invalid and fenced before the page mapping can be 
 relocated. This interface specification is TBD.
 
-| sbi_tee_host_page_promote                      | Promote a set of small 
+| sbi_covh_page_promote                      | Promote a set of small 
 page mappings (existing mappings) for a set of TVM pages to a large page 
 mapping. The affected mappings must be invalidated before the promote operation 
 can succeed. The VMM may reclaim the freed G-stage page table page if
 the operation succeeds. This interface specification is TBD. 
 
-| sbi_tee_host_page_demote                    | Demote a large page 
+| sbi_covh_page_demote                    | Demote a large page 
 mapping for an existing mapping to a set of TVM pages and corresponding 
 small page mappings. The affected mapping must be invalidated before the 
 operation can succeed. The VMM must provide a free TEE-capable page to the 
@@ -1816,99 +1816,99 @@ This interface specification is TBD.
 
 |===
 
-=== Summary of TEE Interrupt Extension
+=== Summary of CoVE Interrupt Extension(COVI)
 
 |===
-| <<sbi_tee_interrupt_init_tvm_aia, sbi_tee_interrupt_init_tvm_aia>> | This 
+| <<sbi_covi_init_tvm_aia, sbi_covi_init_tvm_aia>> | This 
 intrinsic is supported by the TSM to configure AIA virtualization for the TVM
 
-| <<sbi_tee_interrupt_set_tvm_aia_cpu_imsic_addr, sbi_tee_interrupt_set_tvm_aia_cpu_imsic_addr>> | 
+| <<sbi_covi_set_tvm_aia_cpu_imsic_addr, sbi_covi_set_tvm_aia_cpu_imsic_addr>> | 
 Set TVM CPU AIA address
 
-| <<sbi_tee_interrupt_convert_tvm_aia_imsic, sbi_tee_interrupt_convert_tvm_aia_imsic>> | Convert 
+| <<sbi_covi_convert_tvm_aia_imsic, sbi_covi_convert_tvm_aia_imsic>> | Convert 
 TVM GPA AIA address to confidential
 
-| <<sbi_tee_interrupt_reclaim_tvm_aia_imsic, sbi_tee_interrupt_reclaim_tvm_aia_imsic>> | 
+| <<sbi_covi_reclaim_tvm_aia_imsic, sbi_covi_reclaim_tvm_aia_imsic>> | 
 Reclaim TVM GPA AIA address from confidential
 
-| <<sbi_tee_interrupt_bind_aia_imsic, sbi_tee_interrupt_bind_aia_imsic>> |
+| <<sbi_covi_bind_aia_imsic, sbi_covi_bind_aia_imsic>> |
 Binds a TVM vCPU to the current physical CPU using the confidential guest interrupt file.
 
-| <<sbi_tee_interrupt_unbind_aia_imsic_begin, sbi_tee_interrupt_unbind_aia_imsic_begin>> |
+| <<sbi_covi_unbind_aia_imsic_begin, sbi_covi_unbind_aia_imsic_begin>> |
 Begins the unbind process for the specified vCPU from its guest interrupt file.
 
-| <<sbi_tee_interrupt_unbind_aia_imsic_end, sbi_tee_interrupt_unbind_aia_imsic_end>> |
+| <<sbi_covi_unbind_aia_imsic_end, sbi_covi_unbind_aia_imsic_end>> |
 Completes the unbind process for the specified vCPU from its guest interrupt files after
 a TLB flush sequence for the TVM has been completed.
 
-| <<sbi_tee_interrupt_inject_tvm_cpu, sbi_tee_interrupt_inject_tvm_cpu>> |
+| <<sbi_covi_inject_tvm_cpu, sbi_covi_inject_tvm_cpu>> |
 Injects an external interrupt with the given interrupt_id into the specified vCPU.
 
-| <<sbi_tee_interrupt_rebind_aia_imsic_begin, sbi_tee_interrupt_rebind_aia_imsic_begin>> |
+| <<sbi_covi_rebind_aia_imsic_begin, sbi_covi_rebind_aia_imsic_begin>> |
 Begins the rebinding process for the specified vCPU to the current physical CPU and the specified
 confidential guest interrupt file. The host must complete a TLB invalidation sequence
-for the TVM before cloning old interrupt file state using `sbi_tee_interrupt_rebind_aia_imsic_clone()`.
+for the TVM before cloning old interrupt file state using `sbi_covi_rebind_aia_imsic_clone()`.
 
-| <<sbi_tee_interrupt_rebind_aia_imsic_clone, sbi_tee_interrupt_rebind_aia_imsic_clone>> |
+| <<sbi_covi_rebind_aia_imsic_clone, sbi_covi_rebind_aia_imsic_clone>> |
 Clones the old guest interrupt file of the specified vCPU. Caller must make sure to invoke this from
 old physical CPU. The guest interrupt file after this is free to be reclaimed or bound to another
 vCPU.
 
-| <<sbi_tee_interrupt_rebind_aia_imsic_end, sbi_tee_interrupt_rebind_aia_imsic_end>> |
+| <<sbi_covi_rebind_aia_imsic_end, sbi_covi_rebind_aia_imsic_end>> |
 Completes the rebind process for the specified vCPU from this physical CPU and its guest
 interrupt files. Must be called from the same physical CPU as
-`sbi_tee_interrupt_rebind_aia_imsic_begin()`.
+`sbi_covi_rebind_aia_imsic_begin()`.
 
 |===
 
-=== Summary of TEEI - TG-ABI
+=== Summary of CoVE Guest Extension (COVG) 
 
 |===
 
-| <<sbi_tee_guest_add_mmio_region, sbi_tee_guest_add_mmio_region>> |
+| <<sbi_covg_add_mmio_region, sbi_covg_add_mmio_region>> |
 Marks the specified range of TVM physical address space starting at `tvm_gpa_addr` as used for emulated
 MMIO. Upon return, all accesses by the TVM within the range are trapped and may be emulated by the host.
 
-| <<sbi_tee_guest_remove_mmio_region, sbi_tee_guest_remove_mmio_region>> |
+| <<sbi_covg_remove_mmio_region, sbi_covg_remove_mmio_region>> |
 Removes the specified range of TVM physical address space starting at `tvm_gpa_addr` from the emulated
 MMIO regions. Upon return, all accesses by the TVM within the range will result in a page fault.
 
-| <<sbi_tee_guest_share_memory_region, sbi_tee_guest_share_memory_region>> | This 
+| <<sbi_covg_share_memory_region, sbi_covg_share_memory_region>> | This 
 intrinsic is used by the TVM to request the conversion of the specified GPA to 
 non-confidential (from confidential). The GPA must be mapped to the TVM in a 
 present state, and must be scrubbed by the TVM before it is yielded. The TSM 
 enforces that the page is not-present in the G-stage page table and not
 tracked as a TEE page. The VMM owns the process of reclaiming the page.
 
-| <<sbi_tee_guest_unshare_memory_region, sbi_tee_guest_unshare_memory_region>> | Convert 
+| <<sbi_covg_unshare_memory_region, sbi_covg_unshare_memory_region>> | Convert 
 a memory region from non-confidential to confidential for a set of TVM pages. 
 This operation initiates TSM tracking of these pages and also changes the encryption 
 properties of these pages. These pages can then be selected by the VMM to 
 allocate for TVM control structure pages, G-stage page table pages,
 and TVM pages.
 
-| <<sbi_tee_guest_allow_external_interrupt, sbi_tee_guest_allow_external_interrupt>> |
+| <<sbi_covg_allow_external_interrupt, sbi_covg_allow_external_interrupt>> |
 Allows injection of the specified external interrupt ID into the calling TVM vCPU. Passing
 an `interrupt_id` of -1 allows injection of all external interrupts. TVM vCPUs are started with
 injection of external interrupts completely disabled by default.
 
-| <<sbi_tee_guest_deny_external_interrupt, sbi_tee_guest_deny_external_interrupt>> |
+| <<sbi_covg_deny_external_interrupt, sbi_covg_deny_external_interrupt>> |
 Denies injection of the specified external interrupt ID into the calling TVM vCPU. Passing
 an `interrupt_id` of -1 denies injection of all external interrupts.
 
-| <<sbi_tee_guest_get_attcaps, sbi_tee_guest_get_attcaps>>   | This 
+| <<sbi_covg_get_attcaps, sbi_covg_get_attcaps>>   | This 
 intrinsic is used by a TVM to get attestation capabilities supported by the TSM.
 the capabilities enumerated are then used to extend measurements and/or get 
 evidence to support attestation.                                                 
 
-| <<sbi_tee_guest_measurement_extend, sbi_tee_guest_measurement_extend>>   | This 
+| <<sbi_covg_measurement_extend, sbi_covg_measurement_extend>>   | This 
 intrinsic is used by a TVM component to build the chain of trust of measurement for the TVM to 
 extend runtime measurements. These measurements are managed by the TSM in 
 the TVM global structure (To be specified TBD). These measurements are used 
 in the TcbEvidenceInfo when the TVM attestation certificate is generated 
-via sbi_tee_guest_get_evidence. This interface specification is TBD.                                                 
+via sbi_covg_get_evidence. This interface specification is TBD.                                                 
 
-| <<sbi_tee_guest_get_evidence, sbi_tee_guest_get_evidence>>      | This 
+| <<sbi_covg_get_evidence, sbi_covg_get_evidence>>      | This 
 intrinsic is used by a TVM to get 
 attestation evidence to report to a (remote) relying party. It is supported 
 by the TSM to provide HW-key-signed measurements of the TVM and the TSM. 
@@ -1916,13 +1916,13 @@ The attestation key used to sign the evidence is provisioned into the TVM
 by the TSM. The TSM certificate is provisioned by the FW TCB (TSM-driver 
 and HW RoT). This interface specification is TBD.                                                                   
 
-| sbi_tee_guest_enable_debug      | This intrinsic is supported by the TSM to 
+| sbi_covg_enable_debug      | This intrinsic is supported by the TSM to 
 enable the TVM to request for debugging to be enabled for the TVM (TSM 
 invokes TSM-driver to enable debugging if the TVM was created with debug 
 opt-in; TSM enforces state save and restore of debug state for TVM hart). 
 The specification of this interface is TBD.
 
-| sbi_tee_guest_enable_perfmon   | This intrinsic is supported by the TSM to 
+| sbi_covg_enable_perfmon   | This intrinsic is supported by the TSM to 
 enable the TVM to request performance monitoring (where the TSM enforces 
 state save and restore of the performance monitoring inhibit and trigger 
 controls). The specification of this interface is TBD.
