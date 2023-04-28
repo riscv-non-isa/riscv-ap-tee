@@ -45,7 +45,7 @@ also used as synonyms of AP-TEE in this document.
 | Confidential Computing | The protection of data in use by performing 
 computation in a Hardware-based TEE.
 
-| TVM | TEE or Confidential VM - A VM instantiation of an AP-TEE workload
+| TVM | TEE or Confidential VM - A VM instantiation of an confidential workload
 
 | Confidential application or library | A user-mode application or 
 library instantiation in a TVM. The user-mode application may be supported 
@@ -53,12 +53,12 @@ via a trusted runtime. The user-mode library may be hosted by a surrogate
 process runtime.
 
 | Attestation | The process by which a relying party can assess the 
-security posture of the AP-TEE workload based on verifying a set of 
+security posture of the confidential workload based on verifying a set of 
 HW-rooted cryptographically-protected evidence.
  
 | TEE Security Manager (TSM) | HS-mode software module that acts as 
 the trusted (in TCB) intermediary between the VMM and the TVM. This 
-module extends the TCB chain on the AP-TEE platform.
+module extends the TCB chain on the CoVE platform.
 
 | RoT | Isolated HW/SW subsystem with an immutable ROM firmware and 
 isolated compute and memory elements that form the Trusted Compute Base 
@@ -72,7 +72,7 @@ and may take on the role of a Device Identification Composition Engine
 (DICE) as defined in <<R2>>.
 
 | TEE-capable memory | Memory that provides access-control, confidentiality 
-and integrity suitable per the threat model for use in the AP-TEE system. 
+and integrity suitable per the threat model for use in the CoVE system. 
 TEE-capable memory may also be used by untrusted software with appropriate 
 TCB controls on the configuration.
 
