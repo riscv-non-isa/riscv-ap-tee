@@ -1,187 +1,296 @@
 [[threatmodel]]
 === Adversary Model
 
-_Unprivileged Software adversary -_ This includes software executing in 
-U-mode managed by S/HS/M-mode system software. This adversary can access 
-U-mode CSRs, process/task memory, CPU registers in the process context 
+_Unprivileged Software adversary -_ This includes software executing in
+U-mode managed by S/HS/M-mode system software. This adversary can access
+U-mode CSRs, process/task memory, CPU registers in the process context
 managed by system software.
 
-_System Software adversary_ - This includes system software executing in 
-S/HS/VS modes. Such an adversary can access S/HS/VS privileged CSRs, 
+_System Software adversary_ - This includes system software executing in
+S/HS/VS modes. Such an adversary can access S/HS/VS privileged CSRs,
 assigned system memory, CPU registers and IO devices.
 
-_Startup Software adversary_ - This includes system software executing in 
-early/boot phases of the system (in M-mode), including BIOS, memory 
-configuration code, device option ROM/firmware that can access system 
+_Startup Software adversary_ - This includes system software executing in
+early/boot phases of the system (in M-mode), including BIOS, memory
+configuration code, device option ROM/firmware that can access system
 memory, CPU registers, IO devices and IOMMU etc.
 
-_Simple Hardware_ _adversary_ __ - This includes adversaries that can use 
-hardware attacks such as bus interposers to snoop on memory/device 
-interfaces, voltage/clock glitching, observe electromagnetic and other 
-radiation, analyze power usage through instrumentation/tapping of power 
-rails, etc. which may give the adversary the ability to tamper with data in 
+_Simple Hardware_ _adversary_ __ - This includes adversaries that can use
+hardware attacks such as bus interposers to snoop on memory/device
+interfaces, voltage/clock glitching, observe electromagnetic and other
+radiation, analyze power usage through instrumentation/tapping of power
+rails, etc. which may give the adversary the ability to tamper with data in
 memory.
 
-_Advanced Hardware adversary_ - This includes adversaries that can use 
-advanced hardware attacks, with unlimited physical access to the devices, 
-and use mechanisms to tamper-with/reverse-engineer the hardware TCB e.g., 
-extract keys from hardware, using capabilities such as scanning electron 
-microscopes, fib attacks etc. 
+_Advanced Hardware adversary_ - This includes adversaries that can use
+advanced hardware attacks, with unlimited physical access to the devices,
+and use mechanisms to tamper-with/reverse-engineer the hardware TCB e.g.,
+extract keys from hardware, using capabilities such as scanning electron
+microscopes, fib attacks etc.
 
-_Side/Covert Channel Adversary_ - This includes adversaries that may 
-leverage any explicit/implicit shared state (architectural or 
-micro-architectural) to leak information across privilege boundaries via 
-inference of characteristics from the shared resources (e.g. caches, branch 
-prediction state, internal micro-architectural buffers, queues). Some 
-attacks may require use of high-precision timers to leak information. A 
-combination of system software and hardware adversarial approaches may be 
+_Side/Covert Channel Adversary_ - This includes adversaries that may
+leverage any explicit/implicit shared state (architectural or
+micro-architectural) to leak information across privilege boundaries via
+inference of characteristics from the shared resources (e.g. caches, branch
+prediction state, internal micro-architectural buffers, queues). Some
+attacks may require use of high-precision timers to leak information. A
+combination of system software and hardware adversarial approaches may be
 utilized by this adversary.
 
 === Threat Model
 
-T1: Loss of confidentiality of TVMs and TSM memory via in-scope adversaries 
+T1: Loss of confidentiality of TVMs and TSM memory via in-scope adversaries
 that may read TSM/TVM memory via CPU accesses
 
-T2: Tamper/content-injection to TVM and TSM memory from in-scope 
+T2: Tamper/content-injection to TVM and TSM memory from in-scope
 adversaries that may modify TSM/TVM memory via CPU side accesses
 
-T3: Tamper of TVM/TSM memory from in-scope adversaries via software-induced 
+T3: Tamper of TVM/TSM memory from in-scope adversaries via software-induced
 row-hammer attacks on memory
 
-T4: Malicious injection of content into TSM/TVM execution context using 
+T4: Malicious injection of content into TSM/TVM execution context using
 physical memory aliasing attacks via system firmware adversary
 
-T5: Information leakage of workload data via CPU registers, CSRs via 
+T5: Information leakage of workload data via CPU registers, CSRs via
 in-scope adversaries
 
-T6: Incorrect execution of workload via runtime modification of CPU 
+T6: Incorrect execution of workload via runtime modification of CPU
 registers, CSRs, mode switches via in-scope adversaries
 
 T7: Invalid code execution or data injection/replacement via G-stage
 paging remap attacks via system software adversary
 
-T8: Malicious asynchronous interrupt injection or dropped leading to 
+T8: Malicious asynchronous interrupt injection or dropped leading to
 information leakage or incorrect execution of the TEE
 
-T9: Malicious manipulation of time read from the virtualized time CSRs 
+T9: Malicious manipulation of time read from the virtualized time CSRs
 causing invalid execution of TVM workload
 
-T10: Loss of Confidentiality via DMA access from devices under adversary 
+T10: Loss of Confidentiality via DMA access from devices under adversary
 control e.g. via manipulation of IOMMU programming
 
-T11: Loss of Confidentiality from devices assigned to a TVM. Devices bound 
+T11: Loss of Confidentiality from devices assigned to a TVM. Devices bound
 to a TVM must enforce similar properties as the TEE hosted on the platform.
 
-T12: Content injection, exfiltration or replay (within and across TEE 
-memory) via hardware approaches, including via exposed interface/links to 
+T12: Content injection, exfiltration or replay (within and across TEE
+memory) via hardware approaches, including via exposed interface/links to
 other CPU sockets, memory and/or devices assigned to a TVM
 
-T13: Downgrading TEE TCB elements (example TSM-driver, TSM) to older 
-versions or loading Invalid TEE TCB elements on the platform to enable 
+T13: Downgrading TEE TCB elements (example TSM-driver, TSM) to older
+versions or loading Invalid TEE TCB elements on the platform to enable
 confidentiality, integrity attacks
 
-T14: Leveraging transient execution side-channel attacks in TSM-driver, 
-TSM, TVM, host OS/VMM or non-confidential workloads to leak confidential 
+T14: Leveraging transient execution side-channel attacks in TSM-driver,
+TSM, TVM, host OS/VMM or non-confidential workloads to leak confidential
 data e.g. via shared caches, branch predictor poisoning, page-faults.
 
-T15: Leveraging architectural side-channel attacks due to shared cache and 
+T15: Leveraging architectural side-channel attacks due to shared cache and
 other shared resources e.g. via prime/probe, flush/reload approaches
 
-T16: Malicious access to ciphertext with known plaintext to launch a 
-dictionary attack on TVMs or TSM or trusted firmware to extract 
+T16: Malicious access to ciphertext with known plaintext to launch a
+dictionary attack on TVMs or TSM or trusted firmware to extract
 confidential data.
 
-T17: Tamper of TVM state during migration of a TEE workload assets within 
-the platform or from one platform to another. 
+T17: Tamper of TVM state during migration of a TEE workload assets within
+the platform or from one platform to another.
 
 T18: Forging of attestation evidence and sealed data associated with a TVM.
 
-T19: Stale TLB translations (for U/HS mode or for VU/VS) created during TSM 
-or TVM operations are used to execute malicious code in the TVM (or consume 
+T19: Stale TLB translations (for U/HS mode or for VU/VS) created during TSM
+or TVM operations are used to execute malicious code in the TVM (or consume
 stale/invalid data)
 
-T20: Isolation of performance monitoring and/or debug state for a TVM 
-leading to information loss via performance monitoring events/counters and 
+T20: Isolation of performance monitoring and/or debug state for a TVM
+leading to information loss via performance monitoring events/counters and
 debug mode accessible information.
 
 T21: A TVM causes a denial of service on the platform
 
 [NOTE]
 ====
-This is not an exhaustive list and will be updated on a regular basis as attacks evolve._
+This threat model is not an exhaustive list and will be updated (via the RISC-V
+Security Model specification <<R21>>) on a regular basis as attacks evolve.
 ====
 
 === Scope
 
-This specification does not prescribe the scope of mitigation and focusses 
-on the TEEI interface and use-of/impact-on the RISC-V ISA. It is 
-recommended that implementations of this reference architecture address 
-threats from system software adversaries. Implementations may choose to 
-mitigate threats from additional adversaries. For all cases, denial of 
-service by TVMs must be prevented. At the same time, denial of service by 
+This specification does not prescribe the scope of mitigation and focusses
+on the TEEI interface and use-of/impact-on the RISC-V ISA. It is
+recommended that implementations of this reference architecture address
+threats from system software adversaries. Implementations may choose to
+mitigate threats from additional adversaries. For all cases, denial of
+service by TVMs must be prevented. At the same time, denial of service by
 host software is considered out of scope.
 
 [[design_survey]]
-=== TVM Security Requirements to address threat model 
+=== TVM Security Requirements to address threat model
 
 |===
-| Category  |  Security Criteria  |  CoVE Requirement |  Example methods to meet requirement | Description/Example | RVI HC/SIG/TG owner 
+| *Category*  |  *Security Criteria*  |  *CoVE Requirement* |  *Example methods
+ to meet requirement* | *Description / Example* | *RVI normative or
+non-normative Reference*
 
-| Memory Footprint | Stolen/reserved memory | Implementation-specific | Minimize reserved memory | Recording meta data of secure memory | AP-TEE TG to specify
+| Memory Assignment | Ability to make memory confidential or non-confidential |
+Required | MMU, MPU, MTT | Confidential memory should be dynamically allocated/
+unallocated as required | RISC-V Priv. ISA, Smmtt
 
-| Memory Assignment | Ability to make memory confidential or non-confidential | Required | MMU, MPU, PMA/MTT extension | Confidential memory should be dynamically allocated/unallocated as required | "AP-TEE to specify priv. architecture" 
+| TEE CPU State Protection | State Isolation | Required | Priv. levels (M,S,HS,
+U) and Execution context (ASID, VMID, SDID) | Prevent untrusted code from
+arbitrarily accessing/modifying TEE CPU state | Priv ISA, Sv, Smmtt
 
-| TEE CPU State Protection | State Isolation | Required | Confidential qualifier and privilege levels M S HS U | Prevent untrusted code from arbitrarily accessing/modifying TEE CPU state | AP-TEE TG to specify 
+| Memory Confidentiality | Memory isolation (read) | Required | cryptography
+ and/or MMU, MPU, MTT extension | Prevent untrusted components from reading
+TEE memory | Sv, Smmtt
 
-| Memory Confidentiality | Memory isolation (read)     | Required                | cryptography and/or MMU, MPU, PMA/MTT extension | Prevent untrusted components from reading TEE memory       | AP-TEE TG specify 
-| Memory Confidentiality | Cipher text read prevention | Required                | cryptography and/or MMU, MPU, PMA/MTT extension | Prevent untrusted code from accessing encrypted TEE memory | AP-TEE TG specify 
-| Memory Confidentiality | Per TEE encryption          | Implementation-specific | cryptography and/or MMU, MPU, PMA/MTT extension | Each VM has one or more unique keys                        | AP-TEE TG to recommend 
-| Memory Confidentiality | Memory encryption strength  | Implementation-specific | cryptography                                    | Encryption algorithm and key strength                      | AP-TEE TG to recommend 
-| Memory Confidentiality | Number of encryption keys   | Implementation-specific | cryptography                                    | Number of TEE keys supported                               | AP-TEE TG to recommend 
+| Memory Confidentiality | Cipher text read prevention | Required | cryptography
+ and/or MMU, MPU, MTT extension | Prevent untrusted code from accessing
+encrypted TEE memory | Svpams (Supervisor Domains)
 
-| Memory Integrity | Memory integrity against SW attacks | Required                | MMU, MPU, PMA/MTT extension                     | Prevent SW attacks such as remapping aliasing replay corruption etc.                                      | AP-TEE TG to specify 
-| Memory Integrity | Memory integrity against HW attacks | Implementation-specific | cryptography and/or MMU, MPU, PMA/MTT extension | Prevent HW attacks DRAM-bus attacks and physical attacks that replace TEE memory with tampered / old data | AP-TEE TG to recommend 
-| Memory Integrity | Memory isolation (Write exec)       | Required                | cryptography and/or MMU, MPU, PMA/MTT extension | Prevent TEE from executing from normal memory; Enforce integrity of TEE data on writes                    | AP-TEE TG specify 
-| Memory Integrity | Rowhammer attack prevention         | Implementation-specific | cryptography and/or memory-specific extension   | Prevent untrusted code from flipping bits of TEE memory                                                   | AP-TEE TG to recommend 
+| Memory Confidentiality | Per TEE encryption | Implementation-specific |
+cryptography and/or MMU, MPU, MTT extension | Each VM has one or more
+unique keys  | Svpams (Supervisor Domains)
 
-| Shared Memory | TEE controls data shared with untrusted code | Required                | cryptography and/or MMU, MPU, PMA/MTT extension | Prevent malicious code from exfiltrating information without TEE consent/opt-in | AP-TEE TG to specify 
-| Shared Memory | TEE controls data shared with another TEE    | Implementation-specific | cryptography and/or MMU, MPU, PMA/MTT extension | Ability to securely share memory with another TEE                               | AP-TEE TG to recommend 
+| Memory Confidentiality | Memory encryption strength | Implementation-specific
+| cryptography  | Encryption algorithm and key strength | Security Model
 
-| I/O Protection | DMA protection from untrusted devices | Required                | DMA access-control e.g. IOPMP, IOMMU       | Prevent untrusted peripheral devices from accessing TEE memory | AP-TEE TG to specify 
-| I/O Protection | Trusted I/O from trusted devices      | Implementation-specific | Device attestation, Link protection, IOMMU | Admission control to bind devices to TEEs                      | AP-TEE, IOMMU TG to specify 
+| Memory Confidentiality | Number of encryption keys | Implementation-specific |
+cryptography | Number of TEE keys supported | Security Model
 
-| Secure IRQ | Trusted Interrupts | Required | Secure interrupt files, MMU, MPU, PMA/MTT extension | Prevent IRQ injections that violate priority or masking | AIA AP-TEE to specify 
+| Memory Integrity | Memory integrity against SW attacks | Required | MMU, MPU,
+MTT | Prevent SW attacks such as remapping aliasing replay corruption etc. |
+CoVE ABI
 
-| Secure Timetamp | Trusted timestamps | Required | Confindential mode qualifier for CSR accesses | Ensure TEE have consistent timestamp view | AP-TEE TG specify 
+| Memory Integrity | Memory integrity against HW attacks | Implementation
+specific | cryptography and/or MMU, MPU, MTT extension | Prevent HW attacks
+DRAM-bus attacks and physical attacks that replace TEE memory with tampered /
+old data | Security Model
 
-| Debug & Profile | Trusted performance monitoring unit       | Required | Confidential mode qualifier for perf. mon. counter controls | Ensure TEEs get correct PMU info; prevent data leakage due to PMU information (fingerprint attacks) | AP-TEE, Performance Mon. SIG to specify 
-| Debug & Profile | Debug support                             | Required | Confidential mode qualifier for Sdtrig controls             | Support debug trigger registers for TVM                                                             | AP-TEE, Debug TG to specify
-| Debug & Profile | Authenticated debug (Production device)   | Required | Authorize debug via TEE RoT                           | Ensure hardware debug prob (e.g., JTAG SWD) is disabled in production                               | AP-TEE, Debug TG specify 
+| Memory Integrity | Memory isolation (Write exec) | Required | cryptography
+and/or MMU, MPU, MTT | Prevent TEE from executing from normal memory; Enforce
+integrity of TEE data on writes | CoVE ABI
 
-| Availability | TVM DoS Protection            | Required                | VMM retains ability to interrupt TVM  | Prevent TVM from refusing to exit               | AP-TEE TG specify 
-| Availability | VMM DoS Protection            | Implementation-specific | Not in scope for CoVE               | Prevent untrusted code from refusing to run TEE | Not applicable 
+| Memory Integrity | Rowhammer attack prevention | Implementation-specific |
+cryptography and/or memory-specific extension | Prevent untrusted code from
+flipping bits of TEE memory | Security Model
 
-| Side Channel | Protected address mapping (controlled side channel)         | Required                 | Confidential mode qualifier, cryptography, MMU/MPU, MTT | Similar to memory remapping attacks                                                                 | uSG SIG, AP-TEE to specify 
-| Side Channel | Micro-architectural side channels (branch prediction        | Required                 | uArch state flushing, entropy defenses            | Prevent attacks such as meltdown/spectre (it is difficult to defend agains such attacks in advance) | uSC SIG, AP-TEE specify
-| Side Channel | Control channels, single-step/zero-step attacks             | Required                 | uArch state flushing, entropy defenses            | Prevent interrupt/exception injection (combined with cache side channel to leak sensitive data)     | uSC SIG , AP-TEE specify
-| Side Channel | Architectural cache side channel                            | Implementation-specific  | uArch state flushing, entropy defenses            | Prevent shared resource contention, e.g. attacks prime probe                                        | uSG SIG, AP-TEE to specify
-| Side Channel | Architectural timing side channel                           | Implementation-specific  | data independent operations, uArch state flushing |  Leveraging data dependency timing channels                                                         | uSG SIG, AP-TEE to specify 
+| Shared Memory | TEE controls data shared with untrusted code | Required |
+cryptography and/or MMU, MPU, MTT | Prevent malicious code from exfiltrating
+information without TEE consent/opt-in | CoVE ABI
 
-| Secure and measured boot | Establishes root of trust in support of attestation | Required | RoT unique trust chain for TEE TCB | Enforcing initial firmware authorization and versioning | Security Model TG 
+| Shared Memory | TEE controls data shared with another TEE | Implementation
+specific | cryptography and/or MMU, MPU, MTT | Ability to securely share memory
+with another TEE | CoVE ABI, Svpams
 
-| Attestation | Remote attestation           | Required | HW RoT based PKI (trust assertions) via Internet | Prevent fake hardware and software TCB; Prevent malicious hardware debugging in production. | AP-TEE TG to specify 
-| Attestation | Mutual attestation           | Implementation-specific | S/U mode  | Attestation to another TEE on the same platform | AP-TEE TG specify 
-| Attestation | Remote mutual attestation    | Required | Internet |  Attestation to a relying party on a different platform | AP-TEE TG specify 
-| Attestation | Local attestation            | Implementation-specific | Sealing |  Verification of attestation by TCB | AP-TEE TG specify 
-| Attestation | TCB versioning (and updates) | Required | Mutable firmware where TVM has to opt-in if TCB updates are allowed or not - HW TCB then enforces lower TCB elements are updatable (with apropos controls like SVN) only after that opt-in has been honored. | Allow TCB updates - Prevent TCB rollback | AP-TEE TG specify 
-| Attestation | TCB composition -Single root of trust for msmt. for confidential compute | Required |  How do we express the issue with TCB elements being composed of various elements? e.g. M-mode,  ROT firmware. Perhaps we can only express the requirement of a single root of trust for measurement and reporting | Malicious components introduced in the TCB | AP-TEE TG specify 
-| Attestation | Dynamic vs Static Attestation interop (between platform TCB and TEE TCB) - enforce isolation of the entire trust chain | Required | TEE TCB should not be affected by other TCB reporting chains. TEE TCB is separately reportable and recoverable. | Malicious host tampers with TEE TCB or reporting chain | AP-TEE TG specify
-| Attestation | TCB transparency (and auditability) | Implementation-specific | Mutable firmware | TCB elements reviewable | AP-TEE TG recommend
-| Attestation | Sealing                             | Implementation-specific | HW Rot sealing keys per TVM | Binding of secrets to TEEs | AP-TEE TG specify 
+| I/O Protection | DMA protection from untrusted devices | Required | DMA
+access-control e.g. IOPMP, IOMTT, IOMMU | Prevent untrusted peripheral devices
+from accessing TEE memory | CoVE-IO, IOMMU, IOMTT
 
-| Operational Features | TVM Migration | Implementation-specific | Secure migration of TEEs | Malicious host tampers with TVM assets during migration | Hypervisor SIG, AP-TEE TG specify 
-| Operational Features | TVM Nesting | Implementation-specific |  Nested TEE Workloads | Malicious host tampers with nested VMM policies | Hypervisor SIG, AP-TEE TG specify 
-| Operational Features | Memory introspection/ Scanners | Implementation-specific | Interoperability with security features for TVM workload | Unauthorised security TVM | Security HC to specify   
-| Operational Features | QOS interoperability | Implementation-specific | Interoperability with QoS features for TVM workload | Malicious host uses QoS capabilities as a side-channel | QOS SIG to specify 
-| Operational Features | RAS interoperability | Implementation-specific | Interoperability with RAS features for TVM workload | Malicious host uses RAS capabilities as a side-channel or to cause integrity violations | RAS SIG to specify 
+| I/O Protection | Trusted I/O from trusted devices | Implementation-specific |
+Device attestation, Link protection, IOMMU | Admission control to bind devices
+to TEEs | CoVE-IO, IOMMU
+
+| Secure IRQ | Trusted Interrupts | Required | Secure interrupt files, MMU, MPU,
+ MTT | Prevent IRQ injections that violate priority or masking | Smsdia w/ AIA
+
+| Secure Timetamp | Trusted timestamps | Required | Confidential supervisor
+domain qualifier for CSR accesses | Ensure TEE have consistent timestamp view |
+CoVE ABI
+
+| Debug & Profile | Trusted performance monitoring unit data | Required |
+Confidential supervisor domain context switch of perf. mon. counters  |
+Ensure TEEs get correct PMU info; prevent data leakage due to PMU information
+(fingerprint attacks) | CoVE ABI
+
+| Debug & Profile | Secure External Debug support | Required | Confidential
+supervisor domain qualifier for External debug controls | Support debug trigger
+registers for TVM | Secure Debug, CoVE ABI
+
+| Debug & Profile | Authenticated debug (Production device) | Required |
+Authorize debug via TEE RoT | Ensure hardware debug prob (e.g., JTAG SWD) is
+disabled in production | Secure Debug, CoVE ABI
+
+| Availability | TVM DoS Protection | Required | VMM retains ability to
+interrupt TVM | Prevent TVM from refusing to exit | CoVE ABI, Smsdia
+
+| Availability | VMM DoS Protection | Implementation-specific | Not in scope
+for CoVE | Prevent untrusted code from refusing to run TEE | Not applicable
+
+| Side Channel | Protected address mapping (controlled side channel) | Required
+| Confidential mode qualifier, cryptography, MMU/MPU, MTT | Similar to memory
+remapping attacks | CoVE ABI, Security Model
+
+| Side Channel | Micro-architectural side channels (branch prediction | Required
+| uArch state flushing, entropy defenses | Prevent attacks such as meltdown or
+spectre (it is difficult to defend agains such attacks in advance) | Security
+Model
+
+| Side Channel | Control channels, single-step/zero-step attacks | Required |
+uArch state flushing, entropy defenses | Prevent interrupt/exception injection
+(combined with cache side channel to leak sensitive data) | Security Model
+
+| Side Channel | Architectural cache side channel | Implementation-specific  |
+uArch state flushing, entropy defenses | Prevent shared resource contention,
+e.g. attacks prime probe | Security Model
+
+| Side Channel | Architectural timing side channel | Implementation-specific  |
+data independent execution latency (DIEL) operations, uArch state flushing |
+Leveraging data dependency timing channels | Security Model
+
+| Secure and measured boot | Establishes root of trust in support of attestation
+| Required | RoT unique trust chain for TEE TCB | Enforcing initial firmware
+authorization and versioning | Security Model
+
+| Attestation | Remote attestation | Required | HW RoT based PKI (trust
+assertions) via Internet | Prevent fake hardware and software TCB; Prevent
+malicious hardware debugging in production. | CoVE ABI, Security Model
+
+| Attestation | Mutual attestation | Implementation-specific | S/U mode  |
+Attestation to another TEE on the same platform | CoVE ABI
+
+| Attestation | Remote mutual attestation | Required | Internet |  Attestation
+to a relying party on a different platform | CoVE ABI
+
+| Attestation | Local attestation | Implementation-specific | Sealing |
+Verification of attestation by TCB | Future CoVE ABI
+
+| Attestation | TCB versioning (and updates) | Required | Mutable firmware where
+ TVM has to opt-in if TCB updates are allowed or not - HW TCB then enforces
+lower TCB elements are updatable (with apropos controls like SVN) only after
+that opt-in has been honored. | Allow TCB updates - Prevent TCB rollback |
+CoVE ABI
+
+| Attestation | TCB composition for confidential computing | Required |  Single
+root of trust for measurement and reporting | Malicious components introduced in
+the TCB | CoVE ABI, Security Model
+
+| Attestation | Dynamic vs Static Attestation interop (between platform TCB and
+TEE TCB) - enforce isolation of the entire trust chain | Required | TEE TCB
+should not be affected by other TCB reporting chains. TEE TCB is separately
+reportable and recoverable. | Malicious host tampers with TEE TCB or reporting
+chain | CoVE ABI, Security Model
+
+| Attestation | TCB transparency (and auditability) | Implementation-specific |
+Mutable firmware | TCB elements reviewable | CoVE ABI, Security Model
+
+| Attestation | Sealing | Implementation-specific | HW Rot sealing keys per TVM
+| Binding of secrets to TEEs | CoVE ABI
+
+| Operational Features | TVM Migration | Implementation-specific | Secure
+migration of TEEs | Malicious host tampers with TVM assets during migration |
+Future CoVE ABI
+
+| Operational Features | TVM Nesting | Implementation-specific |  Nested TEE
+Workloads | Malicious host tampers with nested VMM policies | Future CoVE ABI
+
+| Operational Features | Memory introspection | Implementation-specific |
+Interoperability with security features for TVM workload | Unauthorised security
+ TVM | Security Model
+
+| Operational Features | QOS interoperability | Implementation-specific |
+Interoperability with QoS features for TVM workload | Malicious host uses QoS
+capabilities as a side-channel | Security Model
+
+| Operational Features | RAS interoperability | Implementation-specific |
+Interoperability with RAS features for TVM workload | Malicious host uses RAS
+capabilities as a side-channel or to cause integrity violations | Security Model
 |===
