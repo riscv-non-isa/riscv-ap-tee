@@ -1,6 +1,10 @@
 == Contributors
+[.text-justify]
+The proposed CoVE specifications (non-ratified, under discussion) have been
+contributed to directly or indirectly by (in alphabetical order):
 
-The proposed CoVE specifications (non-ratified, under discussion) have been contributed to directly or indirectly by (in alphabetical order):
-
-[%hardbreaks]
-Andrew Bresticker, Andy Dellow, Atish Patra, Atul Khare, Beeman Strong, Dingji Li, Dong Du, Dylan Reid, Guerney Hunt, Jiewen Yao, Kailun Qin, Manuel Offenberg, Nick Kossifidis, Rajnesh Kanwal, Ravi Sahita (Editor <ravi@rivosinc.com>), Samuel Ortiz, Vedvyas Shanbhogue, Yann Loisel 
+[.text-justify]
+Andrew Bresticker, Andy Dellow, Atish Patra, Atul Khare, Beeman Strong, Dingji
+Li, Dong Du, Dylan Reid, Guerney Hunt, Jiewen Yao, Kailun Qin,Manuel Offenberg,
+Nicholas Wood, Nick Kossifidis, Rajnesh Kanwal, Ravi Sahita (Editor), Rob
+Bradford, Samuel Ortiz, Vedvyas Shanbhogue, Yann Loisel
