@@ -2,93 +2,105 @@
 == Glossary
 
 |===
-| Hypervisor or Virtual Machine Monitor (VMM) | HS mode software 
-that manages Virtual Machines by virtualizing hart, guest physical memory and 
-IO resources. This document uses the term VMM and hypervisor interchangeably 
+| Hypervisor or Virtual Machine Monitor (VMM) | HS mode software
+that manages Virtual Machines by virtualizing hart, guest physical memory and
+IO resources. This document uses the term VMM and hypervisor interchangeably
 for this software entity.
 
 | VM | Virtual Machines hosted by a VMM
 
-| Host software | All software elements including type-1 or type-2 HS-mode VMM 
-and OS; U mode user-space VMM tools; ordinary VMs hosted by the VMM that 
-emulate devices. The hosting platform is typically a multi-tenant platform 
+| Host software | All software elements including type-1 or type-2 HS-mode VMM
+and OS; U mode user-space VMM tools; ordinary VMs hosted by the VMM that
+emulate devices. The hosting platform is typically a multi-tenant platform
 that hosts multiple mutually distrusting Tenants.
 
-| Tenant software | All software elements including VS-mode guest kernel 
-software, and guest user-space software (in VU-mode) that are deployed 
+| Tenant software | All software elements including VS-mode guest kernel
+software, and guest user-space software (in VU-mode) that are deployed
 by the workload owner (in a multi-tenant hosting environment).
 
-| Trusted Computing Base (TCB)Also, System/ Platform TCB | The hardware, 
-software and firmware elements that are trusted by a relying party to 
-protect the confidentiality and integrity of the relying parties' workload 
-data and execution against a defined adversary model. In a system with 
-separate processing elements within a package on a socket, the TCB 
-boundary is the package. In a multi-socket system the TCB extends across 
+| Trusted Computing Base (TCB)Also, System/ Platform TCB | The hardware,
+software and firmware elements that are trusted by a relying party to
+protect the confidentiality and integrity of the relying parties' workload
+data and execution against a defined adversary model. In a system with
+separate processing elements within a package on a socket, the TCB
+boundary is the package. In a multi-socket system the TCB extends across
 the socket-to-socket interface, and is managed as one system TCB.
 
 | Application Processor (AP) | APs can support commodity operating systems,
- hypervisors/VMMs and applications software workloads. The AP subsystem 
- may contain several processing units, on-chip caches, and other controllers 
-for interfacing with memory, accelerators, and other fixed-function logic. 
+ hypervisors/VMMs and applications software workloads. The AP subsystem
+ may contain several processing units, on-chip caches, and other controllers
+for interfacing with memory, accelerators, and other fixed-function logic.
 Multiple APs may be used within a logical system.
- 
-| Confidential VM Extension (CoVE)| A set of non-ISA RISC-V extensions that
-enables confidential computing on RISC-V platforms. 
 
-| AP-TEE | Application Processor- Trusted Execution Environment: An execution 
-mode that provides HW-isolation for workload assets when in use (user/ 
-supervisor code/ data) and provides HW-attestable confidentiality and 
-integrity protection against specific attack vectors per a specified 
-adversary and threat model. The term CoVE, TEE and hardware-based TEE are
-also used as synonyms of AP-TEE in this document.
- 
-| Confidential Computing | The protection of data in use by performing 
+| RISC-V Supervisor Domains | RISC-V privileged architecture <<R0>> defines
+the S-mode for execution of supervisor software. S-mode software may optionally
+enable Hypervisor extension to host virtual machines. Typically, there is a
+single supervisor domain of execution with access to all physical memory.
+*Supervisor Domains* <<R20>> is a RISC-V privileged architecture extension to
+support physical address space (memory and devices) isolation for more than one
+supervisor domain. Supervisor domains enable the reduction of the supervisor
+Trusted Computing Base (TCB), with differential access to memory and other
+platform resources e.g. as used in this Confidential VM Extension (CoVE) spec.
+
+| Confidential VM Extension (CoVE)| The set of non-ISA RISC-V ABI extensions
+defined in this specification that enables confidential computing on RISC-V
+platforms. In some deployment models, the CoVE ABI may leverage RISC-V ISA
+extensions specified in the RISC-V Supervisor Domains specification <<R20>>.
+
+| AP-TEE | Application Processor-based Trusted Execution Environment: A
+supervisor domain that provides HW-isolation for workload assets when in use
+(user/supervisor code/data) and provides HW-attestable confidentiality and
+integrity protection against specific attack vectors per a specified
+adversary and threat model. The term CoVE, Confidential Supervisor Domain and
+hardware-based TEE are used as synonyms of AP-TEE in this document.
+
+| Confidential Computing | The protection of data in use by performing
 computation in a Hardware-based TEE.
 
 | TVM | TEE or Confidential VM - A VM instantiation of an confidential workload
 
-| Confidential application or library | A user-mode application or 
-library instantiation in a TVM. The user-mode application may be supported 
-via a trusted runtime. The user-mode library may be hosted by a surrogate 
+| Confidential application or library | A user-mode application or
+library instantiation in a TVM. The user-mode application may be supported
+via a trusted runtime. The user-mode library may be hosted by a surrogate
 process runtime.
 
-| Attestation | The process by which a relying party can assess the 
-security posture of the confidential workload based on verifying a set of 
+| Attestation | The process by which a relying party can assess the
+security posture of the confidential workload based on verifying a set of
 HW-rooted cryptographically-protected evidence.
- 
-| TEE Security Manager (TSM) | HS-mode software module that acts as 
-the trusted (in TCB) intermediary between the VMM and the TVM. This 
+
+| TEE Security Manager (TSM) | HS-mode software module that acts as
+the trusted (in TCB) intermediary between the VMM and the TVM. This
 module extends the TCB chain on the CoVE platform.
 
-| RoT | Isolated HW/SW subsystem with an immutable ROM firmware and 
-isolated compute and memory elements that form the Trusted Compute Base 
-of a TEE system. The RoT manages cryptographic keys and other security 
-critical functions such as system lifecycle and debug authorization. 
-The RoT provides trusted services to other software on the platform such 
-as verified boot, key provisioning, and management, security lifecycle 
-management, sealed storage, device management, crypto services, 
-attestation etc. The RoT may be an integrated or discrete element <<R7>>, 
-and may take on the role of a Device Identification Composition Engine 
+| RoT | Isolated HW/SW subsystem with an immutable ROM firmware and
+isolated compute and memory elements that form the Trusted Compute Base
+of a TEE system. The RoT manages cryptographic keys and other security
+critical functions such as system lifecycle and debug authorization.
+The RoT provides trusted services to other software on the platform such
+as verified boot, key provisioning, and management, security lifecycle
+management, sealed storage, device management, crypto services,
+attestation etc. The RoT may be an integrated or discrete element <<R7>>,
+and may take on the role of a Device Identification Composition Engine
 (DICE) as defined in <<R2>>.
 
-| TEE-capable memory | Memory that provides access-control, confidentiality 
-and integrity suitable per the threat model for use in the CoVE system. 
-TEE-capable memory may also be used by untrusted software with appropriate 
+| TEE-capable memory | Memory that is subject to access-control, confidentiality
+and integrity mechanisms per the threat model for use in the CoVE system.
+TEE-capable memory may also be used by untrusted software with appropriate
 TCB controls on the configuration.
 
-| SVN | Security Version Number - Meta-data about the TCB components 
-that conveys the security posture of the TCB. The SVN is a monotonically 
-increasing version number updated when security changes must be reflected in 
-the attestation. The SVN is hence provided as part of the attestation 
-information as part of the evidence of the TCB in use. The SVN is typically 
-combined with other meta-data elements when evaluating the attestation 
-information. 
+| SVN | Security Version Number - Meta-data about the TCB components
+that conveys the security posture of the TCB. The SVN is a monotonically
+increasing version number updated when security changes must be reflected in
+the attestation. The SVN is hence provided as part of the attestation
+information as part of the evidence of the TCB in use. The SVN is typically
+combined with other meta-data elements when evaluating the attestation
+information.
 
-| CDI | Compound Device Identifier - This value represents the hardware, 
-software and firmware combination measured by the TCB elements transitively. 
-A CDI is the output of a DICE <<R2>> and is passed to the entity which is 
-measured by the previous TCB layer. The CDI is a secret that may be 
-certified to use for attestation protocols. 
+| CDI | Compound Device Identifier - This value represents the hardware,
+software and firmware combination measured by the TCB elements transitively.
+A CDI is the output of a DICE <<R2>> and is passed to the entity which is
+measured by the previous TCB layer. The CDI is a secret that may be
+certified to use for attestation protocols.
 
 | AIA | Advanced Interrupt Architecture
 
