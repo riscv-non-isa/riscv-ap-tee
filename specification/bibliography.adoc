@@ -31,8 +31,7 @@ https://trustedcomputinggroup.org/resource/tcg-glossary/
 * [[[R9,9]]] The RISC-V Advanced Interrupt Architecture Document v0.2.1-draft
 https://github.com/riscv/riscv-aia/releases[https://github.com/riscv/riscv-aia/releases]
 
-* [[[R10,10]]] The RISC-V Nested Acceleration ("NACL") extension
-TODO Add spec link once available[TODO]
+* [[[R10,10]]] The RISC-V Nested Acceleration ("NACL") extension[https://github.com/riscv-non-isa/riscv-sbi-doc/releases/download/v2.0-rc8/riscv-sbi.pdf]
 
 * [[[EAT,11]]] IETF Entity Attestation Token (EAT)
 https://github.com/ietf-rats-wg/eat[https://github.com/ietf-rats-wg/eat]
@@ -60,5 +59,9 @@ https://www.rfc-editor.org/rfc/rfc5280[https://www.rfc-editor.org/rfc/rfc5280]
 
 * [[[X509_DSA,19]]] X.509 Algorithms for DSA and ECDSA
 https://datatracker.ietf.org/doc/rfc5758/[https://datatracker.ietf.org/doc/rfc5758/]
+
+* [[[SupervisorDomains,20]]] RISC-V Supervisor Domain Access Protection[https://github.com/riscv/riscv-smmtt/releases/download/v1.0.4/smmtt-spec.pdf]
+
+* [[[SecurityModel,21]]] RISC-V Platform Security Model[https://github.com/riscv-non-isa/riscv-security-model/releases/download/0.1/riscv-platform-security-model.pdf]
 
 bibliography::[]
