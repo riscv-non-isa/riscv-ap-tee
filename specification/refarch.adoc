@@ -75,7 +75,7 @@ Four aspects of memory isolation are impacted due to this dynamic configurable
 property of the MTT:
 
 ==== Address Translation/Page Walk
-The figure 4 below describes a reference model for memory tracking lookup where
+The figure 2 below describes a reference model for memory tracking lookup where
 the physical address derived from the first and guest stage nested page walk is
 looked up via the MTT configured for the active supervisor domain to get the
 access permissions for the physical address. This lookup should be performed
