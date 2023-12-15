@@ -117,7 +117,7 @@ translation), isolated/confidential memory is required to enforce the
 following security properties:
 
 * TEE Instruction fetch - security property: TVM/TSM must not fetch code
-from untrusted/shared memory
+from untrusted/shared memory (this property must be enforced by the hart e.g. MMU)
 * TEE Paging structure walk - security property: TVM/TSM must not locate
 page tables in untrusted shared memory (for TVM, G-stage walks enforced
 to be in confidential memory by the TSM)
