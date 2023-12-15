@@ -98,7 +98,7 @@ TVM confidential memory regions. For the CoVE reference architecture this TCB
 consists of the HW (MMU, IOMMU, Memory Controller) and the SW/FW elements -
 TSM-driver and the TSM. The TSM-driver is responsible for enforcing isolation of
 confidential memory regions (consisting of multiple pages via MTT) and the TSM
-is respondible for enforcing isolation of confidential memory pages among TVMs
+is responsible for enforcing isolation of confidential memory pages among TVMs
 (via G-stage translation) - pages assigned to the TVM may be exclusively
 accessible to the condidential supervisor domain or may be shared with the
 hosting supervisor domain (e.g. to allow for paravirtualized IO access).
