@@ -107,7 +107,7 @@ hosting supervisor domain (e.g. to allow for paravirtualized IO access).
 ====
 The TSM may manage additional attributes on TVM-assigned pages such as:
 TVM-owner, Page-sub-type, TLB versioning information, Locking semaphore and
-additional metadata etc.This extended memory tracking information managed by the
+additional metadata etc. This extended memory tracking information managed by the
 TSM is referred to as the Extended Memory Tracking Table (EMTT).
 ====
 
