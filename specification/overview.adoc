@@ -98,7 +98,7 @@ designed to be portable across AP-TEE class platforms and interact with the
 machine specific capabilities in the platform through the TEEI. The TSM
 provides an ABI to the OS/VMM which has two aspects: A set of host ABIs known
 as *COVH* that includes functions to manage the lifecycle of the TVM, such as
-creating, adding pages to a TVM, scheduling a TVM for execution, etc. in an
+creating, adding pages to a TVM, scheduling a TVM for execution, etc., in an
 OS/platform agnostic manner. The TSM also provides an ABI to the TVM contexts:
 A set of guest ABIs known as *COVG* that enables the TVM workload to request
 attestation functions, memory management functions or paravirtualized IO.
