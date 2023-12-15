@@ -111,7 +111,7 @@ additional metadata etc.This extended memory tracking information managed by the
 TSM is referred to as the Extended Memory Tracking Table (EMTT).
 ====
 
-==== Handling Implicit, Explicit Accesses
+==== Handling Implicit & Explicit Memory Accesses
 For TVM accesses for instruction fetch and page walks (virtual address
 translation), isolated/confidential memory is required to enforce the
 following security properties:
