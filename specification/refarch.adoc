@@ -28,7 +28,7 @@ This model may be suitable for client/embedded systems.
 
 b. The TSM operates in S/HS mode as a peer supervisor domain manager to the
 hosting supervisor domain which operates in S/HS mode as well. This model uses
-the MTT alongwith Sv and G-stage PT for confidential TVM  isolation. The MTT
+the MTT along with Sv and G-stage PT for confidential TVM isolation. The MTT
 is used to assign physical memory to the Confidential supervisor domain called
 *Confidential* memory and memory accessible to the hosting supervisor domain
 called *Non-Confidential*. MTT allows dynamic programming of the per-domain
