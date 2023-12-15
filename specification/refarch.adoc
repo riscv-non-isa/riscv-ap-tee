@@ -11,7 +11,7 @@ architecture in Figure 1.
 
 === CoVE Memory Isolation
 
-Memory isolation for TVMs are orchestrated by the TSM-driver and the TSM in two
+Memory isolation for TVMs is orchestrated by the TSM-driver and the TSM in two
 phases: the conversion of memory to confidential memory and the assignment of
 confidential memory (alongwith the enforcement of properties on use) to TVMs.
 To enforce isolation across Host and Confidential supervisor domains, CoVE
