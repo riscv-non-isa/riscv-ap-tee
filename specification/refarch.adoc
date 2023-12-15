@@ -388,8 +388,8 @@ There are two facets of TVM and TSM memory isolation that are
 implementation-specific:
 
 *a)* *Isolation from host software access* -  The CPU must enforce
-hardware-based access-control of TSM memory to prevent access from host software
-(VMM and host OS) V=0, HS-mode untrusted code (the hosting supervisor domain).
+hardware-based access-control of TSM memory to prevent access from host supervisor domain components
+(VMM and host OS) V=0, HS-mode untrusted code.
 TEE and TVM address spaces are identified by supervisor domain identifiers
 (Smsdid) to maintain the isolation during access and in internal
 address translation caches, e.g. Hart TLB lookup may be extended with the
