@@ -44,7 +44,7 @@ confidential supervisor domain. TVM memory is by default assigned from
 Confidential memory regions. TVM may be assigned shared memory regions as well.
 The TSM enforces at which stage of the TVM memory may be assigned to the TVM.
 The TSM enforces isolation between TVMs by using the G-stage page table. Figure
-3 below shows the abstract model of isolation:
+1 below shows the abstract model of isolation:
 
 * Hart operating with the confidential supervisor domain context has MTT
 permissions to access Confidential and Non-Confidential memory
