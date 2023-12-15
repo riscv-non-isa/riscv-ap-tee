@@ -105,7 +105,7 @@ attestation functions, memory management functions or paravirtualized IO.
 
 In order to isolate the TVMs from the host OS/VMM and non-confidential VMs,
 the TSM state must be isolated first - this is achieved by enforcing isolation
-for memory assigned to the Supervisor Domain that the TSM occupies - this is
+for memory assigned to the supervisor domain that the TSM occupies - this is
 called the *TSM-memory-region.* The TSM-memory-region is expected to be a
 static region of memory that holds the TSM code and data. This region must be
 access-controlled from all software outside the TCB (e.g. using Smmtt), and may
