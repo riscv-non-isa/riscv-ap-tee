@@ -14,7 +14,7 @@ and hardware TCB.
 
 This specification describes the CoVE architecture which enables a new class
 of hardware-attested trusted execution environment called TEE Virtual Machines
-(TVMs).The TVMs are supported by a hardware-rooted, attestable TCB and its
+(TVMs). The TVMs are supported by a hardware-rooted, attestable TCB and its
 execution state and memory are run-time-isolated from the host OS/VMM and other
 platform software not in the TCB of the TVM. TVMs are protected from a broad
 set of software-based and hardware-based threats per the threat model described
