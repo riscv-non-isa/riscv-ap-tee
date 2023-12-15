@@ -425,7 +425,7 @@ management>>.
 As described above, TVMs can access both classes of memory - isolated memory
 - which has confidentiality and access-control properties for memory exclusive
 to the TVM, and non-confidential memory which is memory accessible to the host
-OS/VMM and is used for untrusted operations (e.g. virt-io, grpc communication
+OS/VMM and is used for untrusted operations (e.g. virtio, gRPC communication
 with the host). If the confidential memory is access-controlled only, the TSM
 and TSM-driver are the authority over the access-control enforcement. If the
 confidential memory is using memory encryption (instead or in addition), the
