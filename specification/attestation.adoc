@@ -80,20 +80,20 @@ The TCB elements for each of them is summarized in the following table:
 
 ==== TVM Measurements
 
-At a high level, a TVM measurement is separated into a set of static
-measurements and a dynamic one.
+At a high level, a TVM measurement is separated into a set of initial
+measurements and a runtime one.
 
-===== Static Measurements
+===== Initial Measurements
 
-TVM static measurements are generated from the CoVE workload TCB elements
+TVM initial measurements are generated from the CoVE workload TCB elements
 involved in the TVM construction. Any TCB element that directly or indirectly
-supports a TVM must be measured into the TVM static measurement registers. Once
+supports a TVM must be measured into the TVM initial measurement registers. Once
 a TVM is finalized, i.e. after the `sbi_tee_host_finalize_tvm()` TH-ABI is
-called, the TVM static measurements must no longer be extended.
+called, the TVM initial measurements must no longer be extended.
 
-Each TVM's static measurements are stored in dedicated measurement registers and
+Each TVM's initial measurements are stored in dedicated measurement registers and
 a CoVE implementation must provide at least 1 and at most 8 of them. The
-static measurement registers cover platform, TSM & TVM specific TCB element
+initial measurement registers cover platform, TSM & TVM specific TCB element
 measurements.
 
 Since they hold TCB elements measurements bound to the platform lifetime, the
@@ -102,11 +102,11 @@ for Measurement (RTM). The TVM measurements must be maintained in TSM
 confidential memory with TVM bound life cycle, effectively making the TSM an
 extended RTM for the TVM.
 
-The static TCB measurement mechanism and storage layout is implementation
-specific. One such possible layout, based on a 6 static measurement registers
+The initial TCB measurement mechanism and storage layout is implementation
+specific. One such possible layout, based on a 6 initial measurement registers
 CoVE implementation may look like the following table:
 
-.Static Measurements Layout Example (6 registers)
+.Initial Measurements Layout Example (6 registers)
 [cols="^1,^3,^5,^1", options="header"]
 |===
 |Register |Usage |TCB Elements |Storage
@@ -145,17 +145,17 @@ CoVE implementation may look like the following table:
      | TSM
 |===
 
-===== Dynamic Measurements
+===== Runtime Measurements
 
-After the TVM is finalized, static measurements are immutable and can no longer
+After the TVM is finalized, initial measurements are immutable and can no longer
 be modified. However, a TVM guest may want to measure some of its software
 components (Guest firmware, kernel OS, additional configuration parameters, etc)
 while it is booting or running.
 
 The TSM optionally provides an interface for TVM guests to extend their
-measurement into dynamic measurement registers. When supporting that feature,
-the TSM must store dynamic measurements separately from the TVM static ones. The
-TSM can use up to 8 dynamic measurement registers for that purpose.
+measurement into runtime measurement registers. When supporting that feature,
+the TSM must store runtime measurements separately from the TVM initial ones. The
+TSM can use up to 17 runtime measurement registers for that purpose.
 
 The TVM measurement extension interface is exposed through the optional TG-ABI
 `sbi_covg_extend_measurement()` FID.
@@ -609,12 +609,12 @@ tvm-token-map = {
    tvm-challenge            ; A TVM guest provided challenge
  ? tvm-identity             ; TVM identity
    tvm-public-key           ; TVM public key
-   tvm-static-measurements  ; TVM static measurements
- ? tvm-dynamic-measurements ; TVM dynamic measurements
+   tvm-initial-measurements ; TVM initial measurements
+ ? tvm-runtime-measurements ; TVM runtime measurements
 }
 ----
 
-The TVM dynamic measurements Claim is optional, all other above described Claims
+The TVM runtime measurements Claim is optional, all other above described Claims
 must be present in the TVM Token.
 
 ====== TVM Challenge Claim
@@ -682,9 +682,9 @@ tvm-public-key = (
 )
 ----
 
-====== TVM Static Measurements Claim
+====== TVM Initial Measurements Claim
 
-The TVM static measurements claim value is the list of all static measurements
+The TVM initial measurements claim value is the list of all initial measurements
 for the TVM. The list must contain at most 8 entries.
 
 Each measurement in the list is a map of the following values:
@@ -698,38 +698,38 @@ generate the component measurement. It is recommended to use one of the IANA
 registered hash algorithm name<<Hash_Algorithm_Names>>.
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
-[title= "TVM Static Measurements Claim"]
+[title= "TVM Initial Measurements Claim"]
 [source,cddl]
 ----
-tvm-static-measurements-label = TBD
+tvm-initial-measurements-label = TBD
 riscv-cove-measurement = {
    1 => uint                   ; Measurement register index
    2 => riscv-cove-hash-type ; Measurement value
    3 => text                   ; Hash algorithm identifier
 }
 
-tvm-static-measurements = (
-   tvm-static-measurements-label => [ 1*8 riscv-cove-measurement ]
+tvm-initial-measurements = (
+   tvm-initial-measurements-label => [ 1*8 riscv-cove-measurement ]
 )
 ----
 
-====== TVM Dynamic Measurements Claim
+====== TVM Runtime Measurements Claim
 
-The TVM dynamic measurements claim value is the list of all dynamic measurements
+The TVM runtime measurements claim value is the list of all runtime measurements
 for the TVM. The list must contain at most 8 entries.
 
 By calling into the `sbi_covg_extend_measurement()` SBI FID, a TVM guest can
 extend TVM measurements after the TVM is finalized. The extended measurement
-values are stored into a set of dynamic measurement registers.
+values are stored into a set of runtime measurement registers.
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
-[title= "TVM Dynamic Measurements Claim"]
+[title= "TVM Runtime Measurements Claim"]
 [source,cddl]
 ----
-tvm-dynamic-measurements-label = TBD
+tvm-runtime-measurements-label = TBD
 
-tvm-dynamic-measurements = (
-   tvm-dynamic-measurements-label => [ 1*8 riscv-cove-measurement ]
+tvm-runtime-measurements = (
+   tvm-runtime-measurements-label => [ 1*17 riscv-cove-measurement ]
 )
 ----
 
