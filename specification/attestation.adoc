@@ -716,7 +716,7 @@ tvm-initial-measurements = (
 ====== TVM Runtime Measurements Claim
 
 The TVM runtime measurements claim value is the list of all runtime measurements
-for the TVM. The list must contain at most 8 entries.
+for the TVM. The list must contain at most 17 entries.
 
 By calling into the `sbi_covg_extend_measurement()` SBI FID, a TVM guest can
 extend TVM measurements after the TVM is finalized. The extended measurement
