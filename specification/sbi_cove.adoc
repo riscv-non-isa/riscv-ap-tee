@@ -1607,7 +1607,7 @@ enum HashAlgorithm {
 #define ATTESTATION_CERTIFICATE_X509 (1 << 1)
 
 #define MAX_INITIAL_MEASUREMENT_REGISTERS 8
-#define MAX_RUNTIME_MEASUREMENT_REGISTERS 17
+#define MAX_RUNTIME_MEASUREMENT_REGISTERS 18
 #define MAX_MEASUREMENT_REGISTERS (MAX_INITIAL_MEASUREMENT_REGISTERS \
                                   + MAX_RUNTIME_MEASUREMENT_REGISTERS)
 
@@ -1656,9 +1656,9 @@ struct MeasurementRegisterDescriptor {
        enum MeasurementType  measurement_type;
 
        /*
-        * This is the TCG PCR index this measurement maps to, as defined in
-        * https://trustedcomputinggroup.org/wp-content/uploads/TCG_PCClient_PFP_r1p05_v23_pub.pdf
-        * Implementations not mapping their measurement registers  to TCG
+        * This is the TCG PCR index this measurement maps to, such as [0~16,23] as defined in
+        * https://trustedcomputinggroup.org/resource/pc-client-specific-platform-firmware-profile-specification/
+        * Implementations not mapping their measurement registers to TCG
         * PCR indexes must use UNMAPPED_TCG_PCR for this value.
         */
        uint8_t tcg_pcr_index;
