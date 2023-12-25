@@ -155,7 +155,7 @@ while it is booting or running.
 The TSM optionally provides an interface for TVM guests to extend their
 measurement into runtime measurement registers. When supporting that feature,
 the TSM must store runtime measurements separately from the TVM initial ones. The
-TSM can use up to 17 runtime measurement registers for that purpose.
+TSM can use up to 18 runtime measurement registers for that purpose.
 
 The TVM measurement extension interface is exposed through the optional TG-ABI
 `sbi_covg_extend_measurement()` FID.
@@ -716,7 +716,7 @@ tvm-initial-measurements = (
 ====== TVM Runtime Measurements Claim
 
 The TVM runtime measurements claim value is the list of all runtime measurements
-for the TVM. The list must contain at most 17 entries.
+for the TVM. The list must contain at most 18 entries.
 
 By calling into the `sbi_covg_extend_measurement()` SBI FID, a TVM guest can
 extend TVM measurements after the TVM is finalized. The extended measurement
@@ -729,7 +729,7 @@ values are stored into a set of runtime measurement registers.
 tvm-runtime-measurements-label = TBD
 
 tvm-runtime-measurements = (
-   tvm-runtime-measurements-label => [ 1*17 riscv-cove-measurement ]
+   tvm-runtime-measurements-label => [ 1*18 riscv-cove-measurement ]
 )
 ----
 
