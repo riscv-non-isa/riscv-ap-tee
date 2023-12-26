@@ -134,7 +134,7 @@ of confidential memory to shared), the TCB must enforce that stale
 translations may not be held to memory yielded by a TVM (and used
 by the host for another TVM or VM or the host).
 These properties are implemented by the TSM in conjunction with
-the HW (e.g. MTT cache invalidations) via the proposed TEEI.
+the HW (e.g. MTT cache invalidations) via the proposed COVH interface.
 
 === TSM initialization
 
@@ -177,7 +177,7 @@ this memory. The per-hart TSM state is used to start TSM execution from a
 known-good state for security routines invoked by the OS/VMM. The per-hart
 TSM state should be stored in pages that form a TSM Hart Control Structure
 (THCS - See <<appendix_a>>) which is initialized as part of the TSM memory
-initialization. The THCS structure definition is part of the TEEI and may
+initialization. The THCS structure definition is part of the COVH ABI and may
 be extended by an implementation, with the minimum state shown in the
 structure. Isolating and establishing the execution state of the TSM is the
 responsibility of the TSM-driver. Saving and restoring the execution
@@ -320,7 +320,7 @@ management, scheduling, or interrupt handling of its own. The TSM is not
 expected
 to issue IPIs itself; the TSM must track if appropriate IPIs are issued by the
 host OS/VMM to track that the required security checks are performed on each
-physical hart (or virtual hart context) as required by specific TEEI flows.
+physical hart (or virtual hart context) as required by specific COVH/G flows.
 
 When the TSM is entered via the TSM-driver (as part of the ECALL [TEECALL]
 - MRET), the TSM starts with sstatus.sie set to 0 i.e. interrupts disabled.
@@ -387,18 +387,25 @@ and the TSM-driver.
 There are two facets of TVM and TSM memory isolation that are
 implementation-specific:
 
-*a)* *Isolation from host software access* -  The CPU must enforce
-hardware-based access-control of TSM memory to prevent access from host supervisor domain components
-(VMM and host OS) V=0, HS-mode untrusted code.
+*a)* *Isolation from host software access* -  For the deployment model (a), 
+the CPU must enforce hardware-based access-control of TSM memory via 
+the G-stage page tables to prevent the guest VMM from accessing TSM 
+memory. For the deployment model (b). The CPU must also similarly enforce
+hardware-based access-control of TSM memory to prevent access from host supervisor 
+domain components (VMM and host OS that operate in V=0, HS-mode) software.
+Since in this deployment model (b), other supervisor domains have access to both 1st
+and G-stage paging hardware, the root security manager (TSM-driver) must use MTT
+to isolate supervisor domain memory. In this deployment model, 
 TEE and TVM address spaces are identified by supervisor domain identifiers
 (Smsdid) to maintain the isolation during access and in internal
 address translation caches, e.g. Hart TLB lookup may be extended with the
 SDID in addition to the ASID, VMID for workloads in the Confidential supervisor
 domain. TVM memory isolation must support sparse memory management
 models and architectural page-sizes of 4KB, 64K, 2MB, 1GB (and optionally
-512GB). The hardware may implement the Smmtt extension, or other approaches may
-be used such as a flat table. The memory tracking table may be enforced at the
-memory controller, or in a page table walker.
+512GB). The hardware may implement the MTT as specified in the Smmtt 
+privileged ISA extension, or other approaches may be used such as a flat 
+table. The memory tracking table may be enforced at the memory controller, 
+or in a page table walker.
 
 *b)* *Isolation against physical/out-of-band access* - The platform TCB may
 provide confidentiality, integrity and replay-protection. This may be
@@ -461,7 +468,9 @@ reporting when probe-debug is authorized vs when the platform is not under
 probe-debug mode. The probe-mode debug authorization process must invalidate
 sealed keys to disallow sealed data access when in probe-debug modes. Note that
 the external debug opt-in control for the hosting supervisor domain must be
-independent from the confidential supervisor domain.
+independent from the confidential supervisor domain. Similarly, external debug 
+controls should be independently managed by the RoT to allow for root security 
+manager (TSM-driver) debug.
 
 When a TVM is under self-hosted debugging - on a transition to TVM
 execution, the TSM-driver must set up the trigger CSRs for the TVM. For TVM
@@ -484,9 +493,11 @@ The TVM may opt-in to use performance monitoring either at initialization or
 post-initialization of the TVM.
 
 If the TVM has opted-in to performance monitoring, the TSM may invoke the
-SBI PMU extension (via TSM-driver) or Supervisor counter delegation extension to
-establish a TVM-specific performance monitoring controls (counters, event
-selectors). However, the TVM must use SBI PMU extension unless TSM supports full
+SBI PMU extension (via TSM-driver) or use M-mode counter delegation 
+(Smcdeleg) and Supervisor counter configuration (Ssccfg) extensions to
+establish TVM-specific controls and configuration that allows performance 
+monitoring in a TVM. However, the TVM must use SBI PMU extension unless 
+TSM supports full
 trap & emulate support for the hpmcounter related ISA extensions. The TSM will
 assign a virtual counter to the TVM for the events requested to be monitored by
 the TVM in either approach. The TSM needs to manage a mapping between the
