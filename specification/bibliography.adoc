@@ -52,7 +52,7 @@ https://datatracker.ietf.org/doc/rfc9052/[https://datatracker.ietf.org/doc/rfc90
 https://www.iana.org/assignments/hash-function-text-names/hash-function-text-names.xhtml[https://www.iana.org/assignments/hash-function-text-names/hash-function-text-names.xhtml]
 
 * [[[TCG_Client,17]]] TCG PC Client Platform Profile
-https://trustedcomputinggroup.org/wp-content/uploads/TCG_PCClient_PFP_r1p05_v23_pub.pdf
+https://trustedcomputinggroup.org/resource/pc-client-specific-platform-firmware-profile-specification/
 
 * [[[X509,18]]] X.509 Certificate Profile
 https://www.rfc-editor.org/rfc/rfc5280[https://www.rfc-editor.org/rfc/rfc5280]

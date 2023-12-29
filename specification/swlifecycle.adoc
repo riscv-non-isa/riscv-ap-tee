@@ -41,7 +41,7 @@ The VMM may assign memory to the TVM via a sequence of `sbi_covh_add_tvm_page_ta
 grants memory pages that are to contain second-stage paging structures entries that translate a
 TVM guest physical address to the system physical address, while the latter two are used to hold
 TVM data and is referenced by the hgatp leaf page table entries. For pages added to the TVM, the
-VMM must invoke `sbi_covh_add_tvm_measured_pages()` which extends the static measurement
+VMM must invoke `sbi_covh_add_tvm_measured_pages()` which extends the initial measurement
 hash of the TVM. The hash will be used by the TSM to generate the attestation report (evidence) when
 requested by a challenger (relying party). Note that if the measurement steps are executed by
 the VMM in an incorrect order the final measurements will be different and flagged during
@@ -55,7 +55,7 @@ may be lazily added to the TVM subsequent to the TVM execution using the
 
 Lastly, the VMM can assign memory to the TVM to hold virtual hart state in 
 `sbi_covh_create_tvm_vcpu()` TEECALL. Before the VMM can start 
-executing the TVM virtual harts, the VMM must finalize the static 
+executing the TVM virtual harts, the VMM must finalize the initial 
 measurement of the TVM via `sbi_covh_finalize_tvm()`. The TSM prevents any 
 TVM virtual harts from being entered until the TVM initialization is 
 finalized. 
@@ -122,7 +122,7 @@ provide attestation evidence that the TVM is executing as a HW-rooted TEE.
 The TVM code may in response request a TSM-signed (hence HW-measurement 
 rooted) attestation evidence via `sbi_covg_get_evidence()` - this evidence 
 structure contains signed hash of the TVM measurements (including the 
-run-time and static measurements) and is replay-protected via a TVM 
+runtime and initial measurements) and is replay-protected via a TVM 
 (challenger) provided nonce as part of the signed evidence. 
 
 The TSM enforces specific security checkpoints during TVM execution - it 
@@ -162,7 +162,7 @@ The following are the security requirements/invariants for enforcement of
 memory access-control for memory assigned to the TVMs. These rules are enforced 
 by the TSM and the CPU MMU:
 
-. Contents of a TVM page assigned (statically measured or lazy-initialized) 
+. Contents of a TVM page assigned (initially measured or lazy-initialized) 
 to the TVM is bound to the Guest PA assigned to the TVM during TVM operation.
 . A TVM page can only be assigned to a single TVM, and mapped via a single 
 GPA unless aliases are allowed in which case, such aliases must be tracked 
@@ -334,7 +334,7 @@ VMM uses the sbi_covh_add_tvm_zero/measured_pages interfaces to add a 4KB/2MB/1G
 page to the TVM. The page assigned to the TVM is identified by its PA. A source 
 page (also PA) may be provided to initialize the page contents. In this case, 
 the TVM initialization must not have been committed by the VMM, and the contents of 
-the page and the GPA selected by the VMM are measured into the TVM (static) measurement. 
+the page and the GPA selected by the VMM are measured into the TVM (initial) measurement. 
 If the contents of the page are not specified, which is allowed post-finalization of the TVM, 
 the TSM zero's the page during initialization. The guest physical address (GPA) to the 
 selected page physical address (PA) is specified in the add operation by the VMM. 
