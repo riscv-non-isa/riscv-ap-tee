@@ -4,23 +4,26 @@
 _Unprivileged Software adversary -_ This includes software executing in
 U-mode managed by S/HS/M-mode system software. This adversary can access
 U-mode CSRs, process/task memory, CPU registers in the process context
-managed by system software.
+managed by system software. With user space I/O an Unprivileged software
+adversary may also have ability to submit requests to I/O devices made 
+available by system software for U-mode access.
 
 _System Software adversary_ - This includes system software executing in
 S/HS/VS modes. Such an adversary can access S/HS/VS privileged CSRs,
-assigned system memory, CPU registers and IO devices.
+assigned system memory, CPU registers, IOMMU(s) and IO devices.
 
 _Startup Software adversary_ - This includes system software executing in
 early/boot phases of the system (in M-mode), including BIOS, memory
 configuration code, device option ROM/firmware that can access system
-memory, CPU registers, IO devices and IOMMU etc.
+memory, CPU registers, IOMMU(s), IO devices and platform configuration 
+registers (e.g., address range decoders, SoC fabric configuration, etc.).
 
-_Non-invasive Hardware adversary_ __ - This includes adversaries that can use
-non-invasive hardware attacks such as bus interposers to snoop on memory/device
-interfaces, voltage/clock glitching, observe electromagnetic and other
-radiation, analyze power usage through instrumentation/tapping of power
-rails, etc. which may give the adversary the ability to tamper with data in
-memory.
+_Non-invasive Hardware adversary_ - This includes adversaries that can use
+non-invasive (requiring no physical change to the target hardware) attacks 
+such as bus interposers to snoop on memory and/or device interfaces, 
+voltage and/or clock glitching, observe electromagnetic and other radiation, 
+analyze power usage through instrumentation/tapping of power rails, etc. 
+which may then give the adversary the ability to tamper with data in use.
 
 _Invasive Hardware adversary_ - This includes adversaries that can use
 invasive hardware attacks, with unlimited physical access to the devices,
@@ -115,7 +118,7 @@ Security Model specification <<R21>>) on a regular basis as attacks evolve.
 
 This specification describes the threats that a system implementing CoVE should
 address, however, it does not prescribe the scope of mitigations; instead it
-focusses on mitigations enabled via the COVH/G interface via the underlying use
+focusses on mitigations enabled via the COVH/G interface and the use
 of the RISC-V ISA (and extensions such as Smmtt). This specification also
 provides recommendations that implementations of this reference CoVE
 architecture must address per their chosen scope of adversaries from the list of
@@ -150,9 +153,13 @@ TEE memory | Sv, Smmtt
  and/or MMU, MPU, MTT extension | Prevent non-TCB components from accessing
 encrypted TEE memory | Svpams (Supervisor Domains)
 
-| Memory Confidentiality | Per TEE encryption | Implementation-specific |
-cryptography and/or MMU, MPU, MTT extension | Each VM has one or more
-unique keys  | Svpams (Supervisor Domains)
+| Memory Confidentiality | TEE encryption | Implementation-specific |
+Cryptography and/or MMU, MPU, MTT extension | TEE memory confidentiality 
+against logical attacks via MMU; additionally address physical attacks via 
+cryptography. If cryptography used, TEE should have a unique encryption key; 
+each TEE VM may may also have one or more unique keys. Also see related 
+requirements around ciphertext disclosure and memory integrity  | Svpams 
+(Supervisor Domains)
 
 | Memory Confidentiality | Memory encryption strength | Implementation-specific
 | cryptography  | Encryption algorithm and key strength | Security Model
@@ -193,7 +200,7 @@ from accessing TEE memory | CoVE-IO, IOMMU, IOMTT
 Implementation-specific | Device attestation, Link protection, IOMMU |
 Admission control to bind devices to TEEs | CoVE-IO, IOMMU
 
-| Secure IRQ | Trusted Interrupts | Required | Secure interrupt files, MMU, MPU,
+| Interrupts | Trusted (no spoofing/tampering/dropped) Interrupts | Required | Secure interrupt files, MMU, MPU,
  MTT | Prevent IRQ injections that violate priority or masking | Smsdia w/ AIA
 
 | Secure Timetamp | Trusted timestamps | Required | Confidential supervisor
@@ -219,21 +226,33 @@ interrupt TVM | Prevent TVM from refusing to exit | CoVE ABI, Smsdia
 | Availability | VMM DoS Protection | Implementation-specific | Not in scope
 for CoVE | Prevent non-TCB components from refusing to run TEE | Not applicable
 
-| Side Channel | Protected address mapping (controlled side channel) | Required
-| Confidential mode qualifier, cryptography, MMU/MPU, MTT | Similar to memory
-remapping attacks | CoVE ABI, Security Model
+| Side Channel | Address mapping caches (controlled side channel) | Required
+| Confidential mode qualifier, MMU/MPU, MTT | HW/SW TCB should use 
+tagging/ partitioning/ flushing techniques to address those types of side 
+channels due to temporal/spatial shared resources | CoVE ABI, Security Model
 
-| Side Channel | Micro-architectural side channels (branch prediction | Required
-| uArch state flushing, entropy defenses | Prevent attacks such as meltdown or
-spectre (it is difficult to defend against such attacks in advance) | Security
-Model
+| Side Channel | Transient-execution attack (TEA) side channels | Implementation-specific
+| * Bounds check bypass TEA and variants - should be addressed by TVM software 
+using apropos synchronization. TCB SW should use synchronization to isolate TCB code 
+from non-TCB code.
+* Branch target injection TEA and variants - should be addressed by TCB SW via 
+flushing across privilege boundaries to remove untrusted state injected by 
+non-TCB software
+* Speculative store bypass TEA and variants - should be addressed by TCB HW 
+via synchronization/barriers to prevent speculative execution of memory reads 
+which may allow unauthorized disclosure of information.
+| Implementations should mitigate attacks such as these spectre variants (In 
+practice, it is difficult to defend against such attacks in advance) | 
+Recommendations in Security Model
 
 | Side Channel | Control channels, single-step/zero-step attacks | Required |
-uArch state flushing, entropy defenses | Prevent interrupt/exception injection
+leverage HW/SW TCB mechanisms to enforce restrictions on single-stepping 
+or zero-stepping via use of state flushing/barriers, entropy defenses and 
+detection mechanisms. | Prevent interrupt/exception injection
 (combined with cache side channel to leak sensitive data) | Security Model
 
 | Side Channel | Architectural cache side channel | Implementation-specific  |
-uArch state flushing, entropy defenses | Prevent shared resource contention,
+cache partitioning-based defenses | Prevent shared resource contention,
 e.g. attacks such as prime probe | Security Model
 
 | Side Channel | Architectural timing side channel | Implementation-specific  |
@@ -244,7 +263,7 @@ Leveraging data dependency timing channels | Security Model
 | Required | RoT unique trust chain for TEE TCB | Enforcing initial firmware
 authorization and versioning | Security Model
 
-| Attestation | Remote attestation | Required | HW RoT based PKI (trust
+| Attestation | Remote attestation | Required | HW-RoT-rooted PKI (trust
 assertions) via Internet | Prevent fake hardware and software TCB; Prevent
 non-TCB hardware debugging in production. | CoVE ABI, Security Model
 
@@ -252,16 +271,17 @@ non-TCB hardware debugging in production. | CoVE ABI, Security Model
 Attestation to another TEE on the same platform | CoVE ABI
 
 | Attestation | Remote mutual attestation | Required | Internet |  Attestation
-to a relying party on a different platform | CoVE ABI
+to a relying party on a different platform. Requires provisioning of the TEEs 
+to act as delegated relying parties | CoVE ABI
 
 | Attestation | Local attestation | Implementation-specific | Sealing |
 Verification of attestation by TCB | Future CoVE ABI
 
 | Attestation | TCB versioning (and updates) | Required | Mutable firmware where
- TVM has to opt-in if TCB updates are allowed or not - HW TCB then enforces
-lower TCB elements are updatable (with apropos controls like SVN) only after
-that opt-in has been honored. | Allow TCB updates - Prevent TCB rollback |
-CoVE ABI
+ TVM has to opt-in at startup if TCB updates are allowed while the TVM is 
+ executing - HW TCB then enforces lower TCB elements are updatable 
+ (with apropos controls like security version enforced) to enforce the 
+ opt-in policy. | Allow TCB updates - Prevent TCB rollback | CoVE ABI
 
 | Attestation | TCB composition for confidential computing | Required |  Single
 root of trust for measurement and reporting | Malicious components introduced in
