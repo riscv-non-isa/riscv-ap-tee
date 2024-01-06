@@ -158,7 +158,7 @@ discovered in a prior version of the TCB layer.
 During platform initialization, HW/FW elements form the RTM that measure the
 TSM-driver. The TSM-driver acts as the RTM for the TSM loaded on the
 platform. The TSM-driver initializes the TSM-memory-region for the TSM -
-this TSM-memory-region must be in TEE-capable memory. The TSM binary may be
+this TSM-memory-region must be in confidential memory. The TSM binary may be
 provided by the OS/VMM which may independently authenticate the binary
 before loading the binary into the TSM-memory-region via the TSM-driver.
 Alternatively, the platform firmware may pre-load the RoT-authenticated TSM binary via the TSM-driver.
