@@ -1,8 +1,8 @@
 [[header]]
-:description: RISC-V AP-TEE: HW-Attested Scalable TEE proposal for RISC-V
+:description: Confidential VM Extension (CoVE) for Confidential Computing on RISC-V platforms
 :company: RISC-V.org
-:revdate: 12/2023
-:revnumber: 0.2
+:revdate: 1/2024
+:revnumber: 0.3
 :revremark: This document is in development. Assume everything can change. See http://riscv.org/spec-state for details.
 :url-riscv: http://riscv.org
 :doctype: book
@@ -36,7 +36,7 @@ endif::[]
 :footnote:
 :xrefstyle: short
 
-= Confidential VM Extension (CoVE) for Confidential Computing on RISC-V platforms 
+= Confidential VM Extension (CoVE) for Confidential Computing on RISC-V platforms
 RISC-V AP-TEE Task Group
 
 // Preamble

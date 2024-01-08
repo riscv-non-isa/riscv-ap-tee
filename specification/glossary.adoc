@@ -18,7 +18,7 @@ that hosts multiple mutually distrusting Tenants.
 software, and guest user-space software (in VU-mode) that are deployed
 by the workload owner (in a multi-tenant hosting environment).
 
-| Trusted Computing Base (TCB)Also, System/ Platform TCB | The hardware,
+| Trusted Computing Base (TCB); Also, System/Platform TCB | The hardware,
 software and firmware elements that are trusted by a relying party to
 protect the confidentiality and integrity of the relying parties' workload
 data and execution against a defined adversary model. In a system with
@@ -42,20 +42,18 @@ supervisor domain. Supervisor domains enable the reduction of the supervisor
 Trusted Computing Base (TCB), with differential access to memory and other
 platform resources e.g. as used in this Confidential VM Extension (CoVE) spec.
 
+| Confidential Computing | The protection of data in use by performing
+computation in a Hardware-based and Attestable Trusted Execution Environment.
+
 | Confidential VM Extension (CoVE)| The set of non-ISA RISC-V ABI extensions
 defined in this specification that enables confidential computing on RISC-V
-platforms. In some deployment models, the CoVE ABI may leverage RISC-V ISA
+platforms. In some deployment models, the CoVE ABI leverages the RISC-V ISA
 extensions specified in the RISC-V Supervisor Domains specification <<R20>>.
-
-| AP-TEE | Application Processor-based Trusted Execution Environment: A
-supervisor domain that provides HW-isolation for workload assets when in use
-(user/supervisor code/data) and provides HW-attestable confidentiality and
+CoVE is a Trusted Execution Environment ABI for Application Processors. A
+supervisor domain that provides HW-isolation for workload data assets when in
+use (user/supervisor code/data) and provides HW-attestable confidentiality and
 integrity protection against specific attack vectors per a specified
-adversary and threat model. The term CoVE, Confidential Supervisor Domain and
-hardware-based TEE are used as synonyms of AP-TEE in this document.
-
-| Confidential Computing | The protection of data in use by performing
-computation in a Hardware-based TEE.
+adversary and threat model.
 
 | TVM | TEE or Confidential VM - A VM instantiation of an confidential workload
 
@@ -83,10 +81,11 @@ attestation etc. The RoT may be an integrated or discrete element <<R7>>,
 and may take on the role of a Device Identification Composition Engine
 (DICE) as defined in <<R2>>.
 
-| TEE-capable memory | Memory that is subject to access-control, confidentiality
-and integrity mechanisms per the threat model for use in the CoVE system.
-TEE-capable memory may also be used by untrusted software with appropriate
-TCB controls on the configuration.
+| Confidential memory | Memory that is subject to access-control,
+confidentiality and integrity mechanisms per the threat model for use in the
+CoVE system. Confidential memory may also be used by non-TCB/
+hosting software with appropriate TCB controls on the configuration,
+e.g a separate key used for TCB and non-TCB elements.
 
 | SVN | Security Version Number - Meta-data about the TCB components
 that conveys the security posture of the TCB. The SVN is a monotonically
