@@ -3,193 +3,204 @@
 [[swlifecycle]]
 == TVM Lifecycle
 
-This section describes the TEEI operations for the lifecycle of a TVM 
+This section describes the TEEI operations for the lifecycle of a TVM
 including the OS/VMM interactions with the TSM.
 
 === TVM build and initialization
 
-The host OS/VMM must be capable of hosting many TVMs on a CoVE-capable 
-platform (limited only by the practical limits of the number of cpus and 
-the amount of memory available on the system). To that end, the TVM should 
-be able to use all of the system memory as TEE-capable memory, as long as 
-the platform access-control mechanisms are applicable to all the available 
-memory on the system. The TSM allows the OS/VMM to manage TEE-capable 
-memory assignment by providing a two stage TEE memory management model.
+The host OS/VMM must be capable of hosting many TVMs on a CoVE-capable
+platform (limited only by the practical limits of the number of cpus and
+the amount of memory available on the system). To that end, the TVM should
+be able to use all of the system memory as confidential memory, as long as
+the platform access-control mechanisms are applicable to all the available
+memory on the system. The TSM allows the OS/VMM to manage the assignment of
+confidential memory by providing a two stage TEE memory management model:
 
-1. Creation of confidential memory regions - this process converts memory 
-pages from non-confidential to confidential memory (and in that process 
-brings TEE-capable memory under TSM-managed memory tracking and encryption 
+1. Creation of confidential memory regions - this process converts memory
+pages from non-confidential to confidential memory (and in that process
+brings confidential memory under TSM-managed memory tracking and encryption
 controls described earlier).
-2. Allocation/Assignment of TEE-capable memory pages from the converted
-confidential memory regions for various purposes like creating TVM workloads etc.
 
-The host OS/VMM may create a new TVM by allocating and initializing a TVM 
-using the `sbi_covh_create_tvm()` function. An initial set of memory pages are 
-granted to the TSM and tracked as TEE pages associated with that TVM from 
-that point onwards until the TVM is destroyed via the `sbi_covh_destroy_tvm()` 
-function. 
+2. Allocation/Assignment of confidential memory pages from the converted
+confidential memory regions for various purposes like creating TVM workloads
+etc.
 
-A TVM context may be created and initialized by using the 
-`sbi_covh_create_tvm()` function - this global init function allocates a 
-set of pages for the TVM global control structure and resets the control 
-fields that are immutable for the lifetime of the TVM e.g. configuration of 
-which RISC-V CPU extensions the TVM is allowed to use, debug and pmon 
-capabilities enabled etc. 
+The host OS/VMM may create a new TVM by allocating and initializing a TVM
+using the `sbi_covh_create_tvm()` function. An initial set of memory pages are
+granted to the TSM and tracked as TEE pages associated with that TVM from
+that point onwards until the TVM is destroyed via the `sbi_covh_destroy_tvm()`
+function.
 
-The VMM may assign memory to the TVM via a sequence of `sbi_covh_add_tvm_page_table_pages()`
-`sbi_covh_add_tvm_measured_pages()` and `sbi_covh_add_tvm_zero_pages()` - the former
-grants memory pages that are to contain second-stage paging structures entries that translate a
-TVM guest physical address to the system physical address, while the latter two are used to hold
-TVM data and is referenced by the hgatp leaf page table entries. For pages added to the TVM, the
-VMM must invoke `sbi_covh_add_tvm_measured_pages()` which extends the initial measurement
-hash of the TVM. The hash will be used by the TSM to generate the attestation report (evidence) when
-requested by a challenger (relying party). Note that if the measurement steps are executed by
-the VMM in an incorrect order the final measurements will be different and flagged during
-attestation. In the initial set of measured TVM pages, the VMM would typically provide the 
-guest firmware, boot loader and boot kernel as well as memory needed for the boot stack, heap
-and memory tracking structures. During `sbi_covh_add_tvm_measured_pages()` & 
-`sbi_covh_add_tvm_zero_pages()`, the memory granted is tracked by the TSM to ensure that
-pages assigned to a TVM may not be assigned to a non-confidential VM or another TVM. The pages
-may be lazily added to the TVM subsequent to the TVM execution using the
-`sbi_covh_add_tvm_zero_pages()`.  
+A TVM context may be created and initialized by using the
+`sbi_covh_create_tvm()` function - this global init function allocates a
+set of pages for the TVM global control structure and resets the control
+fields that are immutable for the lifetime of the TVM e.g. configuration of
+which RISC-V CPU extensions the TVM is allowed to use, debug and pmon
+capabilities enabled etc.
 
-Lastly, the VMM can assign memory to the TVM to hold virtual hart state in 
-`sbi_covh_create_tvm_vcpu()` TEECALL. Before the VMM can start 
-executing the TVM virtual harts, the VMM must finalize the initial 
-measurement of the TVM via `sbi_covh_finalize_tvm()`. The TSM prevents any 
-TVM virtual harts from being entered until the TVM initialization is 
-finalized. 
+The VMM may assign memory to the TVM via a sequence of
+`sbi_covh_add_tvm_page_table_pages()` `sbi_covh_add_tvm_measured_pages()` and
+`sbi_covh_add_tvm_zero_pages()` - the former grants memory pages that are to
+contain second-stage paging structures entries that translate a TVM guest
+physical address to the system physical address, while the latter two are used
+to hold TVM data and is referenced by the hgatp leaf page table entries. For
+pages added to the TVM, the VMM must invoke `sbi_covh_add_tvm_measured_pages()`
+which extends the initial measurement hash of the TVM. The hash will be used by
+the TSM to generate the attestation report (evidence) when requested by a
+challenger (relying party). Note that if the measurement steps are executed by
+the VMM in an incorrect order the final measurements will be different and
+flagged during attestation. In the initial set of measured TVM pages, the VMM
+would typically provide the guest firmware, boot loader and boot kernel as well
+as memory needed for the boot stack, heap and memory tracking structures. During
+`sbi_covh_add_tvm_measured_pages()` & `sbi_covh_add_tvm_zero_pages()`, the
+memory granted is tracked by the TSM to ensure that pages assigned to a TVM may
+not be assigned to a non-confidential VM or another TVM. The pages may be lazily
+added to the TVM subsequent to the TVM execution using the
+`sbi_covh_add_tvm_zero_pages()`.
 
-=== TVM execution 
+Lastly, the VMM can assign memory to the TVM to hold virtual hart state in
+`sbi_covh_create_tvm_vcpu()` TEECALL. Before the VMM can start
+executing the TVM virtual harts, the VMM must finalize the initial
+measurement of the TVM via `sbi_covh_finalize_tvm()`. The TSM prevents any
+TVM virtual harts from being entered until the TVM initialization is
+finalized.
 
-The VMM uses `sbi_covh_run_tvm_vcpu()` to (re)activate a virtual hart for a 
-specific TVM (identified by the unique identifier). This TEECALL traps into 
-the TSM-driver which affects the context switch to the TSM - The TSM then 
+=== TVM execution
+
+The VMM uses `sbi_covh_run_tvm_vcpu()` to (re)activate a virtual hart for a
+specific TVM (identified by the unique identifier). This TEECALL traps into
+the TSM-driver which affects the context switch to the TSM - The TSM then
 manages the activation of the virtual hart on the calling physical hart. During
-this activation the TCB trusted firmware can enforce that 
-stale TLB entries that govern guest physical to system physical page access 
-have been evicted across all hart TLBs. There may also be TLB flushes for 
+this activation the TCB trusted firmware can enforce that
+stale TLB entries that govern guest physical to system physical page access
+have been evicted across all hart TLBs. There may also be TLB flushes for
 the virtual-harts due to VS-stage translation changes (guest virtual to
-guest physical) performed by the TVM OS - these are initiated by the TVM OS 
-to cause IPIs to the virtual-harts managed by the TVM OS (and verified by 
-the TVM OS to ensure the IPIs are received by the TVM OS to invalidate the 
-TLB lazily). This reference architecture requires use of AiA IMSIC <<R9>> 
-to ensure these IPIs are delivered through the IMSIC associated with the 
-guest TVM. Each TVM is allocated a guest interrupt file during TVM 
+guest physical) performed by the TVM OS - these are initiated by the TVM OS
+to cause IPIs to the virtual-harts managed by the TVM OS (and verified by
+the TVM OS to ensure the IPIs are received by the TVM OS to invalidate the
+TLB lazily). This reference architecture requires use of AiA IMSIC <<R9>>
+to ensure these IPIs are delivered through the IMSIC associated with the
+guest TVM. Each TVM is allocated a guest interrupt file during TVM
 initialization.
 
-During TVM execution, the HW enforces TSM-driven policies for memory 
-isolation for confidential memory accessed by the TVM software - the 
-following hardware enforcement is recommended to address the threat model 
+During TVM execution, the HW enforces TSM-driven policies for memory
+isolation for confidential memory accessed by the TVM software - the
+following hardware enforcement is recommended to address the threat model
 described in <<Architecture Overview and Threat Model>>:
 
-* TVM instruction fetches and page walks (both VS/second-stage and 
+* TVM instruction fetches and page walks (both VS/second-stage and
 G/VS-stage) are implicitly enforced to be in confidential memory. This
 requires that the TVM supervisor code should not locate VS-stage page
 tables in non-confidential memory. The TSM enforces that G-stage page
 tables are in confidential memory.
-* TVM access to confidential or non-confidential memory is subject to 
-VS-stage address translation (this is existing). G-stage address 
-translation is enforced via the TSM-managed hgatp with the listed 
-recommendations in <<TSM and TVM Isolation>>. 
+* TVM access to confidential or non-confidential memory is subject to
+VS-stage address translation (this is existing). G-stage address
+translation is enforced via the TSM-managed hgatp with the listed
+recommendations in <<TSM and TVM Isolation>>.
 
 For virtual-IO operations, the TVM code must register virtual-IO memory regions
 for trap and emulation by the host using `sbi_covg_add_mmio_region()`. Any
-read/write by the TVM from/to this memory region will result in a guest page-fault into
-TSM and TSM will forward the fault to the host. TSM will also communicate additional
-information such as faulting instruction, faulting address and the GPR value (in case of
-store instruction) to the host. When direct device assignment is supported (which 
-is expected to require IOMMU changes for CoVE), trusted devices may DMA directly 
-into TVM confidential memory. 
+read/write by the TVM from/to this memory region will result in a guest
+page-fault into TSM and TSM will forward the fault to the host. TSM will also
+communicate additional information such as faulting instruction, faulting
+address and the GPR value (in case of store instruction) to the host. When
+direct device assignment is supported (which is expected to require IOMMU
+changes for CoVE), trusted devices may DMA directly into TVM confidential
+memory.
 
-TVM memory may be lazily granted to the TVM by the host VMM, however confidential 
-memory may be only lazily added via `sbi_covh_add_tvm_zero_pages()` after the
-TVM measurement has been finalized. The TVM manages its internal memory database to indicate
-which guest physical page frames are confidential for mapping into VS-stage 
-mappings. There are at least two use scenarios for this ABI - first, late addition of memory 
-to enable TVM boot with the minimal measured state, and second, if some 
-memory pages were converted to non-confidential by the TVM via 
-`sbi_covg_share_memory_region()`, and at a later point they are converted back to 
-confidential, the VMM may add zero pages for those mappings.
+TVM memory may be lazily granted to the TVM by the host VMM, however
+confidential memory may be only lazily added via
+`sbi_covh_add_tvm_zero_pages()` after the TVM measurement has been finalized.
+The TVM manages its internal memory database to indicate which guest physical
+page frames are confidential for mapping into VS-stage mappings. There are at
+least two use scenarios for this ABI - first, late addition of memory to enable
+TVM boot with the minimal measured state, and second, if some memory pages were
+converted to non-confidential by the TVM via `sbi_covg_share_memory_region()`,
+and at a later point they are converted back to confidential, the VMM may add
+zero pages for those mappings.
 
-During execution and typically during TVM initialization, the TVM code can 
-extend the runtime measurement registers by invoking the 
-`sbi_covg_measurement_extend()` - this allows the TVM to measure the next stage of 
-kernel or application modules that are loaded in the TVM.  
+During execution and typically during TVM initialization, the TVM code can
+extend the runtime measurement registers by invoking the
+`sbi_covg_measurement_extend()` - this allows the TVM to measure the next stage
+of kernel or application modules that are loaded in the TVM.
 
-Also during execution, a remote relying party may challenge the TVM to 
-provide attestation evidence that the TVM is executing as a HW-rooted TEE. 
-The TVM code may in response request a TSM-signed (hence HW-measurement 
-rooted) attestation evidence via `sbi_covg_get_evidence()` - this evidence 
-structure contains signed hash of the TVM measurements (including the 
-runtime and initial measurements) and is replay-protected via a TVM 
-(challenger) provided nonce as part of the signed evidence. 
+Also during execution, a remote relying party may challenge the TVM to
+provide attestation evidence that the TVM is executing as a HW-rooted TEE.
+The TVM code may in response request a TSM-signed (hence HW-measurement
+rooted) attestation evidence via `sbi_covg_get_evidence()` - this evidence
+structure contains signed hash of the TVM measurements (including the
+runtime and initial measurements) and is replay-protected via a TVM
+(challenger) provided nonce as part of the signed evidence.
 
-The TSM enforces specific security checkpoints during TVM execution - it 
-tracks when TLB flushes are required by the VMM to ensure stale TLB entries 
-are not utilized by the TVM. To enforce this property, the TSM requires 
-G-stage page-table mapped confidential TVM memory mapping to be invalidated 
-(effectively ensuring new TLB entries cannot be created) before the pages 
-mapped by the mapping can be relocated, fragmented (for page promotion or 
-demotion) or reclaimed back by the VMM. Then, before the new mappings 
-may be activated, the TSM tracks that the VMM has invoked `sbi_covg_local_fence()` 
-and caused invalidation of the TLB on all virtual harts of the TVM. The VMM achieves 
-this via inter-processor interrupts to all the vcpus for the TVM. The local fence is
-enforced by the TSM by executing HFENCE.GVMA for the TVM VMID. This sequence is described 
-in more detail in <<TVM memory management>>.
+The TSM enforces specific security checkpoints during TVM execution - it
+tracks when TLB flushes are required by the VMM to ensure stale TLB entries
+are not utilized by the TVM. To enforce this property, the TSM requires
+G-stage page-table mapped confidential TVM memory mapping to be invalidated
+(effectively ensuring new TLB entries cannot be created) before the pages
+mapped by the mapping can be relocated, fragmented (for page promotion or
+demotion) or reclaimed back by the VMM. Then, before the new mappings
+may be activated, the TSM tracks that the VMM has invoked
+`sbi_covg_local_fence()` and caused invalidation of the TLB on all virtual
+harts of the TVM. The VMM achieves this via inter-processor interrupts to all
+the vcpus for the TVM. The local fence is enforced by the TSM by executing
+HFENCE.GVMA for the TVM VMID. This sequence is described in more detail in
+<<TVM memory management>>.
 
 === TVM memory management
 
-The RISC-V architecture supports page types of 4KB, 2MB, 1GB and 512GB. 
-The untrusted OS/VMM may assign memory to the TVM at any architecture-supported page size. 
-The TSM configures the memory tracking table (MTT) via the TSM-driver to track the 
-assignment of memory pages to trusted execution contexts (i.e. TVMs). 
+The RISC-V architecture supports page types of 4KB, 2MB, 1GB and 512GB.
+The untrusted OS/VMM may assign memory to the TVM at any architecture-supported
+page size. The TSM configures the memory tracking table (MTT) via the TSM-driver
+to track the assignment of memory pages to TVMs.
 
 Memory access-control is enforced at two levels:
- 
-* Isolation of memory assigned to TEEs - this includes memory assigned to the TSM as
- well as any TVMs - this tracking is configured by the firmware TCB (TSM-driver) 
- via the Memory Tracking Table structure and is enforced by the CPU MMU. The MTT tracks 
- the Confidential | Non-confidential state for a software-accessible physical address.
-* Isolation of memory between TVMs - memory tracking is augmented by the TSM via the 
-G-stage translation structures to maintain compatibility with OS/VMM memory
-management, and is also enforced by the CPU MMU. The correct operation of this 
-access-control level is dependent on trusted enforcement of item 1 above.
+
+* Isolation of memory assigned to TEEs - this includes memory assigned to the
+TSM as well as any TVMs - this tracking is configured by the firmware TCB
+(TSM-driver) via the Memory Tracking Table structure and is enforced by the CPU
+MMU. The MTT tracks the access permissions for confidential supervisor domains
+and hosting supervisor domains for all software-accessible physical memory
+addresses.
+* Isolation of memory between TVMs - memory tracking is augmented by the TSM
+via the G-stage translation structures to maintain compatibility with OS/VMM
+memory management, and is also enforced by the CPU MMU. The correct operation of
+this access-control level is dependent on trusted enforcement of item 1 above.
 
 ==== Security requirements for TVM memory mappings
 
-The following are the security requirements/invariants for enforcement of 
-memory access-control for memory assigned to the TVMs. These rules are enforced 
+The following are the security requirements/invariants for enforcement of
+memory access-control for memory assigned to the TVMs. These rules are enforced
 by the TSM and the CPU MMU:
 
-. Contents of a TVM page assigned (initially measured or lazy-initialized) 
+. Contents of a TVM page assigned (initially measured or lazy-initialized)
 to the TVM is bound to the Guest PA assigned to the TVM during TVM operation.
-. A TVM page can only be assigned to a single TVM, and mapped via a single 
-GPA unless aliases are allowed in which case, such aliases must be tracked 
-by the TSM). Aliases in the virtual address space are under the purview of 
+. A TVM page can only be assigned to a single TVM, and mapped via a single
+GPA unless aliases are allowed in which case, such aliases must be tracked
+by the TSM). Aliases in the virtual address space are under the purview of
 the TVM OS.
 . VS-stage address translation - A TVM page mapping must be translated
 only via VS-stage translation structures which are contained in pages
-assigned to the same TVM. 
+assigned to the same TVM.
 . G-stage address translation:
-  .. A TVM page guest physical address mapping must be translated only via 
+  .. A TVM page guest physical address mapping must be translated only via
 the TSM-managed G-stage translation structures for that TVM.
   .. G-stage structures must not be shared between TVMs, and must not
 refer to any other TVMs pages.
   .. The OS/VMM has no access to TVM G-stage paging structures.
-  .. The OS/VMM may install shared page mappings (via TSM oversight) to 
-non-confidential pages that are not assigned to any TVM or the TSM - this 
+  .. The OS/VMM may install shared page mappings (via TSM oversight) to
+non-confidential pages that are not assigned to any TVM or the TSM - this
 is for example for untrusted IO.
   .. Circular mappings in the G-stage paging structures are disallowed.
-. Access to shared memory pages must be explicitly signaled by the TVM via 
-the GPA and enforced for memory ownership for the TVM by the HW.
+. Access to shared memory pages must be explicitly signaled by the TVM via
+the GPA and enforced for memory access for the TVM by the HW.
 
 ====  Information tracked per physical page
- 
-The Extended Memory Tracking Table (EMTT) information managed by the TSM 
-is used to track additional fields of metadata associated with physical addresses.
-The page size is implicit in the MTT and EMTT lookup - 4KB, 2MB, 1GB, 512GB. Actual 
-page sizes supported are implementation-specified.
+
+The Extended Memory Tracking Table (EMTT) information managed by the TSM
+is used to track additional fields of metadata associated with physical
+addresses.
+The page size is implicit in the MTT and EMTT lookup - 4KB, 2MB, 1GB, 512GB.
+Actual page sizes supported are implementation-specified.
 
 |===
 | *Memory Type* | *Confidential or Non-confidential (enforced via MTT)*
@@ -198,80 +209,83 @@ If the Memory type is Confidential, the following page types may be used:
 * Unassigned - page not assigned to any TEE (TSM or TVM)
 * TVM - page assigned to a TVM (mapped via HGAT).
 * TSM - page used by the TSM (for MTT and other control structures)
-| Page Owner  | If the Memory Type is Confidential and Page-Type is TVM, 
+| Page Owner  | If the Memory Type is Confidential and Page-Type is TVM,
 this value holds the identifier (e.g. PPN) for the TVM control page (4KB TEE-
 TSM-TVM page); else it is 0.
-| Page sub-type | Following types apply If Memory Type is Confidential and 
+| Page sub-type | Following types apply If Memory Type is Confidential and
 Page-Type is TVM:
 * HGATP - pages used for HGATP structures
 * Data - pages used for TVM content
 Following types apply If Memory Type is Confidential and Page-Type is TSM:
 * MTT - pages used for MTT structures
-* TVMC - pages used for TVM control structure(s) for global control 
+* TVMC - pages used for TVM control structure(s) for global control
 * VHCS - pages used for TVM VHCS (virtual hart control structures)
-| Page TLB version | TLB version in which the page mapping was invalidated to allow for 
-VMM memory management. If the page is Unassigned, the TLB version is per the 
-global TLB mgmt. If the page is assigned to a TVM, it is versioned per the 
-TVM-local TLB mgmt.
+| Page TLB version | TLB version in which the page mapping was invalidated to
+allow for VMM memory management. If the page is Unassigned, the TLB version is
+per the global TLB mgmt. If the page is assigned to a TVM, it is versioned per
+the TVM-local TLB mgmt.
 | Additional meta-data | Locking state e.g.
 |===
 
 ==== Page walk and Translation caching considerations
 
-Any caching of the address translation information when the memory tracking for confidential
-memory is enabled must cache whether the address translation is for a TEE context or not.
-A miss in the cached MTT information is expected to cause a lookup of the MTT structure 
-using the PA and the resolved page size for TEE ownership evaluation - which results in the 
-TEE ownership information that is cached.
+Any caching of the address translation information when the memory tracking for
+confidential memory is enabled must cache whether the address translation is for
+a TEE context or not. A miss in the cached MTT information is expected to cause
+a lookup of the MTT structure using the PA and the resolved page size for TEE
+access evaluation - which results in the TEE access information that is cached.
 
-The MTT lookups are performed using the physical address, and must be enforced for all modes 
-of operation i.e., with paging disabled, one-level paging and guest-stage paging. 
- 
-Any MTT cached information may be flushed as part of HFENCE.GVMA. The TSM and VMM may both 
-issue this operation. TSM issues this fence when memory ownership is transferred between 
-TEE and non-TEE ownership via sbi_covh_convert_pages.
- 
+The MTT lookups are performed using the physical address, and must be enforced
+for all modes of operation i.e., with paging disabled, one-level paging and
+guest-stage paging.
+
+Any MTT cached information may be flushed as part of HFENCE.GVMA. The TSM and
+VMM may both issue this operation. TSM issues this fence when memory access
+is transferred between TEE and non-TEE domains via sbi_covh_convert_pages.
+
 ==== Page conversion
 
-Post measured boot, the system memory map must be available to the TSM on load 
-(accessed as part of initialization of the TSM). This memory map structure may be placed 
-in the memory that is accessible only to the HW and SW TCB. VMM chosen memory regions must 
-be a strict subset of this set of memory regions. Memory regions used for the TSM are 
-marked as reserved by the TSM-driver in this memory map - the TSM uses its memory space 
-to host an Extended MTT (EMTT).
+Post measured boot, the system memory map must be available to the TSM on load
+(accessed as part of initialization of the TSM). This memory map structure may
+be placed in the memory that is accessible only to the HW and SW TCB. VMM-chosen
+memory regions must be a strict subset of this set of memory regions. Memory
+regions used for the TSM are marked as reserved by the TSM-driver in this memory
+map - the TSM uses its memory space to host an Extended MTT (EMTT).
 
 The operations used by the host for page conversion are:
 
-* sbi_covh_convert_pages: This operation initiates TLB version tracking of pages in 
-the region being converted to confidential. The TSM enforces that the VMM performs 
-invalidation of all harts (via IPIs and subsequent `sbi_covh_local_fence()`) to remove 
-any cached mappings to the memory regions invalidated for conversion via 
-the `sbi_covh_convert_pages()`. 
-* sbi_covh_local_fence: This operation completes the TLB version tracking of pages 
-in the region being converted to confidential. The TSM tracks that all available 
-physical harts have executed this operation before it considers the TLB version 
-updated. The last local fence completes the conversion of a memory region from 
-non-confidential to confidential for a set of TVM pages.
-* sbi_covh_reclaim_pages: VMM may unassign memory for TVMs by destroying them. 
-All confidential-unassigned memory may be reclaimed back as nonconfidential using 
-this interface.
- 
-*Conversion Operation*: TSM uses the EMTT which maps each assignable (non-reserved) PA to page_owner, type, 
-sub-type and other fields such as page_tlb_version. 
-Page conversion involves the following steps by the TSM:
+* sbi_covh_convert_pages: This operation initiates TLB version tracking of
+pages in the region being converted to confidential. The TSM enforces that the
+VMM performs invalidation of all harts (via IPIs and subsequent
+`sbi_covh_local_fence()`) to remove any cached mappings to the memory regions
+invalidated for conversion via the `sbi_covh_convert_pages()`.
+* sbi_covh_local_fence: This operation completes the TLB version tracking of
+pages in the region being converted to confidential. The TSM tracks that all
+available physical harts have executed this operation before it considers the
+TLB version updated. The last local fence completes the conversion of a memory
+region from non-confidential to confidential for a set of TVM pages.
+* sbi_covh_reclaim_pages: VMM may unassign memory for TVMs by destroying them.
+All confidential-unassigned memory may be reclaimed back as nonconfidential
+using this interface.
+
+*Conversion Operation*: TSM uses the EMTT which maps each assignable
+(non-reserved) PA to page_owner, type, sub-type and other fields such as
+page_tlb_version. Page conversion involves the following steps by the TSM:
 
 * Verify page(s) donated by the VMM is/are Non-Confidential page(s)
-* Initiates a new TLB version tracking cycle via `sbi_covh_convert_pages()` - invalidates MTT 
-entries (synchronized) for the requested page(s) and size as pages being converted 
-to confidential (i.e. "in transition")
-* TSM enforces a TLB versioning scheme (described below) and using that enforces that the 
-VMM performs the invalidation of the hart TLBs (via IPIs) to remove any cached mappings - 
-VMM performs a local fence operation on each hart via the `sbi_covh_local_fence()`. 
-* At the last fence operation, TSM verifies that TLB fence was completed for all 
-harts for the batch of pages selected for conversion, and marks those mappings as 
-usable as confidential memory.
-* At this point non-TEE mode software cannot create new TLB entries to donated pages - 
-since non-TEE mode accesses to MTT-tracked Confidential pages will fault (including implicit accesses)
+* Initiates a new TLB version tracking cycle via `sbi_covh_convert_pages()` -
+invalidates MTT entries (synchronized) for the requested page(s) and size as
+pages being converted to confidential (i.e. "in transition")
+* TSM enforces a TLB versioning scheme (described below) and using that
+enforces that the VMM performs the invalidation of the hart TLBs (via IPIs) to
+remove any cached mappings - VMM performs a local fence operation on each hart
+via the `sbi_covh_local_fence()`.
+* At the last fence operation, TSM verifies that TLB fence was completed for all
+harts for the batch of pages selected for conversion, and marks those mappings
+as usable as confidential memory.
+* At this point non-TCB/hosting supervisor domain software cannot create new
+TLB entries to donated pages - since host software accesses to confidential
+memory pages will fault (including implicit accesses)
 
 ==== Global and per-TVM TLB management
 
@@ -279,225 +293,250 @@ since non-TEE mode accesses to MTT-tracked Confidential pages will fault (includ
 [title= "TLB management for memory conversion"]
 image:img_9.png[]
 
-The TSM tracks global TLB version for memory conversions and via the per-TVM and per-vcpu 
-control structures tracks TVM-scoped TLB versions. The TSM also maintains reference counts 
-for the number of harts that were activated during a TLB version. A similar TLB version is managed 
-associated with the physical address in the EMTT.
+The TSM tracks global TLB version for memory conversions and via the per-TVM
+and per-vcpu control structures tracks TVM-scoped TLB versions. The TSM also
+maintains reference counts for the number of harts that were activated during a
+TLB version. A similar TLB version is managed associated with the physical
+address in the EMTT.
 
-If the VMM initiates memory conversion to confidential, or any change to an assigned 
-confidential and present GPA mapping for a TVM (e.g. remove, relocate, promote etc.) - 
-then it must execute the following sequence (enforced by TSM) to affect that change:
+If the VMM initiates memory conversion to confidential, or any change to an
+assigned confidential and present GPA mapping for a TVM (e.g. remove, relocate,
+promote etc.) - then it must execute the following sequence (enforced by TSM) to
+affect that change:
 
-* Invalidate the mapping it wants to modify (page or range of pages). This step prevents 
-new cached mappings from being populated in the TLB
-* In the PA metadata maintained by the TSM (EMTT), captures into the per-page metadata, 
-the TLB version at which the conversion was initiated or the mapping was invalidated
-* Initiate global or per-TVM fence/increment the TLB version for the platform or the TVM 
-(this operation needs to be performed only on any one hart). 
-* Issue an IPI to each hart (for global operations like conversion), or the TVM 
-virtual-harts executing to trap to the TSM -- this step enables the TSM to perform a 
-local fence (via Hfence.GVMA), thus preventing pre-existing (stale) mappings from being 
-utilized. The page meta-data is updated to complete the TLB tracking.
-* TVM exit/trap allows the TSM to keep track that all active harts (for global conversion) 
-or the TVM virtual-harts (for per-TVM scope invalidation) have been invalidated and updated to 
-the new TLB version - the TVM exit is reported to the VMM.
-* Migration of a virtual-hart to a different hart is checked by the TSM to compares the 
-TVM TLB version with the hart TLB version and is fenced by the TSM during vcpu run.  
-* -----No active/usable translations for converted memory or for TVM G-stage mappings exist at this point -----
-* Invoke the specific mapping change operation (remove, relocate, promote, migrate etc.)
-* Checks that the affected mapping(s) are invalidated in the MTT and/or g-stage mapping 
-and validate the mapping
-* Subsequent page walks may create cached mappings from this point onwards. 
+* Invalidate the mapping it wants to modify (page or range of pages). This step
+prevents new cached mappings from being populated in the TLB
+* In the PA metadata maintained by the TSM (EMTT), captures into the per-page
+metadata, the TLB version at which the conversion was initiated or the mapping
+was invalidated
+* Initiate global or per-TVM fence/increment the TLB version for the platform
+or the TVM (this operation needs to be performed only on any one hart).
+* Issue an IPI to each hart (for global operations like conversion), or the TVM
+virtual-harts executing to trap to the TSM -- this step enables the TSM to
+perform a local fence (via Hfence.GVMA), thus preventing pre-existing (stale)
+mappings from being utilized. The page meta-data is updated to complete the TLB
+tracking.
+* TVM exit/trap allows the TSM to keep track that all active harts (for global
+conversion) or the TVM virtual-harts (for per-TVM scope invalidation) have been
+invalidated and updated to the new TLB version - the TVM exit is reported to the
+VMM.
+* Migration of a virtual-hart to a different hart is checked by the TSM to
+compares the TVM TLB version with the hart TLB version and is fenced by the TSM
+during vcpu run.
+* -----No active/usable translations for converted memory or for TVM G-stage
+mappings exist at this point -----
+* Invoke the specific mapping change operation (remove, relocate, promote,
+migrate etc.)
+* Checks that the affected mapping(s) are invalidated in the MTT and/or g-stage
+mapping and validate the mapping
+* Subsequent page walks may create cached mappings from this point onwards.
 
 ==== Page Mapping Page Assignment
 
 The VMM uses this operation to add a hgatp structure page to be used for mapping
-a guest physical address (GPA) to a physical address (PA). The inputs to this 
-operation are the TVM identifier and the physical address(es) for the new 
+a guest physical address (GPA) to a physical address (PA). The inputs to this
+operation are the TVM identifier and the physical address(es) for the new
 page(s) to be used for the hgatp structure entries
 
 *Page Mapping Assignment Operation*:
 
-* Verify that the TVM has been created successfully 
+* Verify that the TVM has been created successfully
 * Verify that the PPN(s) for the new page(s) to be used for TVM hgatp is/are
 Unassigned-Confidential per the MTT
 * For the GPA to be mapped, perform a TVM-hgatp walk to locate the non-leaf
-entry that should refer to the new page being added (to hold the next level of the 
-mapping for the GPA). If the mapping already exists, the operation is aborted.
+entry that should refer to the new page being added (to hold the next level of
+the mapping for the GPA). If the mapping already exists, the operation is
+aborted.
 * Initialize the new hgatp page to zero (no hgatp page table entries are valid)
-* Update the parent hgatp entry to refer to the new hgatp page (mark non-lead as valid)
+* Update the parent hgatp entry to refer to the new hgatp page (mark non-lead
+as valid)
 * Update the hgatp page EMTT entry with the TVM owner-id and page-type
 
 ==== Measured page assignment into a TVM memory map
 
-VMM uses the sbi_covh_add_tvm_zero/measured_pages interfaces to add a 4KB/2MB/1GB 
-page to the TVM. The page assigned to the TVM is identified by its PA. A source 
-page (also PA) may be provided to initialize the page contents. In this case, 
-the TVM initialization must not have been committed by the VMM, and the contents of 
-the page and the GPA selected by the VMM are measured into the TVM (initial) measurement. 
-If the contents of the page are not specified, which is allowed post-finalization of the TVM, 
-the TSM zero's the page during initialization. The guest physical address (GPA) to the 
-selected page physical address (PA) is specified in the add operation by the VMM. 
-The TSM verifies that a free guest page mapping must exist for this operation to succeed. 
-Effectively, this operation sets up the properties of the HGATP L0 leaf entry for the PA.
+VMM uses the sbi_covh_add_tvm_zero/measured_pages interfaces to add a
+4KB/2MB/1GB page to the TVM. The page assigned to the TVM is identified by its
+PA. A source page (also PA) may be provided to initialize the page contents. In
+this case, the TVM initialization must not have been committed by the VMM, and
+the contents of the page and the GPA selected by the VMM are measured into the
+TVM (initial) measurement.
 
-The inputs to this operation are: TVM identifier, physical address for the new page to 
-be assigned to the TVM, source physical address for the source of the page contents 
-to be loaded for the TVM (and measured by the TSM), and the GPA and page size to be used 
-for the guest mapping to be added.
+If the contents of the page are not specified, which is allowed
+post-finalization of the TVM, the TSM zero's the page during initialization. The
+guest physical address (GPA) to the selected page physical address (PA) is
+specified in the add operation by the VMM. The TSM verifies that a free guest
+page mapping must exist for this operation to succeed. Effectively, this
+operation sets up the properties of the HGATP L0 leaf entry for the PA.
 
-*Page Assignment operation*: 
+The inputs to this operation are: TVM identifier, physical address for the new
+page to be assigned to the TVM, source physical address for the source of the
+page contents to be loaded for the TVM (and measured by the TSM), and the GPA
+and page size to be used for the guest mapping to be added.
+
+*Page Assignment operation*:
 
 * Verify that the TVM has been created successfully
-* If the source page is provided, this operation can only be performed if the 
-TVM measurement has not been finalized. 
-* Verify that the PFN for the new page to be used for TVM is free in the MTT 
-* For the GPA to be mapped, perform a TVM-hgatp walk to locate the leaf entry that should
-refer to the new page being added. If the mapping does not exist OR exists but is not in 
-the unmapped state, the operation is aborted.
-* Initialize the new TVM page with contents from source page OR zero if no source page 
-is provided (for lazy addition of memory to TVM). Note that the TVM initialization of 
-memory will be with Confidential-mode asserted and via the TSMs paging structure of the PA 
+* If the source page is provided, this operation can only be performed if the
+TVM measurement has not been finalized.
+* Verify that the PFN for the new page to be used for TVM is free in the MTT
+* For the GPA to be mapped, perform a TVM-hgatp walk to locate the leaf entry
+that should refer to the new page being added. If the mapping does not exist OR
+exists but is not in the unmapped state, the operation is aborted.
+* Initialize the new TVM page with contents from source page OR zero if no
+source page is provided (for lazy addition of memory to TVM). Note that the TVM
+initialization of memory will be performed by the TSM in the context of the
+condifential supervisor domain and via the TSMs paging structure of the PA
 assigned to the TVM - hence the memory will be treated as confidential.
 * The measurement of the TVM is extended with the GPA used to map to the page.
 * Update the TVM page MTT entry with the TVM owner PPN and page type as TEE-TVM
-* Update the leaf hgatp page table entry to refer to the new page (mark leaf as valid)
-to allow TLB mappings to be created when the TVM vcpu is executing subsequently.
+* Update the leaf hgatp page table entry to refer to the new page (mark leaf as
+valid) to allow TLB mappings to be created when the TVM vcpu is executing
+subsequently.
 
 === TVM Interrupt Handling
 
-While OS/VMMs traditionally have unfettered access to the virtualized timer and interrupt 
-state of legacy VMs, TVMs must be protected from malicious injection or filtering of 
-interrupts or modification of timers which could lead to incorrect execution of or 
-information leakage from the TVM. As such, a combination of hardware isolation features 
-and COVH support are necessary to guard access to this state while still ultimately 
-giving the OS/VMM control over resource management.
+While OS/VMMs traditionally have unfettered access to the virtualized timer and
+interrupt state of legacy VMs, TVMs must be protected from malicious injection
+or filtering of interrupts or modification of timers which could lead to
+incorrect execution of or information leakage from the TVM. As such, a
+combination of hardware isolation features and COVH support are necessary to
+guard access to this state while still ultimately giving the OS/VMM control over
+resource management.
 
 ==== TVM timers
 
-The Sstc ISA extension allows for configuration and delivery of timer interrupts 
-directly at VS level without the involvement of HS-level software. While this feature 
-can mostly be used as-is to provide isolated timer support for TVMs, the TSM must still 
-ensure that VS-level timer state cannot be modified by the OS/VMM. In particular:
-The TSM should ensure that VS-level timer interrupts intended for a TVM are delivered to 
-the TVM without OS/VMM involvement while the TVM is running. This is done by delegating 
-(hideleg[6] = 1) and enabling (hie.VSTIE = 1) VS-level timers at VS level.
+The Sstc ISA extension allows for configuration and delivery of timer interrupts
+directly at VS level without the involvement of HS-level software. While this
+feature can mostly be used as-is to provide isolated timer support for TVMs, the
+TSM must still ensure that the VS-level timer state cannot be modified by the
+OS/VMM.
 
-While the OS/VMM should still be able to read a TVM's vstimecmp (for scheduling 
-purposes), it must not be able to overwrite it. To support this the TSM and 
-TSM-driver should leave the vstimecmp CSR intact when context-switching back 
-to the OS/VMM, but should always restore the vstimecmp CSR from saved state 
+In particular:
+The TSM should ensure that VS-level timer interrupts intended for a TVM are
+delivered to the TVM without OS/VMM involvement while the TVM is running. This
+is done by delegating (hideleg[6] = 1) and enabling (hie.VSTIE = 1) VS-level
+timers at VS level.
+
+While the OS/VMM should still be able to read a TVM's vstimecmp (for scheduling
+purposes), it must not be able to overwrite it. To support this the TSM and
+TSM-driver should leave the vstimecmp CSR intact when context-switching back
+to the OS/VMM, but should always restore the vstimecmp CSR from saved state
 when resuming.
 
 ==== TVM external interrupts
 
-Hardware-accelerated interrupt-controller virtualization is possible for TVMs on 
-platform supporting the Advanced Interrupt Architecture [AIA] and an 
-implementation-defined method of isolating IMSIC guest interrupt files between the 
-non-TEE and TEE worlds (either using an MTT as described above, or via other means). 
-This enables delivery of MSIs from TVM-assigned devices and inter-processor interrupts 
-without OS/VMM interference for TVM virtual harts.
+Hardware-accelerated interrupt-controller virtualization is possible for TVMs on
+platform supporting the Advanced Interrupt Architecture [AIA] and an
+implementation-defined method of isolating IMSIC guest interrupt files between
+the non-TEE and TEE worlds (either using an MTT as described above, or via other
+means). This enables delivery of MSIs from TVM-assigned devices and
+inter-processor interrupts without OS/VMM interference for TVM virtual harts.
 
 The AIA supports two mechanisms for tracking of interrupts at VS-level:
-IMSIC guest interrupt files, of which there are a fixed number per physical hart. 
-These allow delivery of external interrupts directly to VS-level as a Virtual Supervisor 
-External Interrupt. Guest interrupt files occupy a single 4kB page of physical address 
-space.
+IMSIC guest interrupt files, of which there are a fixed number per physical
+hart.
+These allow delivery of external interrupts directly to VS-level as a Virtual
+Supervisor External Interrupt. Guest interrupt files occupy a single 4kB page
+of physical address space.
 
-Memory-resident interrupt files (MRIFs), which track pending and enabled interrupts in 
-a 4kB page of DRAM. While the RISC-V IOMMU supports automatically updating an 
-MRIF's pending bits and delivering a notice interrupt to the host when an MSI is 
-targeted at an MRIF, the hypervisor is still responsible for injection of the VSIE 
-to the guest. IPI emulation must be provided by the hypervisor. MRIFs are only 
-constrained by the amount of available DRAM, however.
+Memory-resident interrupt files (MRIFs), which track pending and enabled
+interrupts in a 4kB page of DRAM. While the RISC-V IOMMU supports automatically
+updating an MRIF's pending bits and delivering a notice interrupt to the host
+when an MSI is targeted at an MRIF, the hypervisor is still responsible for
+injection of the VSIE to the guest. IPI emulation must be provided by the
+hypervisor. MRIFs are only constrained by the amount of available DRAM, however.
 
-While it is possible to support execution of a TVM virtual hart using either a 
-guest interrupt file or an MRIF, the architecture describes below constraints for the
-TVM virtual harts to only use guest interrupt files while they are actively executing 
-in order to simplify the duties of the TSM. Inactive (swapped out) TVM virtual harts 
-may use an MRIF, however, and an MRIF is required when migrating a TVM virtual hart 
-between physical harts. In either case the page of physical memory corresponding to 
-a guest interrupt file or MRIF for a TVM virtual hart must be considered confidential 
-to the TVM and must be inaccessible to the OS/VMM. The implementation must additionally 
-provide a mechanism for isolating guest interrupt file CSR state from the OS/VMM.
+While it is possible to support execution of a TVM virtual hart using either a
+guest interrupt file or an MRIF, the architecture describes below constraints
+for the TVM virtual harts to only use guest interrupt files while they are
+actively executing in order to simplify the duties of the TSM. Inactive (swapped
+out) TVM virtual harts may use an MRIF, however, and an MRIF is required when
+migrating a TVM virtual hart between physical harts. In either case the page of
+physical memory corresponding to a guest interrupt file or MRIF for a TVM
+virtual hart must be considered confidential to the TVM and must be inaccessible
+to the OS/VMM. The implementation must additionally provide a mechanism for
+isolating guest interrupt file CSR state from the OS/VMM.
 
-Two fundamental operations must be supported by the TSM in order to enable the use of 
-the IMSIC or MRIFs for TVM virtual harts: 
+Two fundamental operations must be supported by the TSM in order to enable the
+use of the IMSIC or MRIFs for TVM virtual harts:
 
-*Binding* a TVM virtual hart to an IMSIC guest interrupt file on a physical CPU, 
+*Binding* a TVM virtual hart to an IMSIC guest interrupt file on a physical CPU,
 migrating any interrupt state from the virtual hart's MRIF.
 
-*Unbinding* a TVM virtual hart from an IMSIC guest interrupt file and 
+*Unbinding* a TVM virtual hart from an IMSIC guest interrupt file and
 migrating interrupt state to an MRIF.
 
-If MRIFs are not supported by the hardware then TSM must additionally support one
-more operation to allow TVM virtual hart migration from one physical hart to another:
+If MRIFs are not supported by the hardware then TSM must additionally support
+one more operation to allow TVM virtual hart migration from one physical hart to
+another:
 
-*Rebinding* a TVM virtual hart to an IMSIC guest interrupt file on a physical CPU,
-migrating any interrupt state from the virtual hart's previous IMSIC guest interrupt
-file.
+*Rebinding* a TVM virtual hart to an IMSIC guest interrupt file on a physical
+CPU, migrating any interrupt state from the virtual hart's previous IMSIC guest
+interrupt file.
 
-Additionally, the TSM must provide a way for the OS/VMM to query if an inactive 
-virtual hart has external interrupts pending. The COVH calls to support these 
+Additionally, the TSM must provide a way for the OS/VMM to query if an inactive
+virtual hart has external interrupts pending. The COVH calls to support these
 operations are described below:
 
 *tvm_vhart_aia_init*
 
-Initializes the AIA state for a virtual hart. Must be called after the virtual hart 
-has been added but before the TVM is run for the first time. 
+Initializes the AIA state for a virtual hart. Must be called after the virtual
+hart has been added but before the TVM is run for the first time.
 
 The OS/VMM supplies:
 The guest physical address of the IMSIC for the virtual hart
-The supervisor physical address of a page of confidential memory that is to be used 
-as an MRIF for the virtual hart. The page is available to be reclaimed upon destruction 
-of the virtual hart.
-An MSI address + data pair that is to be signaled when an MSI is delivered to 
+The supervisor physical address of a page of confidential memory that is to be
+used as an MRIF for the virtual hart. The page is available to be reclaimed upon
+destruction of the virtual hart.
+An MSI address + data pair that is to be signaled when an MSI is delivered to
 a virtual hart's MRIF.
 
 *tvm_vhart_imsic_bind*
 
-Binds a virtual hart to a guest interrupt file on the current physical hart. 
-The guest interrupt file number is supplied by the OS/VMM. 
+Binds a virtual hart to a guest interrupt file on the current physical hart.
+The guest interrupt file number is supplied by the OS/VMM.
 
 The TSM is then responsible for:
 Converting the guest interrupt file page to confidential memory.
 Updating IOMMU MSI page tables with the address of the interrupt file.
 Migrating MRIF state (if any) to the guest interrupt file.
-Mapping the guest interrupt file at the previously-specified address in the 
+Mapping the guest interrupt file at the previously-specified address in the
 TVM's guest physical address space.
 
-Upon success the virtual hart is considered "bound" to the current physical hart and 
-is eligible to be run. Attempts to run the virtual hart on a different physical hart 
-or to run an "unbound" virtual hart shall return an error.
+Upon success the virtual hart is considered "bound" to the current physical
+hart and is eligible to be run. Attempts to run the virtual hart on a different
+physical hart or to run an "unbound" virtual hart shall return an error.
 
-Note that depending on the implementation's mechanism for isolating guest interrupt 
-files, a coordinated TLB invalidation of the guest interrupt file using the 
-invalidate + fence procedure described in <<TVM memory management>> may be required when 
-converting the interrupt file to confidential memory.
+Note that depending on the implementation's mechanism for isolating guest
+interrupt files, a coordinated TLB invalidation of the guest interrupt file
+using the invalidate + fence procedure described in <<TVM memory management>>
+may be required when converting the interrupt file to confidential memory.
 
 *tvm_vhart_imsic_unbind*
 
-Unbinds the virtual hart from its guest interrupt file, migrating it to an MRIF. 
-Must be called from the same physical hart to which the virtual hart is currently bound.
+Unbinds the virtual hart from its guest interrupt file, migrating it to an MRIF.
+Must be called from the same physical hart to which the virtual hart is
+currently bound.
 
-The OS/VMM is responsible for coordinating a TLB invalidation of the address of the 
-guest interrupt file in the TVM's guest physical address space using the 
+The OS/VMM is responsible for coordinating a TLB invalidation of the address of
+the guest interrupt file in the TVM's guest physical address space using the
 invalidate + fence procedure described in <<TVM memory management>>.
 
 The TSM is then responsible for:
 Verifying that TLB invalidation of the guest interrupt file is complete.
 Updating IOMMU MSI page tables.
-Copying interrupt state from the guest interrupt file to the virtual hart's MRIF.
+Copying interrupt state from the guest interrupt file to the virtual hart's
+MRIF.
 Converting the guest interrupt file back to a non-confidential state.
 
-Upon success the virtual hart is considered "unbound" and the guest interrupt file it 
-was using is available for OS/VMM use.
+Upon success the virtual hart is considered "unbound" and the guest interrupt
+file it was using is available for OS/VMM use.
 
-While a TVM virtual hart is unbound, MSIs directed at the virtual hart shall 
-trigger the notice interrupt registered in tvm_vhart_aia_init. Attempts by other 
-TVM virtual harts to write the virtual hart's IMSIC in the guest physical address 
-space (e.g. for the purposes of generating an IPI) shall generate a guest page 
-fault exit on the virtual hart which initiated the write.
+While a TVM virtual hart is unbound, MSIs directed at the virtual hart shall
+trigger the notice interrupt registered in tvm_vhart_aia_init. Attempts by other
+TVM virtual harts to write the virtual hart's IMSIC in the guest physical
+address space (e.g. for the purposes of generating an IPI) shall generate a
+guest page fault exit on the virtual hart which initiated the write.
 
 *tvm_vhart_imsic_rebind*
 
@@ -509,85 +548,88 @@ This is an optional interface that must be supported in case of missing MRIF
 support. Given the complexity introduced due to missing MRIF the interface
 is divided into three ABI calls to migrate a virtual hart:
 
-* tvm_vhart_imsic_rebind_begin(): Attaches the hart to the new interrupt file and
-updates IOMMU MSI page tables with the address of the new interrupt file. The previous
-interrupt file is no more in use after this call and all the interrupts are forwarded
-to the new interrupt file.
-* tvm_vhart_imsic_rebind_clone(): This must be called from the previous physical hart to
-create a copy of the previous interrupt file state.
-* tvm_vhart_imsic_rebind_end(): Must be run on the new hart. This call copies over the
-saved interrupt state to new interrupt file.
+* tvm_vhart_imsic_rebind_begin(): Attaches the hart to the new interrupt file
+and updates IOMMU MSI page tables with the address of the new interrupt file.
+The previous interrupt file is no more in use after this call and all the
+interrupts are forwarded to the new interrupt file.
+* tvm_vhart_imsic_rebind_clone(): This must be called from the previous
+physical hart to create a copy of the previous interrupt file state.
+* tvm_vhart_imsic_rebind_end(): Must be run on the new hart. This call copies
+over the saved interrupt state to new interrupt file.
 
-Upon success, the virtual hart is considered "bound" to the current physical hart and
-is eligible to be run. Attempts to run the virtual hart on a different physical hart
-or to run a "rebinding" virtual hart shall return an error. The previous interrupt file
-is now free to be used by another virtual hart.
+Upon success, the virtual hart is considered "bound" to the current physical
+hart and is eligible to be run. Attempts to run the virtual hart on a different
+physical hart or to run a "rebinding" virtual hart shall return an error. The
+previous interrupt file is now free to be used by another virtual hart.
 
-Note that depending on the implementation's mechanism for isolating guest interrupt
-files, a coordinated TLB invalidation of the guest interrupt file using the
-invalidate + fence procedure described in <<TVM memory management>> may be required when
-converting the interrupt file to confidential memory.
+Note that depending on the implementation's mechanism for isolating guest
+interrupt files, a coordinated TLB invalidation of the guest interrupt file
+using the invalidate + fence procedure described in <<TVM memory management>>
+may be required when converting the interrupt file to confidential memory.
 
 *tvm_vhart_external_interrupt_pending*
 
-Returns if the virtual hart has an external interrupt pending. For virtual 
-harts using guest interrupt files, it is expected that the OS/VMM will use the 
-hgeip CSR and Supervisor Guest External Interrupts to determine if the virtual 
-hart has an interrupt pending. For virtual harts using MRIFs, the OS/VMM may need 
-this call to disambiguate the cause of a notice interrupt from the IOMMU. 
-In either case the TSM should inspect the interrupt state of the specified virtual 
-hart and return whether or not it has an external interrupt pending.
+Returns if the virtual hart has an external interrupt pending. For virtual
+harts using guest interrupt files, it is expected that the OS/VMM will use the
+hgeip CSR and Supervisor Guest External Interrupts to determine if the virtual
+hart has an interrupt pending. For virtual harts using MRIFs, the OS/VMM may
+need this call to disambiguate the cause of a notice interrupt from the IOMMU.
+In either case the TSM should inspect the interrupt state of the specified
+virtual hart and return whether or not it has an external interrupt pending.
 
 ==== Paravirtualized I/O
-It is expected that the OS/VMM will need to provide paravirtualized I/O support to TVMs, 
-which naturally requires that the OS/VMM be able to inject VSEI to TVM virtual harts. 
-The OS/VMM must not be allowed to arbitrarily inject such interrupts, however, so the 
-TSM must provide a mechanism whereby only allow-listed interrupts may be triggered.
+It is expected that the OS/VMM will need to provide paravirtualized I/O support
+to TVMs, which naturally requires that the OS/VMM be able to inject VSEI to TVM
+virtual harts.
+The OS/VMM must not be allowed to arbitrarily inject such interrupts, however,
+so the TSM must provide a mechanism whereby only allow-listed interrupts may be
+triggered.
 
 *sbi_covg_allow_external_interrupt*
 
-Registers an interrupt ID that the OS/VMM is allowed to trigger. Passing an interrupt ID of
--1 allows the injection of all external interrupts. TVM vCPUs are started with all external
-interrupts completely denied by default. Generates a TVM exit to notify the OS/VMM of the
-interrupt vector.
+Registers an interrupt ID that the OS/VMM is allowed to trigger. Passing an
+interrupt ID of -1 allows the injection of all external interrupts. TVM vCPUs
+are started with all external interrupts completely denied by default. Generates
+a TVM exit to notify the OS/VMM of the interrupt vector.
 
 *sbi_covi_inject_tvm_cpu*
 
-Injects a previously allow-listed interrupt into a TVM. The TSM updates the interrupt 
-state of the targeted virtual hart. The TSM may also enforce rate-limiting on the 
-injection of interrupts in order to prevent single-step attacks by the OS/VMM.
+Injects a previously allow-listed interrupt into a TVM. The TSM updates the
+interrupt state of the targeted virtual hart. The TSM may also enforce
+rate-limiting on the injection of interrupts in order to prevent single-step
+attacks by the OS/VMM.
 
-=== TVM shutdown 
+=== TVM shutdown
 
-The VMM may stop a TVM virtual hart at any point (same as legacy operation 
-for the VMM but in this case via the TSM). If the TVM being shutdown is 
-executing, the VMM stops TVM execution by issuing an asynchronous interrupt 
-that yields the virtual hart and taking control back into the VMM (without 
-any TVM state leakage as that is context saved by the TSM on the trap due to 
-the interrupt). Once the TVM virtual harts are stopped, the VMM must issue a 
-sbi_covh_destroy_tvm that can verify that no TVM harts are executing and 
-unassigns all memory assigned to the TVM. 
+The VMM may stop a TVM virtual hart at any point (same as legacy operation
+for the VMM but in this case via the TSM). If the TVM being shutdown is
+executing, the VMM stops TVM execution by issuing an asynchronous interrupt
+that yields the virtual hart and taking control back into the VMM (without
+any TVM state leakage as that is context saved by the TSM on the trap due to
+the interrupt). Once the TVM virtual harts are stopped, the VMM must issue a
+sbi_covh_destroy_tvm that can verify that no TVM harts are executing and
+unassigns all memory assigned to the TVM.
 
-The VMM may choose grant the confidential memory to another TVM or may 
-reclaim all memory granted to the TVM via sbi_covh_reclaim_pages which will 
-verify the TSM hgatp mapping and tracking for the page and restore it as 
+The VMM may choose grant the confidential memory to another TVM or may
+reclaim all memory granted to the TVM via sbi_covh_reclaim_pages which will
+verify the TSM hgatp mapping and tracking for the page and restore it as
 a VMM-available page to grant to a non-confidential VM.
 
 *Reclaim TSM operation*:
 
-* Verifies that the PAs referenced are either Non-confidential (No-operation) or 
+* Verifies that the PAs referenced are either Non-confidential (No-operation) or
 Confidential-Unassigned state
 * TSM takes exclusive lock over the MTT tracker entry for the PA
 * TSM scrubs page contents
-* TSM updates MTT tracker entry (synchronized) for the page as Non-confidential and 
-returns the PA as an Non-Conf page to the VMM 
+* TSM updates MTT tracker entry (synchronized) for the page as Non-confidential
+and returns the PA as an Non-Conf page to the VMM
 * VMM translations to the PA (via 1st or G stage mappings) may be created now
 
 === RAS interaction
 
-The TSM performs minimal fail-safe tasks when handling RAS events. 
-RAS-induced access violations on a TVM lead to TSM-enforced TVM shutdown and are 
-reported to the OS/VMM for further analysis (without allowing any TVM access). 
-Similarly, RAS-interrupts (both high and low priority) are forwarded by the TSM to 
-the OS/VMM for handling.
+The TSM performs minimal fail-safe tasks when handling RAS events.
+RAS-induced access violations on a TVM lead to TSM-enforced TVM shutdown and are
+reported to the OS/VMM for further analysis (without allowing any TVM access).
+Similarly, RAS-interrupts (both high and low priority) are forwarded by the TSM
+to the OS/VMM for handling.
 
