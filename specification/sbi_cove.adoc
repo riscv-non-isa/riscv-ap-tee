@@ -9,6 +9,29 @@ extension. This specification introduces three new extensions:
 * CoVE Interrupt Extension (EXT_COVI)
 * CoVE Guest Extension (EXT_COVG)
 
+=== CoVE FID namespaces
+
+External specifications (e.g. the CoVE-IO) may need to extend one of the three
+CoVE SBI extensions with domain specific functions. In order to support that
+requirement each one of the CoVE extensions SBI function IDs (`FID`) range is
+split into separate namespaces.
+
+The main CoVE specification uses FIDs from 0 to 1023 (inclusive), and other
+specifications can extend the CoVE SBI by reserving a FID range after 1024.
+
+Below are the reserved CoVE FID namespaces:
+
+[#table_cove_fid_namespaces]
+.CoVE FID Namespaces
+[cols="2,2,6", width=90%, align="center"]
+|===
+2+^s|  SBI Function ID Range                .2+^s| Specification Namespace
+   ^| Start          ^| End
+    | 0 (`0x0`)       | 1023 (`0x3ff`)           | CoVE
+    | 1024 (`0x400`)  | 1087 (`0x43f`)           | CoVE-IO
+    | 1088 (`0x440`)  | 2^32^ - 1 (`0xffffffff`) | Unallocated
+|===
+
 === TEEI - COVH runtime interface
 ECALL invocation from VS (guest OS) causes traps that are handled by the
 TSM module (enforced via `medeleg` configuration). The TSM then may provide
