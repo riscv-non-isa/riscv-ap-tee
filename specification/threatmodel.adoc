@@ -152,15 +152,15 @@ TEE memory | Priv ISA w/ virtual memory system, Supervisor Domains (Smmtt)
 
 | Memory Confidentiality | Cipher text read prevention | Required | cryptography
  and/or MMU, MPU, MTT extension | Prevent non-TCB components from accessing
-encrypted TEE memory | Svpams (Supervisor Domains)
+encrypted TEE memory | Supervisor Domains
 
 | Memory Confidentiality | TEE encryption | Implementation-specific |
 Cryptography and/or MMU, MPU, MTT extension | TEE memory confidentiality
 against logical attacks via MMU; additionally address physical attacks via
 cryptography. If cryptography used, TEE should have a unique encryption key;
 each TEE VM may may also have one or more unique keys. Also see related
-requirements around ciphertext disclosure and memory integrity  | Svpams
-(Supervisor Domains)
+requirements around ciphertext disclosure and memory integrity  | 
+Supervisor Domains
 
 | Memory Confidentiality | Memory encryption strength | Implementation-specific
 | cryptography  | Encryption algorithm and key strength | Security Model
@@ -191,7 +191,7 @@ information without TEE consent/opt-in | Supervisor Domains (Sdid, Smmtt)
 
 | Shared Memory | TEE controls data shared with another TEE | Implementation
 specific | cryptography and/or MMU, MPU, MTT | Ability to securely share memory
-with another TEE | Supervisor Domains (Sdid, Smmtt, Svpams)
+with another TEE | Supervisor Domains
 
 | I/O Protection | DMA protection from non-TCB-admitted devices | Required | DMA
 access-control e.g. IOPMP, IOMTT, IOMMU | Prevent non-TCB peripheral devices
@@ -207,7 +207,7 @@ Supervisor Domains (IOMTT)
 Secure interrupt files, MMU, MPU, MTT | Prevent IRQ injections that violate
 priority or masking | Supervisor Domains (Smsdia) w/ AIA
 
-| Secure Timetamp | Trusted timestamps | Required | Confidential supervisor
+| Secure Timestamp | Trusted timestamps | Required | Confidential supervisor
 domain qualifier for CSR accesses | Ensure TEE have consistent timestamp view |
 Supervisor Domains (Sdid)
 
