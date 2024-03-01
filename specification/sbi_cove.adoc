@@ -5,7 +5,7 @@
 This section describes the normative Confidential VM Extension(CoVE) SBI
 extension. This specification introduces four new extensions:
 
-* CoVE Enumeration Extension (EXT_COVE)
+* Supervisor Domains Enumeration Extension (EXT_SUPD)
 * CoVE Host Extension (EXT_COVH)
 * CoVE Interrupt Extension (EXT_COVI)
 * CoVE Guest Extension (EXT_COVG)
@@ -427,39 +427,38 @@ image::tvm_runtime_execution.svg[]
 
 
 
-== COVE Enumeration Extension (EID #0x434F5645 "COVE")
+== Supervisor Domains Enumeration Extension (EID #0x53555044 "SUPD")
 
-This common CoVE extension enumerates capabilities for CoVE such as number of
-active supervisor domains and capabilities of each CoVE supervisor domain.
+This common extension enumerates capabilities for supervisor domains such as number of
+active supervisor domains and capabilities of each supervisor domain, e.g. used for CoVE.
 
-[#sbi_cove_get_active_domains]
-=== Function: Enumerate active supervisor domains that support CoVE (FID #0)
+[#sbi_supd_get_active_domains]
+=== Function: Enumerate active supervisor domains (FID #0)
 [source, C]
 -----
-struct sbiret sbi_cove_get_active_domains(unsigned long active_domains);
+struct sbiret sbi_supd_get_active_domains(unsigned long active_domains);
 
 -----
 
 Returns a 64 bit vector with bits set for supervisor domains that are active.
 Default value is 1 since supervisor domain 0 is always required (the hosting
 domain). For each non-0 position bit set, the SDID with the value of that bit
-position may be used per the <<cove-fid>> convention to invoke COVH/COVI
-functions. For active domains, the `sbi_covh_get_tsm_info` must be invoked to
-get information about supported TSM capabilities.
+position may be used per the <<cove-fid>> convention to invoke functions
+supported for that domain e.g. COVH. For active domains, other extensions
+may be invoked to get capabilities specific to that domain e.g. the
+`sbi_covh_get_tsm_info` must be invoked to get information from a supervisor
+domain supporting CoVE TSM capabilities.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
-[#table_sbi_cove_get_active_domains]
-.COVE Get Active Domains
+[#table_sbi_supd_get_active_domains]
+.SUPD Get Active Domains
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
-
-
-
 == COVE Host Extension (EID #0x434F5648 "COVH")
 
 === Listing of common enums
