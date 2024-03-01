@@ -3,18 +3,40 @@
 [[sbi_tee]]
 == Confidential VM Extension (CoVE) SBI extension proposal
 This section describes the normative Confidential VM Extension(CoVE) SBI
-extension. This specification introduces three new extensions:
+extension. This specification introduces four new extensions:
 
+* Supervisor Domains Enumeration Extension (EXT_SUPD)
 * CoVE Host Extension (EXT_COVH)
 * CoVE Interrupt Extension (EXT_COVI)
 * CoVE Guest Extension (EXT_COVG)
 
 === CoVE FID namespaces
 
-External specifications (e.g. the CoVE-IO) may need to extend one of the three
+Implementations may support more than one confidential supervisor domains. In
+order to support that scenario, as shown in <<cove-fid>>, the most significant 6
+bits of the SBI Function Id for the CoVE Extension may be set by the host to
+specifies the target Supervisor Domain Idenfier/TSM for the CoVH or COVI
+function invoked. For guest-invoked COVG functions, the RDSM must specify the
+Supervisor Domain Identifier for the callee. `a6` bits [16..25] are reserved for
+future use. `a6` bits [0..15] are used by the host to specify the CoVE functions
+as allocated in <<table_cove_fid_namespaces>>.
+
+[caption="CoVE FID : "]
+[title="Format of register a6 for CoVE SBI Extension"]
+[id=cove-fid]
+[wavedrom, ,svg]
+....
+{reg: [
+  {bits:  16, name: 'FID'},
+  {bits:  10, name: 'Reserved'},
+  {bits:   6, name: 'SDID'},
+], config:{lanes: 1, hspace:1024}}
+....
+
+Other future specifications (e.g. CoVE-IO) may need to extend one of the three
 CoVE SBI extensions with domain specific functions. In order to support that
-requirement each one of the CoVE extensions SBI function IDs (`FID`) range is
-split into separate namespaces.
+requirement each one of the CoVE extensions SBI function IDs (`FID`) in the
+availabe 64K range is split into separate namespaces.
 
 The main CoVE specification uses FIDs from 0 to 1023 (inclusive), and other
 specifications can extend the CoVE SBI by reserving a FID range after 1024.
@@ -25,11 +47,11 @@ Below are the reserved CoVE FID namespaces:
 .CoVE FID Namespaces
 [cols="2,2,6", width=90%, align="center"]
 |===
-2+^s|  SBI Function ID Range                .2+^s| Specification Namespace
+2+^s|  CoVE 16 bit SBI Function ID Range    .2+^s| Specification Namespace
    ^| Start          ^| End
     | 0 (`0x0`)       | 1023 (`0x3ff`)           | CoVE
     | 1024 (`0x400`)  | 1087 (`0x43f`)           | CoVE-IO
-    | 1088 (`0x440`)  | 2^32^ - 1 (`0xffffffff`) | Unallocated
+    | 1088 (`0x440`)  | 2^16^ - 1 (`0xffff`)     | Unallocated
 |===
 
 === TEEI - COVH runtime interface
@@ -63,7 +85,9 @@ entity like the OS/VMM (host) in conjunction with the TSM.
 . Reclaiming confidential memory for non-confidential VMs
 
 ===== Platform TSM detection and capability enumeration
-Platform support for the TSM can be detected by probing for the EXT_COVH
+Platform support for the TSM can be detected by probing for the EXT_COVE and
+then calling `sbi_cove_get_active_domains()` to get information about active
+supervisor domains that may support CoVE. The next step is to probe for EXT_COVH
 extension, and then calling `sbi_covh_get_tsm_info()` to get information about
 the current status of the TSM. The TSM must be in `TSM_READY` in order to
 process further ECALLs.
@@ -401,6 +425,40 @@ image::tvm_destruction_and_memory_reclamation.svg[]
 [title= "TVM runtime execution"]
 image::tvm_runtime_execution.svg[]
 
+
+
+== Supervisor Domains Enumeration Extension (EID #0x53555044 "SUPD")
+
+This common extension enumerates capabilities for supervisor domains such as number of
+active supervisor domains and capabilities of each supervisor domain, e.g. used for CoVE.
+
+[#sbi_supd_get_active_domains]
+=== Function: Enumerate active supervisor domains (FID #0)
+[source, C]
+-----
+struct sbiret sbi_supd_get_active_domains(unsigned long active_domains);
+
+-----
+
+Returns a 64 bit vector with bits set for supervisor domains that are active.
+Default value is 1 since supervisor domain 0 is always required (the hosting
+domain). For each non-0 position bit set, the SDID with the value of that bit
+position may be used per the <<cove-fid>> convention to invoke functions
+supported for that domain e.g. COVH. For active domains, other extensions
+may be invoked to get capabilities specific to that domain e.g. the
+`sbi_covh_get_tsm_info` must be invoked to get information from a supervisor
+domain supporting CoVE TSM capabilities.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_supd_get_active_domains]
+.SUPD Get Active Domains
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
 == COVE Host Extension (EID #0x434F5648 "COVH")
 
 === Listing of common enums
@@ -835,9 +893,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_INVALID_ADDRESS | `base_page_address` was invalid.
 | SBI_ERR_OUT_OF_PTPAGES  | The operation could not complete due to
                             insufficient page table pages.
-| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `num_pages` were invalid,
-                             or `tsm_page_type` is invalid.
-| SBI_ERR_NOT_SUPPORTED   | The `tsm_page_type` isn't supported by the TSM.
+| SBI_ERR_INVALID_PARAM   | `tvm_guest_id` was invalid.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
@@ -853,7 +909,7 @@ struct sbiret sbi_covh_add_tvm_measured_pages(unsigned long tvm_guest_id,
                                                   unsigned long tvm_guest_gpa);
 
 -----
-Copies num_pages pages from non-confidential memory at `source_address` to
+Copies `num_pages` pages from non-confidential memory at `source_address` to
 confidential memory at `dest_address`, then measures and maps the pages at
 `dest_address` at the TVM physical address space at `tvm_guest_gpa`. The mapping
 must lie within a region of confidential memory created with
@@ -880,7 +936,8 @@ The possible error codes returned in `sbiret.error` are shown below.
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
 | SBI_ERR_INVALID_ADDRESS | `source_address` was invalid, or `dest_address`
-                            wasn't in a confidential memory region.
+                            was not in a confidential memory region, or
+                            `tvm_guest_gpa` was invalid.
 | SBI_ERR_INVALID_PARAM   | `tvm_guest_id`, `tsm_page_type`, or `num_pages`
                             were invalid, or the TVM wasn't in the
                             `TVM_INITIALIZING` state.
@@ -897,7 +954,7 @@ struct sbiret sbi_covh_add_tvm_zero_pages(unsigned long tvm_guest_id,
                                           unsigned long num_pages,
                                           unsigned long tvm_base_page_address);
 -----
-Maps num_pages zero-filled pages of confidential memory starting at
+Maps `num_pages` zero-filled pages of confidential memory starting at
 `base_page_address` into the TVM's physical address space starting at
 `tvm_base_page_address`. The `tvm_base_page_address` must lie within a region of
 confidential memory created with `sbi_covh_add_tvm_memory_region()`. The
@@ -932,7 +989,7 @@ struct sbiret sbi_covh_add_tvm_shared_pages(unsigned long tvm_guest_id,
                                            unsigned long num_pages,
                                            unsigned long tvm_base_page_address);
 -----
-Maps num_pages of non-confidential memory starting at `base_page_address` into
+Maps `num_pages` of non-confidential memory starting at `base_page_address` into
 the TVM's physical address space starting at `tvm_base_page_address`. The
 `tvm_base_page_address` must lie within a region of non-confidential memory
 previously defined by the TVM via the guest interface to the TSM.
@@ -980,6 +1037,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 | Error code            | Description
 | SBI_SUCCESS           | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `tvm_stage_page_address` was invalid.
 | SBI_ERR_INVALID_PARAM | `tvm_guest_id` or `tvm_vcpu_id` were invalid,
                           or the TVM wasn't in `TVM_INITIALIZING` state.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
@@ -997,7 +1055,7 @@ The `tvm_guest_id` must be in a "runnable" state (requires a prior call
 to `sbi_covh_finalize_tvm()`). The function does not return unless the TVM
 exits with a trap that cannot be handled by the TSM.
 
-*Returns* 0 on success in sbiret.value if the TVM exited with a resumable VCPU
+*Returns* SBI_SUCCESS in sbiret.value if the TVM exited with a resumable VCPU
 interrupt or exception, and non-zero otherwise. In the latter case, attempts to
 call `sbi_covh_run_tvm_vcpu()` with the same `tvm_vcpu_id` will fail.
 
@@ -1008,7 +1066,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code            | Description
-| SBI_ERR_SUCCESS       | The TVM exited, and sbiret.value contains 0 if the
+| SBI_SUCCESS       | The TVM exited, and sbiret.value contains 0 if the
                           interrupt or exception is resumable. The host can
                           examine `scause` to determine details.
 | SBI_ERR_INVALID_PARAM | `tvm_guest_id` or `tvm_vcpu_id` were invalid, or the
@@ -1581,11 +1639,12 @@ The possible error codes returned in `sbiret.error` are shown below.
 
 == COVE Guest Extension (EID #0x434F5647 "COVG")
 The COVE Guest extension supplements the COVE Host extension, and allows TVMs
-to communicate with TSM.
+to communicate with the TSM for the supervisor domain the guest was instantiated
+within.
 A typical use case for this extension is to relay information to the host.
 COVE-Guest calls cause a trap to the TSM. TSM should do any processing required
 and then must forward the ECALL to the host with `scause` set to ECALL, `a7` set
-to EID, `a6` set to FID, `a0`-`a5` set to ECALL args.
+to EID, `a6` set to FID (See <<cove-fid>>), `a0`-`a5` set to ECALL args.
 
 [#sbi_covg_add_mmio_region]
 === Function: COVE Guest Add MMIO Region (FID #0)
