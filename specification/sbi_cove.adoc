@@ -301,7 +301,7 @@ Following the assignment of memory and VCPU resources, the host can transition
 the guest into a `TVM_RUNNABLE` state by calling `sbi_covh_finalize_tvm()`.
 The host must set up TVM Boot vCPU execution parameters like the
 entrypoint (`ENTRY_PC`) and boot argument (`ENTRY_ARG`) using arguments to
-`sbi_covh_finalize_tvm()`. Note that some TEE calls are no longer permissible
+`sbi_covh_finalize_tvm()`. Note that some COVH calls are no longer permissible
 after this transition.
 
 The host can then call sbi_covh_run_tvm_vcpu()` to begin execution. The host
@@ -393,25 +393,31 @@ This requires the host to make three separate ECALLs to the TSM:
 . `tee_host_tvm_initiate_fence()`
 . `sbi_covh_tvm_remove_pages()`
 
-Upon completion, the host may reclaim the confidential pages that were
-previously mapped in the region using
-`tee_host_tsm_reclaim_pages()`. The host must then continue the TVM execution
-and insert shared pages into
-the region using `tee_host_tvm_add_shared_pages()` on the page-fault when TVM
-tries to access the region. If
-the region of address space is unpopulated, the page removal ECALLs are not
-needed and the host can insert
-shared pages into the region on the next page-fault.
+Upon completion of the invalidation of references to confidential memory, the
+host may reclaim the confidential pages that were previously mapped in the
+region using `tee_host_tsm_reclaim_pages()`. The host must then continue the
+TVM execution and insert shared pages into the region using
+`tee_host_tvm_add_shared_pages()` on the page-fault when TVM tries to access
+the region. If the region of address space is unpopulated, the page removal
+ECALLs are not needed and the host can insert shared pages into the region on
+the next page-fault.
 
 The calling TVM vCPU is considered blocked until the assignment-change is
-completed. Attempts to run it
-with `sbi_covh_run_tvm_vcpu()` will fail. Any guest page faults taken by other
-TVM vCPUs in the
-invalidated pages continue to be reported to the host.
+completed. Attempts to run it with `sbi_covh_run_tvm_vcpu()` will fail.
+Any guest page faults taken by other TVM vCPUs in the invalidated pages
+continue to be reported to the host.
+
+Note that the TVM vCPU is blocked until the host completes the conversion to
+shared memory - this sequence may happen in two parts - invalidation of
+references to confidential memory (and address translation cache flushes if any)
+and, the addition of the mapping to shared memory - the host may run the TVM
+vCPU after the first part, and lazily handle the fault for the second part.
+Also the reclamation is of the confidential pages, and the shared memory pages
+provided by the host may be unique from those pages so that host has the option
+to service the request on the TVM synchronously or asynchronously.
 
 Both sharing and unsharing operations are destructive, i.e. the contents of
-memory in the range to be
-converted are lost.
+memory in the range to be converted are lost.
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
 [title= "TSM Detection and TVM creation"]
@@ -429,8 +435,9 @@ image::tvm_runtime_execution.svg[]
 
 == Supervisor Domains Enumeration Extension (EID #0x53555044 "SUPD")
 
-This common extension enumerates capabilities for supervisor domains such as number of
-active supervisor domains and capabilities of each supervisor domain, e.g. used for CoVE.
+This common extension enumerates capabilities for supervisor domains such as
+number of active supervisor domains and capabilities of each supervisor domain,
+e.g. used for CoVE.
 
 [#sbi_supd_get_active_domains]
 === Function: Enumerate active supervisor domains (FID #0)
