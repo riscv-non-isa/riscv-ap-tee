@@ -150,10 +150,13 @@ HFENCE.GVMA for the TVM VMID. This sequence is described in more detail in
 
 The RISC-V architecture supports page types of 4KB, 2MB, 1GB and 512GB.
 The untrusted OS/VMM may assign memory to the TVM at any architecture-supported
-page size. The TSM configures the memory tracking table (MTT) via the TSM-driver
-to track the assignment of memory pages to TVMs.
+page size. This assignment is enforced via the TSM-driver and the TSM.
+Specifically, the TSM-driver configures the memory tracking table (MTT) after
+enforcing the security requirements to track the assignment of memory pages to
+a supervisor domain/TSM. The TSM manages subsequent assignment of memory to
+TVMs.
 
-Memory access-control is enforced at two levels:
+Thus, memory access-control is enforced at two levels:
 
 * Isolation of memory assigned to TEEs - this includes memory assigned to the
 TSM as well as any TVMs - this tracking is configured by the firmware TCB
