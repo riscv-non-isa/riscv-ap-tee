@@ -27,11 +27,12 @@ resources and platform capabilities to host the TVM workload. The terms
 hosting supervisor domain and OS/VMM are used interchangeably in this
 specification.
 
-[caption="Figure {counter:image}: ", reftext="Figure {image}"]
-[title= "TCB Isolation for VM workloads using Supervisor Domains"]
+[id=dep1]
+[caption="Figure {counter:image}", reftext="Figure {image}"]
+[title= ": TCB Isolation for VM workloads using Supervisor Domains"]
 image::img_0.png[]
 
-As shown in figure 1, the Confidential Supervisor Domain is managed by software
+As shown in <<dep1>>, the Confidential Supervisor Domain is managed by software
 that operates in HS-mode and manages resources granted to it by the Hosting
 Supervisor Domain Manager (the OS/VMM). The Confidential Supervisor Domain
 Manager is called the " *TEE Security Manager* " or *(TSM)* - it acts as the
@@ -81,7 +82,7 @@ TVMs may be hosted by the host OS/VMM via confidential supervisor domains.
 Each TVM may consist of the guest firmware, a guest OS and applications. The
 software components included in the TVM are implementation specific.
 
-As shown in figure 1, the M-mode firmware TSM-driver is in the TCB of all
+As shown in <<dep1>>, the M-mode firmware TSM-driver is in the TCB of all
 Supervisor domains and hence in the TCB for all CoVE workloads hosted on the
 platform. The TSM-driver (operating in M-mode) uses
 the hardware capabilities to provide:
@@ -137,9 +138,9 @@ state save and restore,  as well as enforcing invariants for memory assigned
 to the TVM (including G-stage translation). The host OS/VMM provides the
 typical VM resource management functionality for memory, IO etc.
 
-Confidential VMs (under a VMM) are shown in figure 1 and Confidential
+Confidential VMs (under a VMM) are shown in <<dep1>> and Confidential
 applications (managed by an untrusted host OS) are shown in the
-architecture figure 2. As evident from the architecture, the difference
+architecture <<dep1a>>. As evident from the architecture, the difference
 between these two scenarios is the software TCB (owned by the tenant within
 the TVM) for the tenant workload - in the application TEE case, a minimal
 guest runtime may be used; whereas in the VM TEE case, an enlightened
@@ -148,8 +149,9 @@ modes of operation are also possible as TEE workloads. Importantly, the HW
 mechanisms needed for both cases are identical, and can be supported with the
 CoVE ABI.
 
-[caption="Figure {counter:image}: ", reftext="Figure {image}"]
-[title= "TEE TCB for application workloads (hosted via a TVM)"]
+[id=dep1a]
+[caption="Figure {counter:image}", reftext="Figure {image}"]
+[title= ": TEE TCB for application workloads (hosted via a TVM)"]
 image::img_1.png[]
 
 The detailed architecture is described in the Section <<refarch>>. Note that the
