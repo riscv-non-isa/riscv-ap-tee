@@ -42,8 +42,8 @@ utilized by this adversary.
 
 === Threat Model
 
-T1: Loss of confidentiality of TVMs and TSM memory via in-scope adversaries
-that may read TSM/TVM memory via CPU accesses
+T1: Loss of confidentiality of TVMs and TSM confidential memory via in-scope
+adversaries that may read TSM/TVM confidential memory via CPU
 
 T2: Tamper/content-injection to TVM and TSM memory from in-scope
 adversaries that may modify TSM/TVM memory via CPU side accesses
@@ -138,7 +138,7 @@ out of scope.
 non-normative Reference*
 
 | Memory Assignment | Ability to make memory confidential or non-confidential |
-Required | MMU, MPU, MTT | Confidential memory should be dynamically allocated/
+Required | MMU, xPMP, MTT | Confidential memory should be dynamically allocated/
 unallocated as required | RISC-V Priv. ISA, Supervisor Domains (Sdid, Smmtt)
 
 | TEE CPU State Protection | State Isolation | Required | Priv. levels (M,S,HS,
@@ -147,19 +147,19 @@ arbitrarily accessing/modifying TEE CPU state | Priv ISA w/ virtual memory
 system, Supervisor Domains (Sdid, Smmtt)
 
 | Memory Confidentiality | Memory isolation (read) | Required | cryptography
- and/or MMU, MPU, MTT extension | Prevent non-TCB components from reading
+ and/or MMU, xPMP, MTT extension | Prevent non-TCB components from reading
 TEE memory | Priv ISA w/ virtual memory system, Supervisor Domains (Smmtt)
 
 | Memory Confidentiality | Cipher text read prevention | Required | cryptography
- and/or MMU, MPU, MTT extension | Prevent non-TCB components from accessing
+ and/or MMU, xPMP, MTT extension | Prevent non-TCB components from accessing
 encrypted TEE memory | Supervisor Domains
 
 | Memory Confidentiality | TEE encryption | Implementation-specific |
-Cryptography and/or MMU, MPU, MTT extension | TEE memory confidentiality
-against logical attacks via MMU; additionally address physical attacks via
+Cryptography and/or MMU, xPMP, MTT extension | TEE memory confidentiality
+against logical attacks via hart; additionally address physical attacks via
 cryptography. If cryptography used, TEE should have a unique encryption key;
 each TEE VM may may also have one or more unique keys. Also see related
-requirements around ciphertext disclosure and memory integrity  | 
+requirements around ciphertext disclosure and memory integrity  |
 Supervisor Domains
 
 | Memory Confidentiality | Memory encryption strength | Implementation-specific
@@ -168,17 +168,17 @@ Supervisor Domains
 | Memory Confidentiality | Number of encryption keys | Implementation-specific |
 cryptography | Number of TEE keys supported | Security Model
 
-| Memory Integrity | Memory integrity against SW attacks | Required | MMU, MPU,
+| Memory Integrity | Memory integrity against SW attacks | Required | MMU, xPMP,
 MTT | Prevent SW attacks such as remapping aliasing replay corruption etc. |
 CoVE ABI
 
 | Memory Integrity | Memory integrity against HW attacks | Implementation
-specific | cryptography and/or MMU, MPU, MTT extension | Prevent HW attacks
+specific | cryptography and/or MMU, xPMP, MTT extension | Prevent HW attacks
 DRAM-bus attacks and physical attacks that replace TEE memory with tampered /
 old data | Security Model
 
 | Memory Integrity | Memory isolation (Write exec) | Required | cryptography
-and/or MMU, MPU, MTT | Prevent TEE from executing from normal memory; Enforce
+and/or MMU, xPMP, MTT | Prevent TEE from executing from normal memory; Enforce
 integrity of TEE data on writes | Supervisor Domains (Sdid, Smmtt)
 
 | Memory Integrity | Rowhammer attack prevention | Implementation-specific |
@@ -186,11 +186,11 @@ cryptography and/or memory-specific extension | Prevent non-TCB components from
 flipping bits of TEE memory | Security Model
 
 | Shared Memory | TEE controls data shared with non-TCB components | Required |
-cryptography and/or MMU, MPU, MTT | Prevent non-TCB code from exfiltrating
+cryptography and/or MMU, xPMP, MTT | Prevent non-TCB code from exfiltrating
 information without TEE consent/opt-in | Supervisor Domains (Sdid, Smmtt)
 
 | Shared Memory | TEE controls data shared with another TEE | Implementation
-specific | cryptography and/or MMU, MPU, MTT | Ability to securely share memory
+specific | cryptography and/or MMU, xPMP, MTT | Ability to securely share memory
 with another TEE | Supervisor Domains
 
 | I/O Protection | DMA protection from non-TCB-admitted devices | Required | DMA
@@ -204,7 +204,7 @@ Admission control to bind devices to TEEs | See CoVE-IO <<R22>>, IOMMU,
 Supervisor Domains (IOMTT)
 
 | Interrupts | Trusted (no spoofing/tampering/dropped) Interrupts | Required |
-Secure interrupt files, MMU, MPU, MTT | Prevent IRQ injections that violate
+Secure interrupt files, MMU, xPMP, MTT | Prevent IRQ injections that violate
 priority or masking | Supervisor Domains (Smsdia) w/ AIA
 
 | Secure Timestamp | Trusted timestamps | Required | Confidential supervisor
@@ -232,7 +232,7 @@ for CoVE | Prevent non-TCB hosting components from denying service to a TVM |
 Not in scope
 
 | Side Channel | Address mapping caches (controlled side channel) | Required
-| Supervisor domain Id, MMU/MPU, MTT | HW/SW TCB should use
+| Supervisor domain Id, MMU, xPMP, MTT | HW/SW TCB should use
 tagging/ partitioning/ flushing techniques to address those types of side
 channels due to temporal/spatial shared resources | Supervisor Domains,
 Security Model
