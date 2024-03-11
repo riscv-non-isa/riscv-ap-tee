@@ -8,6 +8,7 @@ build:
 	@echo "Building asciidoc"
 	asciidoctor-pdf \
     --trace \
+    --attribute=allow-uri-read \
     --attribute=mathematical-format=svg \
     --attribute=pdf-fontsdir=docs-resources/fonts \
     --attribute=pdf-style=docs-resources/themes/riscv-pdf.yml \
