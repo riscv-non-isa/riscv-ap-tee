@@ -1,0 +1,8 @@
+[[appendix_c]]
+== Appendix C: Nested virtualization based deployment model
+
+[id=dep2]
+[caption="Figure {counter:image}"]
+[title= ": Nested virtualization based deployment model for CoVE"]
+image::img_10.png[align=center]
+
