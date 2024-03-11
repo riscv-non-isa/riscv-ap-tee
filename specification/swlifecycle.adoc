@@ -150,10 +150,13 @@ HFENCE.GVMA for the TVM VMID. This sequence is described in more detail in
 
 The RISC-V architecture supports page types of 4KB, 2MB, 1GB and 512GB.
 The untrusted OS/VMM may assign memory to the TVM at any architecture-supported
-page size. The TSM configures the memory tracking table (MTT) via the TSM-driver
-to track the assignment of memory pages to TVMs.
+page size. This assignment is enforced via the TSM-driver and the TSM.
+Specifically, the TSM-driver configures the memory tracking table (MTT) after
+enforcing the security requirements to track the assignment of memory pages to
+a supervisor domain/TSM. The TSM manages subsequent assignment of memory to
+TVMs.
 
-Memory access-control is enforced at two levels:
+Thus, memory access-control is enforced at two levels:
 
 * Isolation of memory assigned to TEEs - this includes memory assigned to the
 TSM as well as any TVMs - this tracking is configured by the firmware TCB
@@ -321,7 +324,7 @@ conversion) or the TVM virtual-harts (for per-TVM scope invalidation) have been
 invalidated and updated to the new TLB version - the TVM exit is reported to the
 VMM.
 * Migration of a virtual-hart to a different hart is checked by the TSM to
-compares the TVM TLB version with the hart TLB version and is fenced by the TSM
+compare the TVM TLB version with the hart TLB version and is fenced by the TSM
 during vcpu run.
 * -----No active/usable translations for converted memory or for TVM G-stage
 mappings exist at this point -----
@@ -385,7 +388,7 @@ exists but is not in the unmapped state, the operation is aborted.
 * Initialize the new TVM page with contents from source page OR zero if no
 source page is provided (for lazy addition of memory to TVM). Note that the TVM
 initialization of memory will be performed by the TSM in the context of the
-condifential supervisor domain and via the TSMs paging structure of the PA
+confidential supervisor domain and via the TSMs paging structure of the PA
 assigned to the TVM - hence the memory will be treated as confidential.
 * The measurement of the TVM is extended with the GPA used to map to the page.
 * Update the TVM page MTT entry with the TVM owner PPN and page type as TEE-TVM
@@ -412,15 +415,15 @@ TSM must still ensure that the VS-level timer state cannot be modified by the
 OS/VMM.
 
 In particular:
-The TSM should ensure that VS-level timer interrupts intended for a TVM are
+The TSM must ensure that VS-level timer interrupts intended for a TVM are
 delivered to the TVM without OS/VMM involvement while the TVM is running. This
 is done by delegating (hideleg[6] = 1) and enabling (hie.VSTIE = 1) VS-level
 timers at VS level.
 
 While the OS/VMM should still be able to read a TVM's vstimecmp (for scheduling
 purposes), it must not be able to overwrite it. To support this the TSM and
-TSM-driver should leave the vstimecmp CSR intact when context-switching back
-to the OS/VMM, but should always restore the vstimecmp CSR from saved state
+TSM-driver must leave the vstimecmp CSR intact when context-switching back
+to the OS/VMM, but must always restore the vstimecmp CSR from saved state
 when resuming.
 
 ==== TVM external interrupts
@@ -610,7 +613,7 @@ the interrupt). Once the TVM virtual harts are stopped, the VMM must issue a
 sbi_covh_destroy_tvm that can verify that no TVM harts are executing and
 unassigns all memory assigned to the TVM.
 
-The VMM may choose grant the confidential memory to another TVM or may
+The VMM may grant the confidential memory to another TVM or may
 reclaim all memory granted to the TVM via sbi_covh_reclaim_pages which will
 verify the TSM hgatp mapping and tracking for the page and restore it as
 a VMM-available page to grant to a non-confidential VM.
