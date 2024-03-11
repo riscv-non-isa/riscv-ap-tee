@@ -25,7 +25,8 @@ role as the resource manager (for both legacy VMs and TVMs). The resources
 managed by the hosting supervisor domain (OS/VMM) include memory, CPU, I/O
 resources and platform capabilities to host the TVM workload. The terms
 hosting supervisor domain and OS/VMM are used interchangeably in this
-specification.
+specification. The underlying isolation mechanisms for supervisor domains
+(Smmtt) is agnostic of the number of supervisor domains.
 
 [id=dep1]
 [caption="Figure {counter:image}", reftext="Figure {image}"]
@@ -62,11 +63,15 @@ enforced via the TSM in the owning supervisor domain to enforce isolation
 properties). The hosting supervisor domain may use the reclaimed memory
 for itself or for non-confidential VMs.
 
-Each TVMs address space can be comprised of confidential and non-confidential
+Each TVM's address space can be comprised of confidential and non-confidential
 regions. The former includes both measured pages (that are part of the initial
 TVM payload), and confidential zero-pages that can be mapped-in on demand by
-the VMM following runtime accesses by the TVM. The non-confidential TVM-defined
-regions include those for shared-pages and MMIO.
+the VMM following runtime accesses by the TVM. These zero'ed confidential pages
+are pages that are demand-paged in and are expected to be zero'ed by the TSM to
+prevent attacks from the host software on the TVM. The TSM also enforces that
+the host does not overlap them with existing (present) G-stage mappings for the
+TVM. The non-confidential TVM-defined regions include those for shared-pages and
+MMIO.
 
 The TSM implements ABI that are accessed by the OS/VMM in the Hosting Supervisor
 Domain Manager via a *Trusted Execution Environment Interface (TEEI)*. This ABI
@@ -110,12 +115,14 @@ A set of guest ABIs known as *COVG* that enables the TVM workload to request
 attestation functions, memory management functions or paravirtualized IO.
 
 In order to isolate the TVMs from the host OS/VMM and non-confidential VMs,
-the TSM state must be isolated first - this is achieved by enforcing isolation
-for memory assigned to the supervisor domain that the TSM occupies - this is
-called the *TSM-memory-region.* The TSM-memory-region is expected to be a
-static region of memory that holds the TSM code and data. This region must be
-access-controlled from all software outside the TCB (e.g. using Smmtt), and may
-be additionally protected against physical access via cryptographic mechanisms.
+the supervisor domains (that contain the TSM state) must be isolated first -
+this is achieved by enforcing isolation for memory assigned to the supervisor
+domain that the TSM occupies - this is called the *TSM-memory-region.* The
+TSM-memory-region is expected to be a static region of memory that holds the TSM
+code and data. This region must be access-controlled from all software outside
+the TCB (e.g. using Smmtt), and may be additionally protected against physical
+access via cryptographic mechanisms.
+
 Access to the TSM- memory-region and execution of code from the
 TSM-memory-region (for the TSM ABIs) is enforced in hardware via the maintenance
 of the execution context (ASID, VMID and SDID) maintained per hart. This context
@@ -138,7 +145,7 @@ state save and restore,  as well as enforcing invariants for memory assigned
 to the TVM (including G-stage translation). The host OS/VMM provides the
 typical VM resource management functionality for memory, IO etc.
 
-Confidential VMs (under a VMM) are shown in <<dep1>> and Confidential
+Confidential VMs (managed by a VMM) are shown in figure 1 and Confidential
 applications (managed by an untrusted host OS) are shown in the
 architecture <<dep1a>>. As evident from the architecture, the difference
 between these two scenarios is the software TCB (owned by the tenant within
