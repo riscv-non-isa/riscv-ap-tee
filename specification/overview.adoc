@@ -62,7 +62,7 @@ enforced via the TSM in the owning supervisor domain to enforce isolation
 properties). The hosting supervisor domain may use the reclaimed memory
 for itself or for non-confidential VMs.
 
-Each TVMs address space can be comprised of confidential and non-confidential
+Each TVM's address space can be comprised of confidential and non-confidential
 regions. The former includes both measured pages (that are part of the initial
 TVM payload), and confidential zero-pages that can be mapped-in on demand by
 the VMM following runtime accesses by the TVM. These zero'ed confidential pages
