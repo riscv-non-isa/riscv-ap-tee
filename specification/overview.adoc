@@ -4,12 +4,12 @@
 == Architecture Overview and Threat Model
 
 Virtualization platforms are typically comprised of several components including
-platform firmware, host OS, VMM, and the actual payloads that run on them
-(typically in a VM). A monolith Supervisor Domain exists with the host OS/VMM
-including device drivers and services forming the TCB. This model is well
+platform firmware, host OS, VMM, and the actual workload (typically in a VM) that run on them. 
+A monolith Supervisor Domain exists with the host OS/VMM
+including device drivers and services forming the Trusted Computing Base (TCB). This model is well
 established, but the downside is that most platform components are in the TCB.
-This aspect is ill-suited for Confidential Computing workloads that rely on
-HW-Attested Trusted Execution Environments, and strive to minimize the software
+This aspect is ill-suited for confidential computing workloads that rely on
+hardware-attested Trusted Execution Environments (TEEs), and strive to minimize the software
 and hardware TCB.
 
 This specification describes the CoVE architecture which enables a new class
@@ -25,7 +25,7 @@ role as the resource manager (for both legacy VMs and TVMs). The resources
 managed by the hosting supervisor domain (OS/VMM) include memory, CPU, I/O
 resources and platform capabilities to host the TVM workload. The terms
 hosting supervisor domain and OS/VMM are used interchangeably in this
-specification. The underlying isolation mechanisms for supervisor domains
+specification. The underlying memory isolation mechanisms for supervisor domains
 (Smmtt) is agnostic of the number of supervisor domains.
 
 [id=dep1]
@@ -38,8 +38,8 @@ that operates in HS-mode and manages resources granted to it by the Hosting
 Supervisor Domain Manager (the OS/VMM). The Confidential Supervisor Domain
 Manager is called the " *TEE Security Manager* " or *(TSM)* - it acts as the
 trusted intermediary between TEE and non-TEE workloads on the same platform.
-The TSM should have a minimal HW-attested footprint. The TCB (which includes
-the TSM and HW) enforces strict confidentiality and integrity security
+The TSM should have a minimal hardware-attested footprint. The TCB (which includes
+the TSM and hardware) enforces strict confidentiality and integrity security
 properties for workloads in this supervisor domain. The Root Security Manager
 is an M-mode software module (called the " *TSM-driver* ") which isolates the
 Confidential Supervisor Domain from all other Supervisor domains and other
@@ -48,12 +48,12 @@ confidential). The responsibility of the TSM is to enforce the security
 objectives accorded to TEE workloads assigned to that supervisor domain. The
 VMM is expected to continue to manage the security for non-confidential
 workloads, and importantly the resource-assignment and scheduling management
-functions for all workloads (confidential and non-confidential).
+functions for all confidential and non-confidential workloads.
 
-In this scheme, compute resources like memory start off as traditional
+In this scheme, compute resources, such as memory, start off as traditional
 untrusted resources owned by the non-confidential/hosting supervisor domain, and
 are expected to be donated/transitioned to the confidential supervisor domain
-via ABI supported by the TSM. Once the conversion process is complete,
+via application binary interface (ABI) supported by the TSM. Once the conversion process is complete,
 confidential memory may be assigned to one or more TVMs by the TSM.
 A converted confidential resource may be freely assigned to another TVM within
 the same supervisor domain when it is no longer in use. However, an
@@ -71,7 +71,7 @@ are pages that are demand-paged in and are expected to be zero'ed by the TSM to
 prevent attacks from the host software on the TVM. The TSM also enforces that
 the host does not overlap them with existing (present) G-stage mappings for the
 TVM. The non-confidential TVM-defined regions include those for shared-pages and
-MMIO.
+memory-mapped I/O (MMIO).
 
 The TSM implements ABI that are accessed by the OS/VMM in the Hosting Supervisor
 Domain Manager via a *Trusted Execution Environment Interface (TEEI)*. This ABI
@@ -112,7 +112,7 @@ as *COVH* that includes functions to manage the lifecycle of the TVM, such as
 creating, adding pages to a TVM, scheduling a TVM for execution, etc., in an
 OS/platform agnostic manner. The TSM also provides an ABI to the TVM contexts:
 A set of guest ABIs known as *COVG* that enables the TVM workload to request
-attestation functions, memory management functions or paravirtualized IO.
+attestation functions, memory management functions, or paravirtualized IO.
 
 In order to isolate the TVMs from the host OS/VMM and non-confidential VMs,
 the supervisor domains (that contain the TSM state) must be isolated first -
@@ -120,17 +120,17 @@ this is achieved by enforcing isolation for memory assigned to the supervisor
 domain that the TSM occupies - this is called the *TSM-memory-region.* The
 TSM-memory-region is expected to be a static region of memory that holds the TSM
 code and data. This region must be access-controlled from all software outside
-the TCB (e.g. using Smmtt), and may be additionally protected against physical
+the TCB (e.g., using Smmtt), and may be additionally protected against physical
 access via cryptographic mechanisms.
 
-Access to the TSM- memory-region and execution of code from the
+Access to the TSM-memory-region and execution of code from the
 TSM-memory-region (for the TSM ABIs) is enforced in hardware via the maintenance
 of the execution context (ASID, VMID and SDID) maintained per hart. This context
 is enabled per-hart via the TEECALL interface to context switch into the
 confidential supervisor domain context via the TSM-driver and disabled
 via the TEERET interface to context restore to the hosting supervisor domain.
 Access to TEE-assigned memory is allowed for the hart when the access is
-permitted as per the active permissions enforced by the MMU for the supervisor
+permitted as per the active permissions enforced by the memory management unit (MMU) for the supervisor
 domain active on the hart (enforced through Sv and Smmtt for CoVE). This
 per-hart execution context is used by the processor to enforce access-control
 properties on memory accessed by TEE workloads managed by the TSM. The
@@ -141,18 +141,17 @@ TSM functionality should be explicitly limited to support only the security
 primitives to ensure that the OS/VMM and non-confidential VMs do not violate
 the security of the TVMs through the resource management actions of the
 OS/VMM. These security primitives require the TSM to enforce TVM virtual-hart
-state save and restore,  as well as enforcing invariants for memory assigned
-to the TVM (including G-stage translation). The host OS/VMM provides the
-typical VM resource management functionality for memory, IO etc.
+state save and restore, as well as enforcing invariants for memory assigned
+to the TVM, including G-stage translation. The host OS/VMM provides the
+typical VM resource management functionality for memory, IO, etc.
 
-Confidential VMs (managed by a VMM) are shown in figure 1 and Confidential
-applications (managed by an untrusted host OS) are shown in the
-architecture <<dep1a>>. As evident from the architecture, the difference
+<<dep1>> shows Confidential VMs managed by a VMM and <<dep1a>> shows Confidential
+applications managed by an untrusted host OS. As evident from the architecture, the difference
 between these two scenarios is the software TCB (owned by the tenant within
 the TVM) for the tenant workload - in the application TEE case, a minimal
 guest runtime may be used; whereas in the VM TEE case, an enlightened
-guest OS is expected in the TVM TCB. Other SW models that map to the VU/VS
-modes of operation are also possible as TEE workloads. Importantly, the HW
+guest OS is expected in the TVM TCB. Other software models that map to the VU/VS
+modes of operation are also possible as TEE workloads. Importantly, the hardware
 mechanisms needed for both cases are identical, and can be supported with the
 CoVE ABI.
 
