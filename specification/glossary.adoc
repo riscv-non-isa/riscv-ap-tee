@@ -24,7 +24,7 @@ measured by the previous TCB layer. The CDI is a secret that may be
 certified to use for attestation protocols.
 
 | Confidential Computing | A computing paradigm that protects data in use by performing
-computation in a hardware-based TEE.
+computation in a hardware-based, attested TEE.
 
 | CoVE | Confidential VM extension (CoVE) is the set of non-ISA RISC-V ABI extensions
 defined in this specification that enables confidential computing on RISC-V
