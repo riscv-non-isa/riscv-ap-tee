@@ -6,9 +6,10 @@ This document describes the Confidential VM Extension (CoVE) interface for
 a scalable Trusted Execution Environment (TEE) for hardware virtual-machine-based
 workloads on RISC-V-based platforms. This CoVE interface specification enables
 application workloads that require confidentiality to reduce the Trusted
-Computing Base (TCB) to a minimal TCB, specifically, keeping the host OS/VMM
-and other software outside the TCB. 
-% Do we want to talk here about IO devices as well?
+Computing Base (TCB) to a minimal TCB, specifically, keeping the host OS/VMM,
+devices and other software outside the TCB.  Admitting devices into the TCB of CoVE
+TEE VMs is outside the scope of this specification and is described in the CoVE-IO
+specification.
 The proposed specification supports an
 architecture that can be used for Application and Virtual Machine workloads,
 while minimizing changes to the RISC-V ISA and privilege modes.
