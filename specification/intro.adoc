@@ -13,4 +13,3 @@ specification.
 The proposed specification supports an
 architecture that can be used for Application and Virtual Machine workloads,
 while minimizing changes to the RISC-V ISA and privilege modes.
-% What is the meaning of "Application" here? When I read "Application and Virtual Machine" I think of a "process-based" and "VM-based" TEEs, i.e., SGX and TDX like. But this contradicts the initial sentence in this paragraph that says that CoVE provides TEE for VM-based workloads.
