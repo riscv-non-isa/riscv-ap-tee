@@ -1,40 +1,40 @@
 [[threatmodel]]
 === Adversary Model
 
-_Unprivileged Software adversary -_ This includes software executing in
+_Unprivileged Software Adversary_ - This includes software executing in
 U-mode managed by S/HS/M-mode system software. This adversary can access
 U-mode CSRs, process/task memory, CPU registers in the process context
-managed by system software. With user space I/O an Unprivileged software
-adversary may also have ability to submit requests to I/O devices made
+managed by system software. With user space I/O an Unprivileged Software
+Adversary may also have ability to submit requests to I/O devices made
 available by system software for U-mode access.
 
-_System Software adversary_ - This includes system software executing in
+_System Software Adversary_ - This includes system software executing in
 S/HS/VS modes. Such an adversary can access S/HS/VS privileged CSRs,
 assigned system memory, CPU registers, IOMMU(s) and IO devices.
 
-_Startup Software adversary_ - This includes system software executing in
+_Startup Software Adversary_ - This includes system software executing in
 early/boot phases of the system (in M-mode), including BIOS, memory
-configuration code, device option ROM/firmware that can access system
+configuration code, device option read-only memory (ROM) / firmware that can access system
 memory, CPU registers, IOMMU(s), IO devices and platform configuration
-registers (e.g., address range decoders, SoC fabric configuration, etc.).
+registers (e.g., address range decoders, system-on-chip (SoC) fabric configuration, etc.).
 
-_Non-invasive Hardware adversary_ - This includes adversaries that can use
+_Non-invasive Hardware Adversary_ - This includes adversaries that can use
 non-invasive (requiring no physical change to the target hardware) attacks
 such as bus interposers to snoop on memory and/or device interfaces,
 voltage and/or clock glitching, observe electromagnetic and other radiation,
 analyze power usage through instrumentation/tapping of power rails, etc.
 which may then give the adversary the ability to tamper with data in use.
 
-_Invasive Hardware adversary_ - This includes adversaries that can use
+_Invasive Hardware Adversary_ - This includes adversaries that can use
 invasive hardware attacks, with unlimited physical access to the devices,
-and use mechanisms to tamper-with/reverse-engineer the hardware TCB e.g.,
+and use mechanisms to tamper-with/reverse-engineer the hardware TCB, e.g.,
 extract keys from hardware, using capabilities such as scanning electron
 microscopes, fib attacks etc.
 
 _Side/Covert Channel Adversary_ - This includes adversaries that may
 leverage any explicit/implicit shared state (architectural or
 micro-architectural) to leak information across privilege boundaries via
-inference of characteristics from the shared resources (e.g. caches, branch
+inference of characteristics from the shared resources (e.g., caches, branch
 prediction state, internal micro-architectural buffers, queues). Some
 attacks may require use of high-precision timers to leak information. A
 combination of system software and hardware adversarial approaches may be
@@ -43,52 +43,52 @@ utilized by this adversary.
 === Threat Model
 
 T1: Loss of confidentiality of TVMs and TSM confidential memory via in-scope
-adversaries that may read TSM/TVM confidential memory via CPU
+adversaries that may read TSM/TVM confidential memory via CPU.
 
 T2: Tamper/content-injection to TVM and TSM memory from in-scope
-adversaries that may modify TSM/TVM memory via CPU side accesses
+adversaries that may modify TSM/TVM memory via CPU side accesses.
 
 T3: Tamper of TVM/TSM memory from in-scope adversaries via software-induced
-row-hammer attacks on memory
+row-hammer attacks on memory.
 
 T4: Malicious injection of content into TSM/TVM execution context using
-physical memory aliasing attacks via system firmware adversary
+physical memory aliasing attacks via system firmware adversary.
 
-T5: Information leakage of workload data via CPU registers, CSRs via
-in-scope adversaries
+T5: Information leakage of workload data via CPU registers, control status registers (CSRs) via
+in-scope adversaries.
 
 T6: Incorrect execution of workload via runtime modification of CPU
-registers, CSRs, mode switches via in-scope adversaries
+registers, CSRs, mode switches via in-scope adversaries.
 
 T7: Invalid code execution or data injection/replacement via G-stage
-paging remap attacks via system software adversary
+paging remap attacks via system software adversary.
 
 T8: Malicious asynchronous interrupt injection or dropped leading to
-information leakage or incorrect execution of the TEE
+information leakage or incorrect execution of the TEE.
 
 T9: Malicious manipulation of time read from the virtualized time CSRs
-causing invalid execution of TVM workload
+causing invalid execution of TVM workload.
 
 T10: Loss of Confidentiality via DMA access from devices under adversary
-control e.g. via manipulation of IOMMU programming
+control, e.g., via manipulation of IOMMU programming.
 
 T11: Loss of Confidentiality from devices assigned to a TVM. Devices bound
 to a TVM must enforce similar properties as the TEE hosted on the platform.
 
 T12: Content injection, exfiltration or replay (within and across TEE
 memory) via hardware approaches, including via exposed interface/links to
-other CPU sockets, memory and/or devices assigned to a TVM
+other CPU sockets, memory and/or devices assigned to a TVM.
 
 T13: Downgrading TEE TCB elements (example TSM-driver, TSM) to older
 versions or loading Invalid TEE TCB elements on the platform to enable
-confidentiality, integrity attacks
+confidentiality, integrity attacks.
 
 T14: Leveraging transient execution side-channel attacks in TSM-driver,
 TSM, TVM, host OS/VMM or non-confidential workloads to leak confidential
-data e.g. via shared caches, branch predictor poisoning, page-faults.
+data, e.g., via shared caches, branch predictor poisoning, page-faults.
 
 T15: Leveraging architectural side-channel attacks due to shared cache and
-other shared resources e.g. via prime/probe, flush/reload approaches
+other shared resources, e.g., via prime/probe, flush/reload approaches.
 
 T16: Malicious access to ciphertext with known plaintext to launch a
 dictionary attack on TCB components to extract confidential data.
@@ -100,13 +100,13 @@ T18: Forging of attestation evidence and sealed data associated with a TVM.
 
 T19: Stale TLB translations (for U/HS mode or for VU/VS) created during TSM
 or TVM operations are used to execute non-TCB code in the TVM (or consume
-stale/invalid data)
+stale/invalid data).
 
 T20: Isolation of performance monitoring and/or debug state for a TVM
 leading to information loss via performance monitoring events/counters and
 debug mode accessible information.
 
-T21: A TVM causes a denial of service on the platform
+T21: A TVM causes a denial of service on the platform.
 
 [NOTE]
 ====
@@ -119,14 +119,14 @@ Security Model specification <<R21>>) on a regular basis as attacks evolve.
 This specification describes the threats that a system implementing CoVE should
 address, however, it does not prescribe the scope of mitigations; instead it
 focusses on mitigations enabled via the COVH/G interface and the use
-of the RISC-V ISA (and extensions such as Smmtt). This specification also
+of the RISC-V ISA and its extensions, such as Smmtt. This specification also
 provides recommendations that implementations of this reference CoVE
 architecture must address per their chosen scope of adversaries from the list of
 adversaries discussed above, and what performance/security trade-offs they
 accept. For threats from any adversaries, implementations may choose to mitigate
 threats using additional platform capabilities as needed. For all scenarios
 though, denial of service by TVMs must be prevented. At the same time, denial of
-service by non-TCB software (e.g. in a hosting supervisor domain) is considered
+service by non-TCB software (e.g., in a hosting supervisor domain) is considered
 out of scope.
 
 [[design_survey]]
@@ -168,12 +168,12 @@ Supervisor Domains
 | Memory Confidentiality | Number of encryption keys | Implementation-specific |
 cryptography | Number of TEE keys supported | Security Model
 
-| Memory Integrity | Memory integrity against SW attacks | Required | MMU, xPMP,
-MTT | Prevent SW attacks such as remapping aliasing replay corruption etc. |
+| Memory Integrity | Memory integrity against software attacks | Required | MMU, xPMP,
+MTT | Prevent software attacks such as remapping aliasing replay corruption etc. |
 CoVE ABI
 
-| Memory Integrity | Memory integrity against HW attacks | Implementation
-specific | cryptography and/or MMU, xPMP, MTT extension | Prevent HW attacks
+| Memory Integrity | Memory integrity against hardware attacks | Implementation
+specific | cryptography and/or MMU, xPMP, MTT extension | Prevent hardware attacks
 DRAM-bus attacks and physical attacks that replace TEE memory with tampered /
 old data | Security Model
 
@@ -194,7 +194,7 @@ specific | cryptography and/or MMU, xPMP, MTT | Ability to securely share memory
 with another TEE | Supervisor Domains
 
 | I/O Protection | DMA protection from non-TCB-admitted devices | Required | DMA
-access-control e.g. IOPMP, IOMTT, IOMMU | Prevent non-TCB peripheral devices
+access-control, e.g., IOPMP, IOMTT, IOMMU | Prevent non-TCB peripheral devices
 from accessing TEE memory | See CoVE-IO <<R22>>, IOMMU, Supervisor Domains
 (IOMTT)
 
@@ -232,34 +232,34 @@ for CoVE | Prevent non-TCB hosting components from denying service to a TVM |
 Not in scope
 
 | Side Channel | Address mapping caches (controlled side channel) | Required
-| Supervisor domain Id, MMU, xPMP, MTT | HW/SW TCB should use
+| Supervisor domain Id, MMU, xPMP, MTT | hardware/software TCB should use
 tagging/ partitioning/ flushing techniques to address those types of side
 channels due to temporal/spatial shared resources | Supervisor Domains,
 Security Model
 
 | Side Channel | Transient-execution attack (TEA) side channels |
 Implementation-specific | * Bounds check bypass TEA and variants - should be
-addressed by TVM software using apropos synchronization. TCB SW should use
+addressed by TVM software using apropos synchronization. Software TCB should use
 synchronization to isolate TCB code from non-TCB code.
-* Branch target injection TEA and variants - should be addressed by TCB SW via
+* Branch target injection TEA and variants - should be addressed by software TCB via
 flushing across privilege boundaries to remove untrusted state injected by
 non-TCB software
-* Speculative store bypass TEA and variants - should be addressed by TCB HW
+* Speculative store bypass TEA and variants - should be addressed by TCB hardware
 via synchronization/barriers to prevent speculative execution of memory reads
 which may allow unauthorized disclosure of information.
 | Implementations should mitigate attacks such as these spectre variants (In
 practice, it is difficult to defend against such attacks in advance) |
-Supervisor Domain Id, Addtl. Recommendations in Security Model
+Supervisor Domain Id, additional recommendations in Security Model
 
 | Side Channel | Control channels, single-step/zero-step attacks | Required |
-leverage HW/SW TCB mechanisms to enforce restrictions on single-stepping
+leverage hardware/software TCB mechanisms to enforce restrictions on single-stepping
 or zero-stepping via use of state flushing/barriers, entropy defenses and
 detection mechanisms. | Prevent interrupt/exception injection
 (combined with cache side channel to leak sensitive data) | Security Model
 
 | Side Channel | Architectural cache side channel | Implementation-specific  |
 cache partitioning-based defenses | Prevent shared resource contention,
-e.g. attacks such as prime probe | Security Model
+e.g., attacks such as prime probe | Security Model
 
 | Side Channel | Architectural timing side channel | Implementation-specific  |
 data independent execution latency (DIEL) operations, uArch state flushing |
@@ -269,7 +269,7 @@ Leveraging data dependency timing channels | Security Model
 | Required | RoT unique trust chain for TEE TCB | Enforcing initial firmware
 authorization and versioning | CoVE ABI, Security Model
 
-| Attestation | Remote attestation | Required | HW-RoT-rooted PKI (trust
+| Attestation | Remote attestation | Required | hardware RoT-rooted PKI (trust
 assertions) via Internet | Prevent fake hardware and software TCB; Prevent
 non-TCB hardware debugging in production. | CoVE ABI, Security Model
 
@@ -285,7 +285,7 @@ Verification of attestation by TCB | Future CoVE ABI, Security Model
 
 | Attestation | TCB versioning (and updates) | Required | Mutable firmware where
  TVM has to opt-in at startup if TCB updates are allowed while the TVM is
- executing - HW TCB then enforces lower TCB elements are updatable
+ executing - hardware TCB then enforces lower TCB elements are updatable
  (with apropos controls like security version enforced) to enforce the
  opt-in policy. | Allow TCB updates - Prevent TCB rollback | CoVE ABI,
  Security Model
@@ -303,7 +303,7 @@ chain | CoVE ABI, Security Model
 | Attestation | TCB transparency (and auditability) | Implementation-specific |
 Mutable firmware | TCB elements reviewable | CoVE ABI, Security Model
 
-| Attestation | Sealing | Implementation-specific | HW Rot sealing keys per TVM
+| Attestation | Sealing | Implementation-specific | Hardware RoT sealing keys per TVM
 | Binding of secrets to TEEs | CoVE ABI, Security Model
 
 | Operational Features | TVM Migration | Implementation-specific | Secure

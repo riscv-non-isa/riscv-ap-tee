@@ -33,10 +33,11 @@ as allocated in <<table_cove_fid_namespaces>>.
 ], config:{lanes: 1, hspace:1024}}
 ....
 
-Other future specifications (e.g. CoVE-IO) may need to extend one of the three
+Other future specifications (e.g., CoVE-IO) may need to extend one of the three
 CoVE SBI extensions with domain specific functions. In order to support that
 requirement each one of the CoVE extensions SBI function IDs (`FID`) in the
 availabe 64K range is split into separate namespaces.
+% what 64K above means? 64KB?
 
 The main CoVE specification uses FIDs from 0 to 1023 (inclusive), and other
 specifications can extend the CoVE SBI by reserving a FID range after 1024.
@@ -55,34 +56,34 @@ Below are the reserved CoVE FID namespaces:
 |===
 
 === TEEI - COVH runtime interface
-ECALL invocation from VS (guest OS) causes traps that are handled by the
+ECALL invocation from VS-mode (guest OS) causes traps that are handled by the
 TSM module (enforced via `medeleg` configuration). The TSM then may provide
 intrinsics via the COVG (CoVE-Guest ABI) to the TVM to provide attestation
 and other trusted services. The TSM may allow the TEE (application or VM)
 to request host (untrusted) services via the COVH (CoVE host-ABI).
 
 ==== Operational model for the CoVE Host Extension
-Executing confidential workloads in a CoVE requires a sequence of one or more of
+Executing confidential workloads in a CoVE-enabled system requires a sequence of one or more of
 the steps detailed below. These steps are performed by the non-TCB hosting
 entity like the OS/VMM (host) in conjunction with the TSM.
 
-. Platform TSM detection and capability enumeration
-. Conversion of non-confidential memory to confidential memory
-. Trusted VM (TVM) creation
-. Donating confidential memory to the TSM for TVM page management
-. Defining TVM confidential memory regions
-. Mapping TVM code and data payload to confidential-memory regions
-. Creating TVM VCPUs
-. Finalizing TVM creation
-. Scheduling TVM execution
-. Management of TVM secure interrupts
-. Handling and servicing TVM faults and exits
-. Mapping TVM demand-zero confidential memory regions
-. Mapping TVM non-confidential shared pages on demand
-. Processing TVM-access to MMIO regions
-. Tearing down TVMs
-. Reassignment of confidential memory for other TVMs
-. Reclaiming confidential memory for non-confidential VMs
+. Platform TSM detection and capability enumeration.
+. Conversion of non-confidential memory to confidential memory.
+. Trusted VM (TVM) creation.
+. Donating confidential memory to the TSM for TVM page management.
+. Defining TVM confidential memory regions.
+. Mapping TVM code and data payload to confidential-memory regions.
+. Creating TVM vCPUs.
+. Finalizing TVM creation.
+. Scheduling TVM execution.
+. Management of TVM secure interrupts.
+. Handling and servicing TVM faults and exits.
+. Mapping TVM demand-zero confidential memory regions.
+. Mapping TVM non-confidential shared pages on demand.
+. Processing TVM-access to MMIO regions.
+. Tearing down TVMs.
+. Reassignment of confidential memory for other TVMs.
+. Reclaiming confidential memory for non-confidential VMs.
 
 ===== Platform TSM detection and capability enumeration
 Platform support for the TSM can be detected by probing for the EXT_COVE and
@@ -96,18 +97,17 @@ process further ECALLs.
 TVMs are created using the sbi_covh_create_tvm(). This creates a TVM with state
 set to `TVM_INITIALIZING`.
 The host must assign confidential memory for page tables, payload mapping, and
-VCPUs before it can be
-transitioned into a `TVM_RUNNABLE` state.
+vCPUs before it can be transitioned into the `TVM_RUNNABLE` state.
 
 ===== TVM memory management
 The host is responsible for the following memory management functions:
 
-. Converting non-confidential memory to confidential memory
-. Donating confidential memory for the TVM page-table pool
-. Defining confidential memory regions
-. Mapping TVM code and data payload to confidential TVM-pages
-. Mapping zero-page confidential pages to the TVM regions
-. Mapping non-confidential pages TVM-defined regions for shared-pages / MMIO
+. Converting non-confidential memory to confidential memory.
+. Donating confidential memory for the TVM page-table pool.
+. Defining confidential memory regions.
+. Mapping TVM code and data payload to confidential TVM-pages.
+. Mapping zero-page confidential pages to the TVM regions.
+. Mapping non-confidential pages TVM-defined regions for shared-pages / MMIO.
 
 ===== Converting non-confidential memory to confidential memory
 Platform memory is non-confidential by default, and must be converted to
@@ -158,24 +158,24 @@ The region can be sparsely populated, and since the host cannot directly access
 confidential memory, it must copy the TVM code and data payload from
 non-confidential memory to confidential memory by calling
 `sbi_covh_add_tvm_measured_pages()`. This operation requires the host to convert
-a sufficient number of non-confidential pages to confidential (by calling
-`sbi_covh_convert_pages()`, or by using converted pages that aren't currently
+a sufficient number of non-confidential pages to confidential by calling
+`sbi_covh_convert_pages()` or by using converted pages that aren't currently
 assigned to a TVM. The TSM copies the payload for the TVM from non-confidential
-pages to confidential pages, and extends the corresponding measurements for the
+pages to confidential pages and extends the corresponding measurements for the
 TVM.
 
-===== VCPU shared state
-Host needs access to some of the TVM CSRS and GPRs to handle TVM exits. For
+===== vCPU shared state
+Host needs access to some of the TVM CSRs and GPRs to handle TVM exits. For
 example, the host needs `htval` to determine the fault address, `a0`-`a7` GPRs
-are needed to handle forwarded ECALLs and so on. For this purpose, the host and
-TSM use NACL Extension based shared memory interface <<R10>>, from now on called
+to handle forwarded ECALLs and so on. For this purpose, the host and
+TSM use the Nested Acceleration (NACL) extension based shared memory interface <<R10>>, from now on called
 NACL shared memory to avoid confusion with shared memory pages between TVM and
 the host.
 
 The NACL shared memory interface is between TSM and the host and TSM is
 responsible for writing any trap-related CSRs and GPRs needed by the host to
 handle the exception. TSM is also responsible for reading the returned result
-and forwarding it to the TVM. Further details about which CSRs and GPRS are used
+and forwarding it to the TVM. Further details about which CSRs and GPRs are used
 by the TSM and the host can be found in <<table_tsm_csr_updates_in_nacl>>.
 The layout of NACL shared memory is shown below as `struct nacl_shmem` and
 `scratch` space layout for TSM is shown as
@@ -235,10 +235,9 @@ are supposed to use from NACL shared memory.
 It also describes the operation allowed for each entity in terms of `R` (read)
 and `W` (write) permissions. Note that the TSM
 and the host can read/write to any of the fields without any faults but the
-permissions depict the expected use case. For write only
-CSRs or GPRs TSM is supposed to ignore any modifications by the host. TSM is
-only supposed to take modifications from CSRs or GPRs
-with read permission such as `a0` and `a1` GPRs.
+permissions depict the expected use case. For write only accesses to
+CSRs or GPRs, TSM is supposed to ignore any modifications by the host. TSM should only take modifications from CSRs or GPRs, e.g., `a0` and `a1` GPRs,
+when it has the read permission.
 
 [#table_tsm_csr_updates_in_nacl]
 .TSM NACL CSRs and GPRs
@@ -285,19 +284,19 @@ interrupt ticking.
 [TIP]
 ====
 It's recommended that the TSM should transform the load or store instruction
-to/from `a0` before writing to the htinst CSR.
+to/from `a0` before writing to the `htinst` CSR.
 So that `a0` will be the only GPR used for MMIO emulation reducing the GPRs
 accessible to the host.
 ====
 
-===== VCPU creation
+===== vCPU creation
 The host must register CPUs/harts with the TSM before they can be used for TVM
 execution by calling `sbi_covh_create_tvm_vcpu()`. The NACL shared memory
 interface is used between the host and the TSM for processing TVM exits from
 `sbi_covh_run_tvm_vcpu()`.
 
 ===== TVM execution
-Following the assignment of memory and VCPU resources, the host can transition
+Following the assignment of memory and vCPU resources, the host can transition
 the guest into a `TVM_RUNNABLE` state by calling `sbi_covh_finalize_tvm()`.
 The host must set up TVM Boot vCPU execution parameters like the
 entrypoint (`ENTRY_PC`) and boot argument (`ENTRY_ARG`) using arguments to
@@ -346,7 +345,7 @@ decoding the contents of the
 NACL shared memory region.
 
 ===== Management of secure interrupts
-The host can use the Tee Interrupt Extension (EXT_COVI) to manage secure TVM
+The host can use the TEE Interrupt Extension (EXT_COVI) to manage secure TVM
 interrupts on
 platforms with AIA support.
 
@@ -416,7 +415,7 @@ Also the reclamation is of the confidential pages, and the shared memory pages
 provided by the host may be unique from those pages so that host has the option
 to service the request on the TVM synchronously or asynchronously.
 
-Both sharing and unsharing operations are destructive, i.e. the contents of
+Both sharing and unsharing operations are destructive, i.e., the contents of
 memory in the range to be converted are lost.
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
@@ -437,7 +436,7 @@ image::tvm_runtime_execution.svg[]
 
 This common extension enumerates capabilities for supervisor domains such as
 number of active supervisor domains and capabilities of each supervisor domain,
-e.g. used for CoVE.
+e.g., used for CoVE.
 
 [#sbi_supd_get_active_domains]
 === Function: Enumerate active supervisor domains (FID #0)
@@ -447,12 +446,12 @@ struct sbiret sbi_supd_get_active_domains(unsigned long active_domains);
 
 -----
 
-Returns a 64 bit vector with bits set for supervisor domains that are active.
+Returns a 64-bit vector with bits set for supervisor domains that are active.
 Default value is 1 since supervisor domain 0 is always required (the hosting
 domain). For each non-0 position bit set, the SDID with the value of that bit
 position may be used per the <<cove-fid>> convention to invoke functions
-supported for that domain e.g. COVH. For active domains, other extensions
-may be invoked to get capabilities specific to that domain e.g. the
+supported for that domain, e.g., COVH. For active domains, other extensions
+may be invoked to get capabilities specific to that domain, e.g., the
 `sbi_covh_get_tsm_info` must be invoked to get information from a supervisor
 domain supporting CoVE TSM capabilities.
 
@@ -474,7 +473,7 @@ The following enums are referenced by several functions described below.
 [source, C]
 -------------------
 enum tsm_page_type {
-    /* 4KiB */
+    /* 4 KiB */
     PAGE_4K = 0,
     /* 2 MiB */
     PAGE_2MB = 1,
@@ -535,11 +534,11 @@ struct tsm_info {
      * state in sbi_covh_create_tvm_vcpu().
      */
     unsigned long tvm_state_pages;
-    /* The maximum number of VCPUs a TVM can support. */
+    /* The maximum number of vCPUs a TVM can support. */
     unsigned long tvm_max_vcpus;
     /*
-     * The number of 4kB pages which must be donated to the TSM when
-     * creating a new VCPU.
+     * The number of 4KB pages which must be donated to the TSM when
+     * creating a new vCPU.
      */
     unsigned long tvm_vcpu_state_pages;
 };
@@ -585,7 +584,7 @@ Begins the process of converting `num_pages` of non-confidential memory starting
 at `base_page_address` to confidential-memory. On success, pages can be assigned
 to TVMs only following subsequent calls to `sbi_covh_global_fence()` and
 `sbi_covh_local_fence()` that complete the conversion process. The implied
-page size is 4KiB.
+page size is 4KB.
 
 The `base_page_address` must be page-aligned.
 
@@ -613,7 +612,7 @@ struct sbiret sbi_covh_reclaim_pages(unsigned long base_page_address,
 -------
 Reclaims `num_pages` of confidential memory starting at `base_page_address`.
 The pages must not be currently assigned to an active TVM. The implied page
-size is 4KiB.
+size is 4KB.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -696,8 +695,8 @@ information about the parameters that should be used to populate
 ----
 struct tvm_create_params {
     /*
-     * The base physical address of the 16KiB confidential memory region
-     * that should be used for the TVM's page directory. Must be 16KiB-aligned.
+     * The base physical address of the 16KB confidential memory region
+     * that should be used for the TVM's page directory. Must be 16KB-aligned.
      */
     unsigned long tvm_page_directory_addr;
     /*
@@ -757,17 +756,17 @@ Transitions the TVM specified by `tvm_guest_id` from the `TVM_INITIALIZING`
 state to a `TVM_RUNNABLE`
 state. Also, sets the entry point (`ENTRY_PC`) using `entry_sepc` and boot
 argument (`ENTRY_ARG`)
-using `entry_arg` for the boot VCPU. Both `entry_sepc` and `entry_arg` are
+using `entry_arg` for the boot vCPU. Both `entry_sepc` and `entry_arg` are
 included in the measurement
-of the TVM. `entry_sepc` is the address in TVM binary to start the boot VCPU
+of the TVM. `entry_sepc` is the address in TVM binary to start the boot vCPU
 from and `entry_arg` is
-the address of guest fdt and is passed as an argument to the boot VCPU in `a1`
+the address of guest flattened device tree (FDT) and is passed as an argument to the boot vCPU in `a1`
 GPR.
 
-`tvm_identity_addr` points to a 64 bytes buffer containing a host-defined TVM
+`tvm_identity_addr` points to a 64-bytes buffer containing a host-defined TVM
 identity. This piece of data can be used to bind TVMs to a host-defined identity
-(e.g. an attestation service public key, a guest configuration file hash, an
-attestation policy description, etc). Although this piece of data is included in
+(e.g., an attestation service public key, a guest configuration file hash, an
+attestation policy description, etc.). Although this piece of data is included in
 the TVM attestation certificate as a dedicated TVM claim (`tvm-identity`), it is
 *not* included in the TVM measurements.
 That allows for the host to optionally personalize cryptographically identical
@@ -777,8 +776,8 @@ The semantics of this piece of data is defined by the host and can be ignored
 by both the guest and the attestation services. However, when being used, the
 TVM identity can be leveraged as follows:
 
-1. The host passes some information to the guest through e.g. some out-of-band
-VM orchestration mechanisms. This could be e.g. the hash value for a policy
+1. The host passes some information to the guest through, e.g., some out-of-band
+VM orchestration mechanisms. This could be, e.g., the hash value for a policy
 file the guest is expected to apply at runtime.
 2. The guest compares the passed host data with the `tvm-identity` attestation
 certificate claim and can decide to use it or not depending on this local
@@ -792,8 +791,7 @@ this verifiable TVM identity.
 Giving TVMs an identity is optional and the TSM must not include a TVM identity
 claim in the TVM attestation token when `tvm_identity_addr` is set to 0.
 When a TVM identity is provided, the `tvm_identity_addr` must be different than
-0
-and 64B-aligned.
+0 and 64B-aligned.
 
 The TSM enforces that a TVM virtual harts cannot be entered unless the TVM
 measurement is committed
@@ -856,7 +854,7 @@ Marks the range of TVM physical address space starting at `tvm_gpa_addr` as
 reserved for the mapping of confidential memory. The memory region length is
 specified by `region_len`.
 
-Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned, and the region must
+Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned, and the region must
 not overlap with a previously defined region. This call must not be made after
 calling `sbi_covh_finalize_tvm()`.
 
@@ -884,7 +882,7 @@ struct sbiret sbi_covh_add_tvm_page_table_pages(unsigned long tvm_guest_id,
                                                 unsigned long num_pages);
 -----
 Adds `num_pages` confidential memory starting at `base_page_address` to the
-TVM's page-table page-pool. The implied page size is 4KiB.
+TVM's page-table page-pool. The implied page size is 4KB.
 
 Page table pages may be added at any time, and a typical use case is in
 response to a TVM page fault.
@@ -1023,14 +1021,14 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_covh_create_tvm_vcpu]
-=== Function: COVE Host Create TVM VCPU (FID #13)
+=== Function: COVE Host Create TVM vCPU (FID #13)
 [source, C]
 -----
 struct sbiret sbi_covh_create_tvm_vcpu(unsigned long tvm_guest_id,
                                            unsigned long tvm_vcpu_id,
                                            unsigned long tvm_state_page_addr);
 -----
-Adds a VCPU with ID `vcpu_id` to the TVM specified by `tvm_guest_id`.
+Adds a vCPU with ID `vcpu_id` to the TVM specified by `tvm_guest_id`.
 `tvm_state_page_addr` must be page-aligned and point to a confidential memory
 region used to hold the TVM's vCPU state, and must be
 `tsm_info::tvm_state_pages` pages in length. This call must not be made after
@@ -1039,7 +1037,7 @@ calling `sbi_covh_finalize_tvm()`.
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_covh_create_tvm_vcpu_errors]
-.COVE Host Create TVM VCPU Errors
+.COVE Host Create TVM vCPU Errors
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code            | Description
@@ -1051,25 +1049,25 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_covh_run_tvm_vcpu]
-=== Function: COVE Host Run TVM VCPU (FID #14)
+=== Function: COVE Host Run TVM vCPU (FID #14)
 [source, C]
 -----
 struct sbiret sbi_covh_run_tvm_vcpu(unsigned long tvm_guest_id,
                                     unsigned long tvm_vcpu_id);
 -----
-Runs the VCPU specified by `tvm_vcpu_id` in the TVM specified by `tvm_guest_id`.
+Runs the vCPU specified by `tvm_vcpu_id` in the TVM specified by `tvm_guest_id`.
 The `tvm_guest_id` must be in a "runnable" state (requires a prior call
 to `sbi_covh_finalize_tvm()`). The function does not return unless the TVM
 exits with a trap that cannot be handled by the TSM.
 
-*Returns* SBI_SUCCESS in sbiret.value if the TVM exited with a resumable VCPU
+*Returns* SBI_SUCCESS in sbiret.value if the TVM exited with a resumable vCPU
 interrupt or exception, and non-zero otherwise. In the latter case, attempts to
 call `sbi_covh_run_tvm_vcpu()` with the same `tvm_vcpu_id` will fail.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_covh_run_tvm_vcpu_errors]
-.COVE Host Run TVM VCPU Errors
+.COVE Host Run TVM vCPU Errors
 [cols="2,3", width=90%, align="center", options="header"]
 |===
 | Error code            | Description
@@ -1081,7 +1079,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
 
-The TSM updates the hosts `scause` CSR. The host should use the `scause` field
+The TSM updates the host's `scause` CSR. The host should use the `scause` field
 to determine whether the exit was caused by an interrupt or exception, and then
 use the additional information in the NACL shared memory region to determine
 further course of action (if sbiret.value is 0).
@@ -1284,7 +1282,7 @@ struct sbiret sbi_covh_tvm_remove_pages(unsigned long tvm_guest_id,
 Removes mappings for invalidated pages in the specified range of guest physical
 address space. The range to be unmapped must already have been invalidated and
 fenced, and must lie within a removable region of the guest's physical address
-space. The TSM zeros out all PTEs within the specified range and returns the
+space. The TSM zeros out all page table entries (PTEs) within the specified range and returns the
 ownership of the pages to the host if previously owned by the TVM.
 
 The possible error codes returned in `sbiret.error` are shown below.
@@ -1350,7 +1348,7 @@ struct tvm_aia_params {
      */
     uint32_t guest_index_bits;
     /*
-     * The number of guest interrupt files to be implemented per VCPU.
+     * The number of guest interrupt files to be implemented per vCPU.
      * Implementations may reject configurations with guests_per_hart > 0 if
      * nested IMSIC virtualization is not supported.
      */
@@ -1381,13 +1379,13 @@ struct sbiret sbi_covi_set_tvm_aia_cpu_imsic_addr(unsigned long tvm_guest_id,
                                              unsigned long tvm_vcpu_imsic_gpa);
 -------
 
-Sets the guest physical address of the specified VCPU’s virtualized IMSIC to
+Sets the guest physical address of the specified vCPU’s virtualized IMSIC to
 `tvm_vcpu_imsic_gpa`. The `tvm_vcpu_imsic_gpa` must be valid for the AIA
-configuration that was set by `sbi_covi_init_tvm_aia()`. No two VCPUs may share
+configuration that was set by `sbi_covi_init_tvm_aia()`. No two vCPUs may share
 the same `tvm_vcpu_imsic_gpa`.
 
 This can be called only after `sbi_covi_init_tvm_aia()` and before
-`sbi_covh_finalize_tvm()`. All VCPUs in an AIA-enabled TVM must have their
+`sbi_covh_finalize_tvm()`. All vCPUs in an AIA-enabled TVM must have their
 IMSIC configuration set prior to calling `sbi_covh_finalize_tvm()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
@@ -1603,10 +1601,10 @@ struct sbiret sbi_covi_rebind_aia_imsic_clone(unsigned long tvm_guest_id,
                                               unsigned long tvm_vcpu_id);
 -------
 
-TSM clones the old guest interrupt file of the specified VCPU. The cloned copy
-is maintained in VCPU specific structure visible to TSM only. The host must make
+TSM clones the old guest interrupt file of the specified vCPU. The cloned copy
+is maintained in vCPU specific structure visible to TSM only. The host must make
 sure to invoke this from the old physical CPU. The guest interrupt file after
-this is free to be reclaimed or bound to another VCPU.
+this is free to be reclaimed or bound to another vCPU.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -1664,7 +1662,7 @@ Marks the specified range of TVM physical address space starting at
 `tvm_gpa_addr` as used for emulated MMIO. Upon return, all accesses by the TVM
 within the range are trapped and may be emulated by the host.
 
-Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned, and the region must
+Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned, and the region must
 not overlap with a previously defined region. This call will result in an exit
 to the host on success.
 
@@ -1691,7 +1689,7 @@ Removes the specified range of TVM physical address space starting at
 `tvm_gpa_addr` from the emulated MMIO regions. Upon return, all accesses by the
 TVM within the range will result in a page fault.
 
-Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned, and the region must
+Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned, and the region must
 not overlap with a previously defined region. This call will result in an exit
 to the host on success.
 
@@ -1727,7 +1725,7 @@ completed. Attempts to run it with `sbi_covh_run_tvm_vcpu()` will fail. Any
 guest page faults taken by other TVM vCPUs in the invalidated pages continue to
 be reported to the host.
 
-Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned.
+Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned.
 
 The possible error codes returned in sbiret.error are:
 
@@ -1769,7 +1767,7 @@ with `sbi_covh_run_tvm_vcpu()` will fail. Any guest page faults taken by other
 TVM vCPUs in the
 invalidated pages continue to be reported to the host.
 
-Both `tvm_gpa_addr` and `region_len` must be 4kB-aligned.
+Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned.
 
 [#table_sbi_covg_unshare_memory_region_errors]
 .COVE Guest Unshare Memory Region
