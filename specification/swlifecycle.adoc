@@ -210,7 +210,7 @@ Actual page sizes supported are implementation-specified.
 | Page-Type   | Reserved - page that may not be assigned to any TEE entity
 If the Memory Type is Confidential, the following page types may be used:
 * Unassigned - page not assigned to any TEE (TSM or TVM)
-* TVM - page assigned to a TVM (mapped via HGAT).
+* TVM - page assigned to a TVM (mapped via G-stage page table).
 * TSM - page used by the TSM (for MTT and other control structures)
 | Page Owner  | If the Memory Type is Confidential and Page-Type is TVM,
 this value holds the identifier (e.g., PPN) for the TVM control page (4KB TEE-
