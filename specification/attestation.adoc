@@ -163,8 +163,8 @@ The TVM measurement extension interface is exposed through the optional TG-ABI
 [NOTE]
 ====
 if an implementation uses UEFI firmware to initialize the CoVE TVM guest
-environment, then refer to UEFI specification <<R23>> chapter on confidential
-computing chapter for UEFI ABI related to runtime measurement extension and
+environment, then refer to UEFI specification <<R23>> chapter 38 on confidential
+computing for UEFI ABI related to runtime measurement extension and
 event log creation.
 ====
 
