@@ -160,6 +160,14 @@ TSM can use up to 18 runtime measurement registers for that purpose.
 The TVM measurement extension interface is exposed through the optional TG-ABI
 `sbi_covg_extend_measurement()` FID.
 
+[NOTE]
+====
+if an implementation uses UEFI firmware to initialize the CoVE TVM guest
+environment, then refer to UEFI specification <<R23>> chapter 38 on confidential
+computing for UEFI ABI related to runtime measurement extension and
+event log creation.
+====
+
 === Attestation
 
 All above described TCB elements measurements are added to an attestation

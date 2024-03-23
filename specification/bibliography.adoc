@@ -60,12 +60,12 @@ https://www.rfc-editor.org/rfc/rfc5280[https://www.rfc-editor.org/rfc/rfc5280]
 * [[[X509_DSA,19]]] X.509 Algorithms for DSA and ECDSA
 https://datatracker.ietf.org/doc/rfc5758/[https://datatracker.ietf.org/doc/rfc5758/]
 
-* [[[SupervisorDomains,20]]] RISC-V Supervisor Domain Access Protection[https://github.com/riscv/riscv-smmtt/releases/download/v1.0.4/smmtt-spec.pdf]
+* [[[R20,20]]] RISC-V Supervisor Domain Access Protection[https://github.com/riscv/riscv-smmtt/releases/download/v1.0.4/smmtt-spec.pdf]
 
-* [[[SecurityModel,21]]] RISC-V Platform Security Model[https://github.com/riscv-non-isa/riscv-security-model/releases/download/0.1/riscv-platform-security-model.pdf]
+* [[[R21,21]]] RISC-V Platform Security Model[https://github.com/riscv-non-isa/riscv-security-model/releases/download/0.1/riscv-platform-security-model.pdf]
 
-* [[[CoVE-IO,22]]] RISC-V CoVE-IO[https://github.com/riscv-non-isa/riscv-ap-tee-io/releases/download/v0.1.0/riscv-cove-io.pdf]
+* [[[R22,22]]] RISC-V CoVE-IO[https://github.com/riscv-non-isa/riscv-ap-tee-io/releases/download/v0.1.0/riscv-cove-io.pdf]
 
-* [[[UEFI, 23]]] Unified Extensible Firmware Interface (UEFI) Specification v2.1[https://uefi.org/specs/UEFI/2.10/index.html]
+* [[[R23, 23]]] Unified Extensible Firmware Interface (UEFI) Specification v2.1[https://uefi.org/specs/UEFI/2.10/index.html]
 
 bibliography::[]
