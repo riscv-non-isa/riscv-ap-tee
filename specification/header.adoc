@@ -2,7 +2,7 @@
 :description: Confidential VM Extension (CoVE) for Confidential Computing on RISC-V platforms
 :company: RISC-V.org
 :revdate: 3/2024
-:revnumber: 0.4
+:revnumber: 0.5
 :revremark: This document is in development. Assume everything can change. See http://riscv.org/spec-state for details.
 :url-riscv: http://riscv.org
 :doctype: book
