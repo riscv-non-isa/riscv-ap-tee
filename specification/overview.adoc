@@ -18,10 +18,13 @@ of hardware-attested trusted execution environment called TEE Virtual Machines
 execution state and memory are run-time-isolated from the host OS/VMM and other
 platform software not in the TCB of the TVM. TVMs are protected from a broad
 set of software-based and hardware-based threats per the threat model described
-in <<threatmodel>>. The design describes an isolated (Confidential) Supervisor
+in <<threatmodel>>. The architecture describes an isolated (Confidential) Supervisor
 Domain to enforce TCB and confidentiality properties, while using an isolated
 (Hosting) Supervisor Domain for the host domain, thus maintaining the OS/VMMs
-role as the resource manager (for both legacy VMs and TVMs). The resources
+role as the resource manager (for both legacy VMs and TVMs). As will be described
+in this document the architecture can be
+implemented on processors that do not support supervisor domains (smmtt). 
+When supervisor domains are available the resources
 managed by the hosting supervisor domain (OS/VMM) include memory, CPU, I/O
 resources and platform capabilities to host the TVM workload. The terms
 hosting supervisor domain and OS/VMM are used interchangeably in this
