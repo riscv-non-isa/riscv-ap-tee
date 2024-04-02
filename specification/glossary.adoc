@@ -62,7 +62,7 @@ that hosts multiple mutually distrusting software owned by different tenants.
 
 | MTT | Memory Tracking Table (MTT).
 
-| relying party | A relying party refer to a system providing access to a secured software application.
+| Relying party | A relying party refer to a system providing access to a secured software application.
 
 | RISC-V Supervisor Domains | RISC-V privileged architecture <<R0>> defines
 the S-mode for execution of supervisor software. S-mode software may optionally
@@ -110,7 +110,7 @@ across multiple sockets.
 
 | TVM | TEE VM (TVM) also known as Confidential VM. It is a VM instantiation of an confidential workload.
 
-| Virtual Machine (VM) | Guest operating system hosted by a VMM.
+| VM | Virtual Machine (VM) is a guest operating system hosted by a VMM.
 
 | VMM | Virtual machine monitor (VMM) is used interchangeably with the term hypervisor in this document.
 

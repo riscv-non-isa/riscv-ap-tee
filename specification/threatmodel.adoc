@@ -80,7 +80,7 @@ memory) via hardware approaches, including via exposed interface/links to
 other CPU sockets, memory and/or devices assigned to a TVM.
 
 T13: Downgrading TEE TCB elements (example TSM-driver, TSM) to older
-versions or loading Invalid TEE TCB elements on the platform to enable
+versions or loading invalid TEE TCB elements on the platform to enable
 confidentiality, integrity attacks.
 
 T14: Leveraging transient execution side-channel attacks in TSM-driver,
@@ -141,16 +141,16 @@ non-normative Reference*
 Required | MMU, xPMP, MTT | Confidential memory should be dynamically allocated/
 unallocated as required | RISC-V Priv. ISA, Supervisor Domains (Sdid, Smmtt)
 
-| TEE CPU State Protection | State Isolation | Required | Priv. levels (M,S,HS,
-U) and Execution context (ASID, VMID, SDID) | Prevent non-TCB components from
+| TEE CPU State Protection | State Isolation | Required | Priv. levels (M, S, HS, U) 
+and execution context (ASID, VMID, SDID) | Prevent non-TCB components from
 arbitrarily accessing/modifying TEE CPU state | Priv ISA w/ virtual memory
 system, Supervisor Domains (Sdid, Smmtt)
 
-| Memory Confidentiality | Memory isolation (read) | Required | cryptography
+| Memory Confidentiality | Memory isolation (read) | Required | Cryptography
  and/or MMU, xPMP, MTT extension | Prevent non-TCB components from reading
 TEE memory | Priv ISA w/ virtual memory system, Supervisor Domains (Smmtt)
 
-| Memory Confidentiality | Cipher text read prevention | Required | cryptography
+| Memory Confidentiality | Cipher text read prevention | Required | Cryptography
  and/or MMU, xPMP, MTT extension | Prevent non-TCB components from accessing
 encrypted TEE memory | Supervisor Domains
 
@@ -177,16 +177,16 @@ specific | cryptography and/or MMU, xPMP, MTT extension | Prevent hardware attac
 DRAM-bus attacks and physical attacks that replace TEE memory with tampered /
 old data | Security Model
 
-| Memory Integrity | Memory isolation (Write exec) | Required | cryptography
+| Memory Integrity | Memory isolation (Write exec) | Required | Cryptography
 and/or MMU, xPMP, MTT | Prevent TEE from executing from normal memory; Enforce
 integrity of TEE data on writes | Supervisor Domains (Sdid, Smmtt)
 
 | Memory Integrity | Rowhammer attack prevention | Implementation-specific |
-cryptography and/or memory-specific extension | Prevent non-TCB components from
+Cryptography and/or memory-specific extension | Prevent non-TCB components from
 flipping bits of TEE memory | Security Model
 
 | Shared Memory | TEE controls data shared with non-TCB components | Required |
-cryptography and/or MMU, xPMP, MTT | Prevent non-TCB code from exfiltrating
+Cryptography and/or MMU, xPMP, MTT | Prevent non-TCB code from exfiltrating
 information without TEE consent/opt-in | Supervisor Domains (Sdid, Smmtt)
 
 | Shared Memory | TEE controls data shared with another TEE | Implementation
@@ -317,7 +317,7 @@ Workloads | Malicious host tampers with nested VMM policies | Future CoVE ABI
 Interoperability with security features for TVM workload | Unauthorised security
  TVM | Future CoVE ABI
 
-| Operational Features | QOS interoperability | Implementation-specific |
+| Operational Features | QoS interoperability | Implementation-specific |
 Interoperability with QoS features for TVM workload | Malicious host uses QoS
 capabilities as a side-channel | Security Model
 

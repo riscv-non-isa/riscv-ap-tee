@@ -1,0 +1,8 @@
+[[appendix_d]]
+== Appendix D: M-mode TSM based deployment model
+
+[id=depd]
+[caption="Figure {counter:image}"]
+[title= ": M-mode TSM based deployment model for CoVE"]
+image::img_11.png[align=center]
+

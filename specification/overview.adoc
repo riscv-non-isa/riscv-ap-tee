@@ -23,7 +23,7 @@ Domain to enforce TCB and confidentiality properties, while using an isolated
 (Hosting) Supervisor Domain for the host domain, thus maintaining the OS/VMMs
 role as the resource manager (for both legacy VMs and TVMs). As will be described
 in this document the architecture can be
-implemented on processors that do not support supervisor domains (smmtt). 
+implemented on processors that do not support supervisor domains (Smmtt extension). 
 When supervisor domains are available the resources
 managed by the hosting supervisor domain (OS/VMM) include memory, CPU, I/O
 resources and platform capabilities to host the TVM workload. The terms
@@ -43,10 +43,9 @@ Manager is called the " *TEE Security Manager* " or *(TSM)* - it acts as the
 trusted intermediary between TEE and non-TEE workloads on the same platform.
 The TSM should have a minimal hardware-attested footprint. The TCB (which includes
 the TSM and hardware) enforces strict confidentiality and integrity security
-properties for workloads in this supervisor domain. The Root Security Manager
-is an M-mode software module (called the " *TSM-driver* ") which isolates the
-Confidential Supervisor Domain from all other Supervisor domains and other
-platform components (non-confidential and
+properties for workloads in this supervisor domain. The Root Security Manager, 
+also called the " *TSM-driver* ", isolates the Confidential Supervisor Domain 
+from all other Supervisor domains and other platform components (non-confidential and
 confidential). The responsibility of the TSM is to enforce the security
 objectives accorded to TEE workloads assigned to that supervisor domain. The
 VMM is expected to continue to manage the security for non-confidential
@@ -90,10 +89,12 @@ TVMs may be hosted by the host OS/VMM via confidential supervisor domains.
 Each TVM may consist of the guest firmware, a guest OS and applications. The
 software components included in the TVM are implementation specific.
 
-As shown in <<dep1>>, the M-mode firmware TSM-driver is in the TCB of all
-Supervisor domains and hence in the TCB for all CoVE workloads hosted on the
-platform. The TSM-driver (operating in M-mode) uses
-the hardware capabilities to provide:
+<<dep1>> shows the deplyment model in which the TSM-driver runs in M-mode and TSM runs 
+in HS-mode. Thus the TSM-driver is in the TCB of all supervisor domains and hence in 
+the TCB for all CoVE workloads hosted on the platform. Systems without the requirement 
+for multiple supervisor domains might combine TSM-driver and TSM and run them together 
+the M-mode, see <<appendix_d>>. The TSM-driver (operating in M-mode) uses the hardware 
+capabilities to provide:
 
 * Isolation of memory associated with TEEs (including the TSM). We describe
 *Confidential memory* as memory that is subject to access-control,
@@ -115,16 +116,16 @@ as *COVH* that includes functions to manage the lifecycle of the TVM, such as
 creating, adding pages to a TVM, scheduling a TVM for execution, etc., in an
 OS/platform agnostic manner. The TSM also provides an ABI to the TVM contexts:
 A set of guest ABIs known as *COVG* that enables the TVM workload to request
-attestation functions, memory management functions, or paravirtualized IO.
+attestation functions, memory management functions, or paravirtualized IO. 
 
 In order to isolate the TVMs from the host OS/VMM and non-confidential VMs,
-the supervisor domains (that contain the TSM state) must be isolated first -
-this is achieved by enforcing isolation for memory assigned to the supervisor
-domain that the TSM occupies - this is called the *TSM-memory-region.* The
-TSM-memory-region is expected to be a static region of memory that holds the TSM
-code and data. This region must be access-controlled from all software outside
-the TCB (e.g., using Smmtt), and may be additionally protected against physical
-access via cryptographic mechanisms.
+the supervisor domains (that contain the TSM state) must be isolated first.
+This is achieved by enforcing isolation for memory assigned to the supervisor
+domain that the TSM occupies. This memory region is called *TSM-memory-region* and 
+is expected to be a static region of memory that holds the TSM code and data. 
+It must be access-controlled from all software outside the TCB (e.g., using Smmtt 
+or PMP), and may be additionally protected against physical access with help of 
+cryptographic mechanisms.
 
 Access to the TSM-memory-region and execution of code from the
 TSM-memory-region (for the TSM ABIs) is enforced in hardware via the maintenance
@@ -132,9 +133,9 @@ of the execution context (ASID, VMID and SDID) maintained per hart. This context
 is enabled per-hart via the TEECALL interface to context switch into the
 confidential supervisor domain context via the TSM-driver and disabled
 via the TEERET interface to context restore to the hosting supervisor domain.
-Access to TEE-assigned memory is allowed for the hart when the access is
-permitted as per the active permissions enforced by the memory management unit (MMU) for the supervisor
-domain active on the hart (enforced through Sv and Smmtt for CoVE). This
+Access to TEE-assigned memory is allowed for the hart when access is
+permitted as per the active permissions enforced by the memory management unit (MMU) 
+for the supervisor domain active on the hart (enforced through Sv and Smmtt for CoVE). This
 per-hart execution context is used by the processor to enforce access-control
 properties on memory accessed by TEE workloads managed by the TSM. The
 details of the supervisor domain access protection is specified in the Smmtt
@@ -146,12 +147,13 @@ the security of the TVMs through the resource management actions of the
 OS/VMM. These security primitives require the TSM to enforce TVM virtual-hart
 state save and restore, as well as enforcing invariants for memory assigned
 to the TVM, including G-stage translation. The host OS/VMM provides the
-typical VM resource management functionality for memory, IO, etc.
+typical VM resource management functionality for memory, IO, and VM's lifecycle
+management.
 
-<<dep1>> shows Confidential VMs managed by a VMM and <<dep1a>> shows Confidential
-applications managed by an untrusted host OS. As evident from the architecture, the difference
-between these two scenarios is the software TCB (owned by the tenant within
-the TVM) for the tenant workload - in the application TEE case, a minimal
+<<dep1>> shows TVMs (a.k.a. confidential VMs) managed by a VMM and <<dep1a>> shows Confidential
+applications managed by an untrusted host OS. As evident from the architecture, the 
+difference between these two scenarios is the software TCB (owned by the tenant within
+the TVM) for the tenant workload in the application TEE case, a minimal
 guest runtime may be used; whereas in the VM TEE case, an enlightened
 guest OS is expected in the TVM TCB. Other software models that map to the VU/VS
 modes of operation are also possible as TEE workloads. Importantly, the hardware
@@ -164,6 +166,6 @@ CoVE ABI.
 image::img_1.png[]
 
 The detailed architecture is described in the Section <<refarch>>. Note that the
-architecture described above may have various implementations, however the goal
+architecture described above may have various implementations. However, the goal
 of this specification is to propose a reference architecture and ratify a
-normative CoVE ABI for Confidential VMs as a RISC-V non-ISA specification.
+normative CoVE ABI for TVMs as a RISC-V non-ISA specification.
