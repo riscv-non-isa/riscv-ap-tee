@@ -92,7 +92,7 @@ software components included in the TVM are implementation specific.
 <<dep1>> shows the deplyment model in which the TSM-driver runs in M-mode and TSM runs 
 in HS-mode. Thus the TSM-driver is in the TCB of all supervisor domains and hence in 
 the TCB for all CoVE workloads hosted on the platform. Systems without the requirement 
-for multiple supervisor domains might combine TSM-driver and TSM and run them together 
+for multiple confidential supervisor domains might combine TSM-driver and TSM and run them together 
 the M-mode, see <<appendix_d>>. The TSM-driver (operating in M-mode) uses the hardware 
 capabilities to provide:
 

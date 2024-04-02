@@ -94,10 +94,22 @@ the current status of the TSM. The TSM must be in `TSM_READY` in order to
 process further ECALLs.
 
 ===== TVM creation
-TVMs are created using the sbi_covh_create_tvm(). This creates a TVM with state
-set to `TVM_INITIALIZING`.
-The host must assign confidential memory for page tables, payload mapping, and
-vCPUs before it can be transitioned into the `TVM_RUNNABLE` state.
+A TVM might be created in two ways: (1) a non-confidential VM requests TSM to be promoted 
+to a TVM, (2) VMM assemblies a TVM under the TSM supervision.
+
+The promotion of a non-confidential VM to a TVM happens when a non-confidential VM
+executes a `sbi_covh_create_tvm()` call. TSM handles this call by copying the entire
+VMs state (CPU state, memory) into confidential memory. This is performed as a single 
+operation after which the newly created TSM is in the `TVM_RUNNABLE` state. This way
+of TVM creation reduces the number of ABI calls, thus simplifies the TSM implementation.
+
+In the second approach, VMM assembles the TVM in a sequences of calls to TSM. The first 
+call is `sbi_covh_create_tvm()` that creates a TVM in `TVM_INITIALIZING` state. With 
+subsequent calls to TSM, VMM requests assignment of confidential memory for page tables, 
+payload mapping, and vCPUs. The last call transitions TVM into the `TVM_RUNNABLE` state.
+The advantage of this approach is that the TVM creation, which is a time-consuming operation,
+does not block the CPU for a single long interval, allowing for concurrent execution of other
+workloads.
 
 ===== TVM memory management
 The host is responsible for the following memory management functions:
