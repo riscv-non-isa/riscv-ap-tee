@@ -21,8 +21,8 @@ set of software-based and hardware-based threats per the threat model described
 in <<threatmodel>>. The architecture describes an isolated (Confidential) Supervisor
 Domain to enforce TCB and confidentiality properties, while using an isolated
 (Hosting) Supervisor Domain for the host domain, thus maintaining the OS/VMMs
-role as the resource manager (for both legacy VMs and TVMs). As will be described
-in this document the architecture can be
+role as the resource manager (for both legacy VMs and TVMs). 
+The architecture can be
 implemented on processors that do not support supervisor domains (Smmtt extension). 
 When supervisor domains are available the resources
 managed by the hosting supervisor domain (OS/VMM) include memory, CPU, I/O
@@ -52,7 +52,7 @@ VMM is expected to continue to manage the security for non-confidential
 workloads, and importantly the resource-assignment and scheduling management
 functions for all confidential and non-confidential workloads.
 
-In this scheme, compute resources, such as memory, start off as traditional
+In this model, compute resources, such as memory, start off as traditional
 untrusted resources owned by the non-confidential/hosting supervisor domain, and
 are expected to be donated/transitioned to the confidential supervisor domain
 via application binary interface (ABI) supported by the TSM. Once the conversion process is complete,
@@ -90,11 +90,12 @@ Each TVM may consist of the guest firmware, a guest OS and applications. The
 software components included in the TVM are implementation specific.
 
 <<dep1>> shows the deplyment model in which the TSM-driver runs in M-mode and TSM runs 
-in HS-mode. Thus the TSM-driver is in the TCB of all supervisor domains and hence in 
-the TCB for all CoVE workloads hosted on the platform. Systems without the requirement 
-for multiple confidential supervisor domains might combine TSM-driver and TSM and run them together 
-the M-mode, see <<appendix_d>>. The TSM-driver (operating in M-mode) uses the hardware 
-capabilities to provide:
+in HS-mode. Systems without Smmtt or the requirement 
+for multiple supervisor domains can combine the functions of the TSM-driver and TSM  
+in M-mode, see <<appendix_d>>. When supervisor domains are in use
+ the TSM-driver is in the TCB of all supervisor domains and hence in 
+the TCB for all CoVE workloads hosted on the platform.  The TSM-driver 
+(operating in M-mode) uses the hardware capabilities to provide:
 
 * Isolation of memory associated with TEEs (including the TSM). We describe
 *Confidential memory* as memory that is subject to access-control,
