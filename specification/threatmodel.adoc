@@ -150,7 +150,7 @@ system, Supervisor Domains (Sdid, Smmtt)
  and/or MMU, xPMP, MTT extension | Prevent non-TCB components from reading
 TEE memory | Priv ISA w/ virtual memory system, Supervisor Domains (Smmtt)
 
-| Memory Confidentiality | Cipher text read prevention | Required | Cryptography
+| Memory Confidentiality | Cipher text read prevention | Optional | Cryptography
  and/or MMU, xPMP, MTT extension | Prevent non-TCB components from accessing
 encrypted TEE memory | Supervisor Domains
 
