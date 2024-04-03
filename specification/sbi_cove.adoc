@@ -2,7 +2,7 @@
 
 [[sbi_tee]]
 == Confidential VM Extension (CoVE) SBI extension proposal
-This section describes the normative Confidential VM Extension(CoVE) SBI
+This section describes the normative Confidential VM Extension (CoVE) SBI
 extension. This specification introduces four new extensions:
 
 * Supervisor Domains Enumeration Extension (EXT_SUPD)
@@ -37,9 +37,8 @@ Other future specifications (e.g., CoVE-IO) may need to extend one of the three
 CoVE SBI extensions with domain specific functions. In order to support that
 requirement each one of the CoVE extensions SBI function IDs (`FID`) in the
 availabe 64K range is split into separate namespaces.
-% what 64K above means? 64KB?
 
-The main CoVE specification uses FIDs from 0 to 1023 (inclusive), and other
+The main CoVE specification uses SBI's function identifiers (FIDs) from 0 to 1023 (inclusive), and other
 specifications can extend the CoVE SBI by reserving a FID range after 1024.
 
 Below are the reserved CoVE FID namespaces:
@@ -69,7 +68,7 @@ entity like the OS/VMM (host) in conjunction with the TSM.
 
 . Platform TSM detection and capability enumeration.
 . Conversion of non-confidential memory to confidential memory.
-. Trusted VM (TVM) creation.
+. TEE VM (TVM) creation.
 . Donating confidential memory to the TSM for TVM page management.
 . Defining TVM confidential memory regions.
 . Mapping TVM code and data payload to confidential-memory regions.
@@ -95,21 +94,23 @@ process further ECALLs.
 
 ===== TVM creation
 A TVM might be created in two ways: (1) a non-confidential VM requests TSM to be promoted 
-to a TVM, (2) VMM assemblies a TVM under the TSM supervision.
+to a TVM, (2) VMM assembles a TVM under the TSM supervision.
 
-The promotion of a non-confidential VM to a TVM happens when a non-confidential VM
-executes a `sbi_covh_create_tvm()` call. TSM handles this call by copying the entire
-VMs state (CPU state, memory) into confidential memory. This is performed as a single 
-operation after which the newly created TSM is in the `TVM_RUNNABLE` state. This way
-of TVM creation reduces the number of ABI calls, thus simplifies the TSM implementation.
+The promotion of a non-confidential VM to a TVM happens when a regular (non-confidential) VM
+executes a `sbi_covg_promote_to_tvm()` call. TSM handles this call by copying the entire
+VMs state (the CPU state, VM memory, page tables) into confidential memory. This is performed as a single 
+operation after which the newly created TSM is in the `TVM_RUNNABLE` state. 
+
+[NOTE]
+====
+Creating a TVM in a single step reduces the number of ABI calls, thus simplifies the TSM and OS/VMM implementation. 
+However, it will block the CPU for the duration of the TVM creation.
+====
 
 In the second approach, VMM assembles the TVM in a sequences of calls to TSM. The first 
 call is `sbi_covh_create_tvm()` that creates a TVM in `TVM_INITIALIZING` state. With 
 subsequent calls to TSM, VMM requests assignment of confidential memory for page tables, 
 payload mapping, and vCPUs. The last call transitions TVM into the `TVM_RUNNABLE` state.
-The advantage of this approach is that the TVM creation, which is a time-consuming operation,
-does not block the CPU for a single long interval, allowing for concurrent execution of other
-workloads.
 
 ===== TVM memory management
 The host is responsible for the following memory management functions:
@@ -120,6 +121,15 @@ The host is responsible for the following memory management functions:
 . Mapping TVM code and data payload to confidential TVM-pages.
 . Mapping zero-page confidential pages to the TVM regions.
 . Mapping non-confidential pages TVM-defined regions for shared-pages / MMIO.
+
+[NOTE]
+====
+The division into confidential and non-confidential memory might be done statically or dynamically. 
+CoVE implementations that support only static partitioning of confidential and 
+non-confidential memory (for example, high-assurance systems that must be formally verified, see <<appendix_d>>) 
+might partition the memory during platform initialization before execution of untrusted code, 
+and thus do not need to implement above ABI.
+====
 
 ===== Converting non-confidential memory to confidential memory
 Platform memory is non-confidential by default, and must be converted to
@@ -302,21 +312,25 @@ accessible to the host.
 ====
 
 ===== vCPU creation
-The host must register CPUs/harts with the TSM before they can be used for TVM
+During assembly of a TVM, the host must register CPUs/harts with the TSM before they can be used for TVM
 execution by calling `sbi_covh_create_tvm_vcpu()`. The NACL shared memory
 interface is used between the host and the TSM for processing TVM exits from
-`sbi_covh_run_tvm_vcpu()`.
+`sbi_covh_run_tvm_vcpu()`. The vCPU creation is not required for TVMs created
+using `sbi_covg_promote_to_tvm()` because TSM reuses vCPUs number defined in the
+flattened device tree (FDT).
 
-===== TVM execution
-Following the assignment of memory and vCPU resources, the host can transition
-the guest into a `TVM_RUNNABLE` state by calling `sbi_covh_finalize_tvm()`.
+===== Finalization of TVM creation 
+The OS/VMM that finishes the assembly of a TVM, i.e., assignment of memory and 
+vCPU resources to a TVM, transitions the guest into a `TVM_RUNNABLE` state by 
+calling `sbi_covh_finalize_tvm()`.
 The host must set up TVM Boot vCPU execution parameters like the
 entrypoint (`ENTRY_PC`) and boot argument (`ENTRY_ARG`) using arguments to
 `sbi_covh_finalize_tvm()`. Note that some COVH calls are no longer permissible
-after this transition.
+after this transition. 
 
-The host can then call sbi_covh_run_tvm_vcpu()` to begin execution. The host
-must boot vCPU `0` first otherwise `sbi_covh_run_tvm_vcpu()` call will fail.
+===== TVM execution
+The host can then call `sbi_covh_run_tvm_vcpu()` to begin execution. The host
+must run the TVM Boot vCPU first otherwise `sbi_covh_run_tvm_vcpu()` call will fail.
 TVM execution continues until there is an event like an interrupt, or
 fault that cannot be serviced by the TSM. Some interrupts and exceptions are
 resumable, and the host can determine specific reason by examining the `scause`
@@ -387,7 +401,7 @@ shared memory region. The expectation
 is that the host will service a subsequent page-fault that results from a
 TVM-access to the non-confidential region.
 
-===== TVM-defined Shared memory regions
+===== TVM-defined shared memory regions
 TVMs can choose to yield access to confidential memory at runtime and request
 shared (non-confidential) memory.
 The TVM must communicate its request to the host to convert confidential to
@@ -1663,6 +1677,42 @@ COVE-Guest calls cause a trap to the TSM. TSM should do any processing required
 and then must forward the ECALL to the host with `scause` set to ECALL, `a7` set
 to EID, `a6` set to FID (See <<cove-fid>>), `a0`-`a5` set to ECALL args.
 
+[#sbi_covg_promote_to_tvm]
+=== Function: COVE Guest Promote to TVM (FID #0)
+[source, C]
+-----
+struct sbiret sbi_covg_promote_to_tvm(unsigned long fdt_addr,
+                                      unsigned long auth_addr);
+-----
+A VM requests a TSM to be promoted to a TVM. The `fdt_addr` is the guest physical address 
+of the flattened device tree (FDT). `auth_addr` is the guest physical address of the `authentication blob` 
+used for `local attestation`. VMs that do not require local attestation (only the remote attestation)
+must write `0` to `auth_addr`.
+
+The VM must make this call early during the boot process, so that the content of memory
+is known and the resulting integrity measurement hash is deterministic. TSM uses VM page table to copy
+VM's data to confidential memory. TSM extracts from FDT information about the number of vCPUs, allocating
+required amount of memory and populating one with the vCPU state of the caller.
+
+On success, TSM reflects an SBI call `sbi_register_tvm(unsigned long tvm_guest_id)` to the hypervisor.
+The hypervisor marks the VM as TVM and releases the VM memory. For now on, OS/VMM interacts with TVM
+with help of TSM using the COVH ABI. For example, it resumes TVM using the `sbi_covh_run_tvm_vcpu()` call.
+
+If the call fails, the TSM returns SBI error code in `sbiret.error` to the VM. The possible error codes 
+are shown below.
+
+[#table_sbi_covg_promote_to_tvm_errors]
+.COVE Guest Promote to TVM Errors
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `fdt_addr` was invalid.
+| SBI_ERR_AUTH            | Local attestation failed.
+| SBI_ERR_OUT_OF_MEMORY   | Not enough memory to store TVM
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
 [#sbi_covg_add_mmio_region]
 === Function: COVE Guest Add MMIO Region (FID #0)
 [source, C]
@@ -2261,7 +2311,7 @@ This interface specification is TBD for version 2 of the ABI.
 
 |===
 
-=== Summary of CoVE Interrupt Extension(COVI)
+=== Summary of CoVE Interrupt Extension (COVI)
 
 |===
 | <<sbi_covi_init_tvm_aia, sbi_covi_init_tvm_aia>> | This

@@ -9,7 +9,7 @@ including the OS/VMM interactions with the TSM.
 === TVM build and initialization
 
 The host OS/VMM must be capable of hosting many TVMs on a CoVE-capable
-platform (limited only by the practical limits of the number of cpus and
+platform (limited only by the practical limits of the number of CPUs and
 the amount of memory available on the system). To that end, the TVM should
 be able to use all of the system memory as confidential memory, as long as
 the platform access-control mechanisms are applicable to all the available

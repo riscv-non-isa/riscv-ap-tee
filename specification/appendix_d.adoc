@@ -1,8 +1,34 @@
 [[appendix_d]]
 == Appendix D: M-mode TSM based deployment model
 
+This deployment model targets high-assurance systems whose design might be constrained by real-time and formal verification requirements. It trade offs a feature-rich design supporting, e.g., dynamic resource allocation, for simpler implementation, which correctness can be formally verified.
+
 [id=depd]
 [caption="Figure {counter:image}"]
 [title= ": M-mode TSM based deployment model for CoVE"]
 image::img_11.png[align=center]
 
+=== Overview
+<<depd>> shows that the deployment model supports a single confidential supervisor domain in which the TSM runs along the TSM driver in the M-mode. This single confidential supervisor domain can run multiple TVMs that are isolated from each other using MMU, i.e., G-stage page tables managed by TSM. TSM isolates the hosting supervisor domain (i.e., OS/VMM and non-confidential applications and VMs) from the confidential supervisor domain (TSM and TVMs) using a hardware memory isolation mechanism, like PMP. The Smmtt extension is therefore not required. IO accesses to confidential memory must be prevented with, for example, IOPMP.
+
+[NOTE]
+====
+Since the TSM is not required to run in the HS-mode, this deployment model supports systems that emulate the hypervisor extension.
+====
+
+=== Static memory partitioning
+The deployment model proposes static partitioning of memory into confidential and non-confidential parts to simplify formal reasoning about the correctness of the TVM execution and isolation. TSM might perform this paritioning early during the boot of the platform, resulting in the following advantages: (1) simplified formal reasoning about the ownership of memory, (2) reacher attestation that covers static system configuration (e.g., values of PMP registers), (3) reduced attack surface between OS/VMM and TSM (narrower ABI). On the other hand, static partitioning might lead to underutilization of resources.
+
+=== TVM creation
+To reduce the complexity of the TSM implementation, TSM creates TVM as a result of a single operation triggered with the `sbi_covg_promote_to_tvm()` call. Specifically, OS/VMM initializes and starts a regular VM, which early during the boot process requests to be promoted to TVM. This call is reflected to TSM that copies TVM data, the page table configuration, and the vCPU state into confidential memory. 
+
+=== Local attestation
+Embedded systems might operate without access to network, what prevents use of remote attestation. From this reason, this deployment model aims for local attestation, in which the TSM attests to the integrity of the TVM image during its creation and allows its creation only when it contains a specfic cryptographic authentication blob. This attestation blob will the be signed with the expected attestation key, specific to the TSM integrity and platform configuration.
+
+=== Further recommendations
+Embedded systems with real-time requirements must have fixed upper bounded execution time. This requires determining maximal number of instructions that can execute between TVM context switches. From this reason, this deployment model recommends an uninterruptible TSM. <<depd2>> shows this operation mode, in which TSM running in M-mode exposes COVH and COVG ABI to OS/VMM and TVM, respectively. VM ECALLS trap directly to TSM due to the `medeleg` configuration and all interrupts during TVM execution trap in tSM due to the `mideleg` configuration. 
+
+[id=depd2]
+[caption="Figure {counter:image}"]
+[title= ": TSM operation"]
+image::img_13.png[align=center]
