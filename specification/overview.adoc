@@ -22,11 +22,10 @@ in <<threatmodel>>. The architecture describes an isolated (Confidential) Superv
 Domain to enforce TCB and confidentiality properties, while using an isolated
 (Hosting) Supervisor Domain for the host domain, thus maintaining the OS/VMMs
 role as the resource manager (for both legacy VMs and TVMs). 
-The architecture can be
-implemented on processors that do not support supervisor domains (Smmtt extension). 
-When supervisor domains are available the resources
+
+On processors supporting supervisor domains (the Smmtt extension), the resources
 managed by the hosting supervisor domain (OS/VMM) include memory, CPU, I/O
-resources and platform capabilities to host the TVM workload. The terms
+resources and platform capabilities required to host the TVM workload. The terms
 hosting supervisor domain and OS/VMM are used interchangeably in this
 specification. The underlying memory isolation mechanisms for supervisor domains
 (Smmtt) is agnostic of the number of supervisor domains.
@@ -39,7 +38,7 @@ image::img_0.png[]
 As shown in <<dep1>>, the Confidential Supervisor Domain is managed by software
 that operates in HS-mode and manages resources granted to it by the Hosting
 Supervisor Domain Manager (the OS/VMM). The Confidential Supervisor Domain
-Manager is called the " *TEE Security Manager* " or *(TSM)* - it acts as the
+Manager is called the " *TEE Security Manager* " or *(TSM)* and acts as the
 trusted intermediary between TEE and non-TEE workloads on the same platform.
 The TSM should have a minimal hardware-attested footprint. The TCB (which includes
 the TSM and hardware) enforces strict confidentiality and integrity security
@@ -47,16 +46,19 @@ properties for workloads in this supervisor domain. The Root Security Manager,
 also called the " *TSM-driver* ", isolates the Confidential Supervisor Domain 
 from all other Supervisor domains and other platform components (non-confidential and
 confidential). The responsibility of the TSM is to enforce the security
-objectives accorded to TEE workloads assigned to that supervisor domain. The
+objectives accorded to TEE workloads (TVMs) assigned to that supervisor domain. The
 VMM is expected to continue to manage the security for non-confidential
 workloads, and importantly the resource-assignment and scheduling management
 functions for all confidential and non-confidential workloads.
+Note that CoVE implementations that support only one Confidential Supervisor
+Domain might combine TSM and TSM-driver functionality in a single deployment unit.
 
-In this model, compute resources, such as memory, start off as traditional
+CoVE supports models with dynamic resource allocations, where 
+compute resources, such as memory, start off as traditional
 untrusted resources owned by the non-confidential/hosting supervisor domain, and
 are expected to be donated/transitioned to the confidential supervisor domain
 via application binary interface (ABI) supported by the TSM. Once the conversion process is complete,
-confidential memory may be assigned to one or more TVMs by the TSM.
+TSM may may assign confidential memory to one or more TVMs.
 A converted confidential resource may be freely assigned to another TVM within
 the same supervisor domain when it is no longer in use. However, an
 unused confidential resource must be explicitly reclaimed for use in the
@@ -66,12 +68,12 @@ properties). The hosting supervisor domain may use the reclaimed memory
 for itself or for non-confidential VMs.
 
 Each TVM's address space can be comprised of confidential and non-confidential
-regions. The former includes both measured pages (that are part of the initial
-TVM payload), and confidential zero-pages that can be mapped-in on demand by
+regions. The former may include measured pages (that are part of the initial
+TVM payload) and confidential zero-pages that can be mapped-in on demand by
 the VMM following runtime accesses by the TVM. These zero'ed confidential pages
 are pages that are demand-paged in and are expected to be zero'ed by the TSM to
 prevent attacks from the host software on the TVM. The TSM also enforces that
-the host does not overlap them with existing (present) G-stage mappings for the
+the host does not overlap them with the existing (present) G-stage mappings for the
 TVM. The non-confidential TVM-defined regions include those for shared-pages and
 memory-mapped I/O (MMIO).
 
@@ -89,12 +91,12 @@ TVMs may be hosted by the host OS/VMM via confidential supervisor domains.
 Each TVM may consist of the guest firmware, a guest OS and applications. The
 software components included in the TVM are implementation specific.
 
-<<dep1>> shows the deplyment model in which the TSM-driver runs in M-mode and TSM runs 
-in HS-mode. Systems without Smmtt or the requirement 
-for multiple supervisor domains can combine the functions of the TSM-driver and TSM  
-in M-mode, see <<appendix_d>>. When supervisor domains are in use, the TSM-driver is in the TCB of all supervisor domains and hence in 
-the TCB for all CoVE workloads hosted on the platform. The TSM-driver 
-(operating in M-mode) uses the hardware capabilities to provide:
+<<dep1>> shows the deployment model in which the TSM-driver runs in M-mode and TSM runs 
+in HS-mode. Systems without Smmtt or the requirement for multiple supervisor domains 
+can combine the functions of the TSM-driver and TSM in M-mode, see <<appendix_d>>. 
+When supervisor domains are in use, the TSM-driver is in the TCB of all supervisor 
+domains and hence in the TCB for all CoVE workloads hosted on the platform. 
+The TSM-driver, which always operates in M-mode, uses the hardware capabilities to provide:
 
 * Isolation of memory associated with TEEs (including the TSM). We describe
 *Confidential memory* as memory that is subject to access-control,
@@ -111,10 +113,10 @@ The TSM-driver delegates parts of the TEE management functions to the TSM,
 specifically isolation across confidential memory assigned to TVMs. The TSM is
 designed to be portable across RISC-V platforms (that support CoVE) and interact
 with the machine specific capabilities in the platform through the TEEI. The TSM
-provides an ABI to the OS/VMM which has two aspects: A set of host ABIs known
+provides an ABI to the OS/VMM which has two aspects. First, a set of host ABIs known
 as *COVH* that includes functions to manage the lifecycle of the TVM, such as
 creating, adding pages to a TVM, scheduling a TVM for execution, etc., in an
-OS/platform agnostic manner. The TSM also provides an ABI to the TVM contexts:
+OS/platform agnostic manner. Second, the TSM also provides an ABI to the TVM contexts:
 A set of guest ABIs known as *COVG* that enables the TVM workload to request
 attestation functions, memory management functions, or paravirtualized IO. 
 
@@ -151,7 +153,7 @@ typical VM resource management functionality for memory, IO, and VM's lifecycle
 management.
 
 <<dep1>> shows TVMs (a.k.a. confidential VMs) managed by a VMM and <<dep1a>> shows Confidential
-applications managed by an untrusted host OS. As evident from the architecture, the 
+applications managed by an untrusted host (OS/VMM). As evident from the architecture, the 
 difference between these two scenarios is the software TCB (owned by the tenant within
 the TVM) for the tenant workload in the application TEE case, a minimal
 guest runtime may be used; whereas in the VM TEE case, an enlightened
@@ -166,6 +168,6 @@ CoVE ABI.
 image::img_1.png[]
 
 The detailed architecture is described in the Section <<refarch>>. Note that the
-architecture described above may have various implementations. However, the goal
-of this specification is to propose a reference architecture and ratify a
+architecture described above may have various implementations (e.g., see <<appendix_c>> and <<appendix_d>>).
+However, the goal of this specification is to propose a reference architecture and ratify a
 normative CoVE ABI for TVMs as a RISC-V non-ISA specification.
