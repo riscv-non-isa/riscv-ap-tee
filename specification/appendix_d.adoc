@@ -45,6 +45,19 @@ during its creation and allows its creation only when it contains a specfic cryp
 attestation blob will the be signed with the expected attestation key, specific to the TSM integrity and platform 
 configuration.
 
+[note]
+====
+I am not sure that this definition is fully correct. We need to refer to the attestation call, reminding the reader
+that the same call is used for local and remote attestation. In PEF local attestatin works as follows. The 
+builder of the TVM had to know a public key associated with the hardware, a TPM. THe TVM was built with an 
+encrypted disk. The encryption key was sealed to the secret in the TPM and the attestation state so that 
+if the attestation state was incorrect or the key was incorrect then the TSM would be unable to supply the key 
+to enable the TVM to decrypt its disk. This meant that the measurments for the hardware environment have to be correct
+and the TVM has to be authorized to run on that hardware. This sort of structure needs to be described.
+
+It is important to note that there are multiple ways to enable this.
+====
+
 === Further recommendations
 Embedded systems with real-time requirements must have a fixed upper bounded for execution time. This requires determining 
 the maximal number of instructions that can execute between TVM context switches. From this reason, this deployment model 
