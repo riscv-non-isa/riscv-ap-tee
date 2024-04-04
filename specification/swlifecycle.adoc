@@ -25,7 +25,7 @@ controls described earlier).
 confidential memory regions for various purposes like creating TVM workloads
 etc.
 
-[note]
+[NOTE]
 ====
 In deployment model 3 described in <<appendix_d> creation of the confidential
 memory region is statically done at boot time.
@@ -37,10 +37,10 @@ using the `sbi_covh_create_tvm()` function. An initial set of memory pages are
 granted to the TSM and tracked as TEE pages associated with that TVM from
 that point onwards until the TVM is destroyed via the `sbi_covh_destroy_tvm()`
 function. In deployment model 3, all TVMs start execution as a VM.
-To become a TVM, the VM request that the TSM change it into
-a TVM using the sbi_coveh_promote_TVM call. 
+To become a TVM, a VM requests that the TSM changes it into
+a TVM using the `sbi_coveg_promote_to_tvm()` call. 
 
-=== Deployment Models 1 and 2
+==== Deployment Models 1 and 2
 
 When a TVM context is created and initialized by using the
 `sbi_covh_create_tvm()` function - this global init function allocates a
@@ -76,9 +76,9 @@ measurement of the TVM via `sbi_covh_finalize_tvm()`. The TSM prevents any
 TVM virtual harts from being entered until the TVM initialization is
 finalized.
 
-=== Deployment Model 3
+==== Deployment Model 3
 
-When a TVM context is created and intialized by using the sbi_coveh_promote_TVM
+When a TVM context is created and intialized by using the `sbi_coveg_promote_to_tvm()`
 call all of the pages of the TVM are allocate at creation. The default 
 configuration, control structures are initialized. The TVM is measured 
 as part of the initializtion process.
@@ -174,12 +174,12 @@ enforcing the security requirements to track the assignment of memory pages to
 a supervisor domain/TSM. The TSM manages subsequent assignment of memory to
 TVMs.
 
-[note]
+[NOTE]
 ====
 This section describes memory management when Smmtt is available enabling dynamic assignment
 of pages to a TVM and conversion of pages from confidential to non-confidential and from non-confidential
-to confidential. In deployment model 3, when Smmtt is not available and memory is statically divided
-between confidential and non-confidential memory dynamic assignment and conversion of memory is not 
+to confidential memory. In deployment model 3, when Smmtt is not available and memory is statically divided
+between confidential and non-confidential, dynamic assignment and conversion of memory is not 
 possible. The parts of this section that depend on Smmtt are not applicable.
 ====
 
@@ -256,7 +256,6 @@ per the global TLB management. If the page is assigned to a TVM, it is versioned
 the TVM-local TLB management.
 | Additional meta-data | Locking state
 |===
-% HGAT above what does it stand for, hypervisor guest address translation? should it be HGATP, or HGATP should be HGAT?
 
 ==== Page walk and Translation caching considerations
 
@@ -656,13 +655,11 @@ Confidential-Unassigned state.
 and returns the PA as an Non-Conf page to the VMM.
 * VMM translations to the PA (via 1st or G stage mappings) may be created now.
 
-[Note]
+[NOTE]
 ====
-For deployment model 3 when no Smmtt is available memory is dynamically partitions. TVM shutdown is
-simler, the VMM can cause all pages to be reclaimed via the sbi_covh_reclaim_pages which will 
-verify that the non-confidential pages are (no-operation) and
-* Verify that each confidential page is not assigned to a TVM
-* scrub each confidential page.
+If Smmtt is not available and memory is memory is statically partitioned into confidential and non-condiential, the TVM shutdown procedure is
+simpler. The OS/VMM can reclaim all confidential pages via the `sbi_covh_reclaim_pages()` call, which will 
+verify that the non-confidential pages are (no-operation) and (1) verify that each confidential page is not assigned to a TVM, (2) scrub each confidential page.
 ====
 
 === RAS interaction

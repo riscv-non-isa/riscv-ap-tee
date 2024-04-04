@@ -92,9 +92,8 @@ software components included in the TVM are implementation specific.
 <<dep1>> shows the deplyment model in which the TSM-driver runs in M-mode and TSM runs 
 in HS-mode. Systems without Smmtt or the requirement 
 for multiple supervisor domains can combine the functions of the TSM-driver and TSM  
-in M-mode, see <<appendix_d>>. When supervisor domains are in use
- the TSM-driver is in the TCB of all supervisor domains and hence in 
-the TCB for all CoVE workloads hosted on the platform.  The TSM-driver 
+in M-mode, see <<appendix_d>>. When supervisor domains are in use, the TSM-driver is in the TCB of all supervisor domains and hence in 
+the TCB for all CoVE workloads hosted on the platform. The TSM-driver 
 (operating in M-mode) uses the hardware capabilities to provide:
 
 * Isolation of memory associated with TEEs (including the TSM). We describe

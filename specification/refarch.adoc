@@ -120,19 +120,19 @@ image::https://github.com/riscv/riscv-smmtt/blob/main/images/fig2.png?raw=true[]
 
 ==== Management of Isolation for Confidential Physical Memory
 
-The software TCB (specifically TSM) manages the assignment of physical memory to the Confidential
+The software TCB (specifically TSM) manages the assignment of physical memory to the confidential
 supervisor domain, while the hardware TCB (specifically the hart MMU including virtual memory system,
 MTT Extensions) enforces the access-control for confidential memory against
 other supervisor domains. The region sizes at which the memory tracking enforces
 isolation may be multiples of the architectural page sizes supported by the hart
 MMU. The IOMMU is expected to support a similar memory tracking lookup
 to enable a device/function trusted by the TVM to directly access
-TVM confidential memory regions. For the CoVE reference architecture this TCB
+TVM confidential memory regions. For the CoVE reference architecture, this TCB
 consists of the hardware (e.g., MMU, IOMMU, Memory Controller) and the software/firmware elements -
 TSM-driver and the TSM. The TSM-driver is responsible for enforcing isolation of
-confidential memory regions (consisting of multiple pages via MTT) and the TSM
+confidential memory regions (e.g., via PMP or MTT) and the TSM
 is responsible for enforcing isolation of confidential memory pages among TVMs
-(via G-stage translation) - pages assigned to the TVM may be exclusively
+(e.g., via G-stage page tables) - pages assigned to the TVM may be exclusively
 accessible to the condidential supervisor domain or may be shared with the
 hosting supervisor domain (e.g., to allow for paravirtualized IO access).
 
@@ -143,13 +143,6 @@ TVM-owner, Page-sub-type, Translation Lookaside Buffer (TLB) versioning informat
 additional metadata, etc. This extended memory tracking information managed by
 the TSM software is referred to as the Extended Memory Tracking Table (EMTT).
 ====
-
-[Note]
-====
-When Smmtt is not available  in <dep3>  isolation is managed using G-Stage PTpage and
-PMPs.
-==== 
-
 
 ==== Handling Implicit & Explicit Memory Accesses
 For TVM accesses for instruction fetch and page walks, isolated/confidential

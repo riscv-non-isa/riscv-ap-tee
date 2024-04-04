@@ -10,9 +10,9 @@ running in. This framework allows for Remote and Local attestation.
 Remote attestation relies on the ability for the SoC to generate a cryptographic evidence
 for a workload executing in a CoVE TVM. The workload executing in a TVM may
 request this cryptographic evidence to relay to a remote relying party which
-verifies that the evidence is valid (per some appraisal policy). If valid the 
-evidence  attest to the trustworthiness of the TVM. When valid relying party 
-releases secrets or attestation result tokens back to the trusted workload.
+verifies that the evidence is valid (per some appraisal policy). If valid, the 
+evidence attests to the trustworthiness of the TVM, so that the relying party 
+can release secrets or attestation result tokens to the TVM.
 
 Local attestation is a model where the TVM presents cryptographic evidence to the TSM 
 that enables the TSM to release a secret to the TVM if it is authorized to
@@ -176,17 +176,11 @@ event log creation.
 
 All above described TCB elements measurements are added to an attestation
 evidence and then reported to relying parties. The attestation mechanism
-and protocol that take place between the attester (i.e. the TVM) and the
+and protocol that take place between the attester (i.e., the TVM) and the
 remote attestation service are out of this document scope.
 
-In this section we describe the high level attestation remote model for CoVE,
+In this section, we describe the high level model of remote attestation for CoVE,
 together with the attestation evidence content, format and generation process.
-
-[note]
-====
-Question: Should  local attestation's  mechanism and protocol between the attester (i.e.
-the TVM) and the TSM be out of scope for this document.  
-====
 
 ==== Model
 
