@@ -28,12 +28,9 @@ managed by the hosting supervisor domain (OS/VMM) include memory, CPU, I/O
 resources and platform capabilities required to host the TVM workload. The terms
 hosting supervisor domain and OS/VMM are used interchangeably in this
 specification. The underlying memory isolation mechanisms for supervisor domains
-(Smmtt) is agnostic of the number of supervisor domains. On processors with 
-hypervisor mode that 
-do not support Smmtt, a single confidential supervisor domain and a single
-non-confidential supervisor domain can be supported (see <<depd>> ).
-
-
+(Smmtt) is agnostic of the number of supervisor domains. On processors that do not support 
+multiple supervisor domains where Smmtt is not mandated, a single confidential supervisor 
+domain and a single hosting supervisor domain can be supported (see <<depd>>).
 
 [id=dep1]
 [caption="Figure {counter:image}", reftext="Figure {image}"]
