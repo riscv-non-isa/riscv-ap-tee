@@ -42,8 +42,32 @@ configuration, and the vCPU state into confidential memory.
 Embedded systems might operate without access to a network, which prevents use of remote attestation. For this 
 reason, this deployment model also supports local attestation, in which the TSM attests to the integrity of the TVM image 
 during its creation and allows its creation only when it contains a specfic cryptographic authentication blob. This 
-attestation blob will carry a cryptographic proof issued with the expected attestation key specific to the TSM integrity and platform 
-configuration.
+attestation blob will carry a cryptographic proof issued with the expected attestation key specific to the TSM integrity 
+and platform configuration. The call to promote to a TVM requires two parameters a pointer to the FDT and a pointer 
+to some cryptographic data. If the pointer to cryptographic data is zero, then remote attestation is used, 
+otherwise local attestation is used. Local attestation is strongest when it is hardware enforced.  
+
+Attestation in this environments two requires two properties. 
+. The TVM must be able to verify that the the configuration
+of the hardware platform is acceptable.
+. The embedded platform must be able to verify that the TVM is authorized to 
+run on the platform. Separate mechanisms are used to acheive these goals.
+
+
+====VM (TV) Authorization
+The TSM must have a list of public keys of those authorized to sign VM for execution on the platform. The 
+cryptographic data associated with the TVM will be
+signed with a private key. When the VM request to be promoted to a TVM the signature on the  the cryptographic data
+will be checked. If the signature is not valid the TSM will not convert the VM and terminate execution of the
+VM. The method for provisioning thes keys into the TSM is outside the scope of this specification.
+
+====Hardware Platform configuration
+For local attestation the standard approah is to encrypt the disk of the VM (that will become a TVM). THe key 
+that is used to decrypt the disk is sealed (in a TPM sense) to the measurment of the platform. THe creator decides what
+values are required inorde for the key to be released. Sealing prevents the valuse from being exposed during transmission
+of the VM. The principal is that the key will not be beavailabel unless the hardware is in the correct state. 
+
+
 
 === Further recommendations
 Embedded systems with real-time requirements must have a fixed upper bounded execution time. This requires determining 
