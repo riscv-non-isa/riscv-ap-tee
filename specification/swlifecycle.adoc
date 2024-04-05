@@ -102,9 +102,11 @@ the virtual-harts due to VS-stage translation changes (guest virtual to
 guest physical) performed by the TVM OS - these are initiated by the TVM OS
 to cause IPIs to the virtual-harts managed by the TVM OS (and verified by
 the TVM OS to ensure the IPIs are received by the TVM OS to invalidate the
-TLB lazily). This reference architecture requires use of AiA IMSIC <<R9>>
-to ensure these IPIs are delivered through the IMSIC associated with the
-guest TVM. Each TVM is allocated a guest interrupt file during TVM
+TLB lazily). 
+
+For implementations using AIA <<R9>>, this reference architecture requires 
+use of AIA IMSIC to ensure these IPIs are delivered through the IMSIC associated 
+with the guest TVM. Each TVM is allocated a guest interrupt file during TVM
 initialization.
 
 During TVM execution, the hardware enforces TSM-driven policies for memory
@@ -190,7 +192,7 @@ maintain compatibility with OS/VMM memory management, and is also enforced by th
 memory management unit (MMU). The correct operation of this access-control level is dependent 
 on trusted enforcement of item 1 above.
 
-In CoVE implementation that support MMT, the TSM-driver configures the memory tracking table (MTT) 
+In CoVE implementation that support MTT, the TSM-driver configures the MTT
 after enforcing the security requirements to track the assignment of memory pages to
 a supervisor domain/TSM. The TSM manages subsequent assignment of memory to TVMs. In implementations
 that do not implement MTT, memory must be statically partitioned into confidential and 
@@ -226,7 +228,8 @@ the GPA and enforced for memory access for the TVM by the hardware.
 
 ====  Information tracked per physical page
 
-The Extended Memory Tracking Table (EMTT) information managed by the TSM
+For implementations that utilize MTT the Extended Memory Tracking Table (EMTT) 
+information managed by the TSM
 is used to track additional fields of metadata associated with physical
 addresses.
 The page size is implicit in the MTT and EMTT lookup - 4KB, 2MB, 1GB, 512GB.
