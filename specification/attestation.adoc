@@ -166,7 +166,7 @@ The TVM measurement extension interface is exposed through the optional TG-ABI
 
 [NOTE]
 ====
-if an implementation uses UEFI firmware to initialize the CoVE TVM guest
+If an implementation uses UEFI firmware to initialize the CoVE TVM guest
 environment, then refer to UEFI specification <<R23>> chapter 38 on confidential
 computing for UEFI ABI related to runtime measurement extension and
 event log creation.
@@ -177,7 +177,7 @@ event log creation.
 All above described TCB elements measurements are added to an attestation
 evidence and then reported to relying parties. The attestation mechanism
 and protocol that take place between the attester (i.e., the TVM) and the
-remote attestation service are out of this document scope.
+remote attestation service are out of the scope of this document.
 
 In this section, we describe the high level model of remote attestation for CoVE,
 together with the attestation evidence content, format and generation process.
@@ -226,13 +226,13 @@ TCB layer measurements:
 [.center]
 [stem]
 ++++
-CDI_{0} = KDF(UDS_{Len},\ UDS\ ||\ H_{alg}(Meas(TCB_{0}))
+CDI_{0} = KDF(UDS_{Len},\ UDS\ ||\ H_{alg}(Meas(TCB_{0})))
 ++++
 :stem: asciimath
 [.center]
 [stem]
 ++++
-CDI_{N} = KDF(CDI_{Len},\ CDI_{N-1}\ ||\ H_{alg}(Meas(TCB_{N}))
+CDI_{N} = KDF(CDI_{Len},\ CDI_{N-1}\ ||\ H_{alg}(Meas(TCB_{N})))
 ++++
 
 Asymmetric key pairs can be derived from a CDI in order to generate the

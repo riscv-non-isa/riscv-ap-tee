@@ -258,7 +258,9 @@ per-hart control sub-structure THCS.hssa (See <<appendix_a>>). Figure 3 shows th
 flow.
 
 Beyond the basic operation described above, the following different
-operational models of the TSM may be supported by an implementation:
+operational models of the TSM may be supported by an implementation. 
+Interruptible TSM implementations must run TSM-driver and TSM in different
+processor privileged modes.
 
 * *Uninterruptible* *TSM* - In this model, the TSM security routines are
 executed in an uninterruptible manner for S-mode interrupts (M-mode
@@ -359,7 +361,7 @@ the TEECALL / TEERESUME)
 
 The TSM-driver is stateless across TEECALL invocations, however a security
 routine invoked in the TSM via a TEECALL may be interrupted and must be resumed
-via a TEERESUME i.e. _the TSM is preemptable but non-reentrant_. These
+via a TEERESUME, i.e., _the TSM is preemptable but non-reentrant_. These
 properties are enforced by the TSM-driver, and other models described above
 may be implemented. The TSM does not perform any dynamic resource
 management, scheduling, or interrupt handling of its own. The TSM is not
@@ -369,7 +371,7 @@ host OS/VMM to track that the required security checks are performed on each
 physical hart (or virtual hart context) as required by specific COVH/G flows.
 
 When the TSM is entered via the TSM-driver (as part of the ECALL [TEECALL]
-- MRET), the TSM starts with sstatus.sie set to 0 i.e. interrupts disabled.
+- MRET), the TSM starts with sstatus.sie set to 0, i.e., interrupts disabled.
 The sstatus.sie does not affect HS interrupts from being seen when mode =
 U/VS/VU. The OS/VMM sip and sie will be saved by the TSM in the HSSA and
 will retain the state as it existed when the host OS/VMM invoked the TSM.
@@ -404,7 +406,7 @@ interrupt, VS-mode software interrupt, and VS-mode timer interrupts to the TVM.
 S-mode Software/Timer/External interrupts are delegated to the TSM (with the
 behavior described above). _All other interrupts_ , M-mode
 Software/Timer/External, bus error, high temp, RAS etc. are not delegated and
-delivered to M-mode/TSM-driver. Under these circumstances the saving of the
+delivered to the TSM-driver. Under these circumstances, the saving of the
 state is the TSM-driver responsibility. Also since scrubbing the TVM state
 is the TSM responsibility, the TSM-driver may pend an S-mode interrupt to
 the TSM to allow cleanup on such events. See <<appendix_b>> for a table of
@@ -426,7 +428,7 @@ TVMs are prevented from execution after that point.
 
 TSM (and all TVMs) memory is granted by the host OS/VMM but is isolated
 (via access-control and/or confidentiality-protection) by the hardware and TCB
-elements. The TSM, TVM and hardware isolation methods used must be evident in the
+elements. The TSM, TVM, and hardware isolation methods used must be evident in the
 attestation evidence provided for the TVM since it identifies the hardware
 and the TSM-driver.
 
@@ -457,10 +459,10 @@ table. The memory tracking table may be enforced at the memory controller,
 or in a page table walker.
 
 *b)* *Isolation against physical/out-of-band access* - The platform TCB may
-provide confidentiality, integrity and replay-protection. This may be
+provide confidentiality, integrity, and replay-protection. This may be
 achieved via a Memory Encryption Engine (MEE) to prevent TEE state being
 exposed in volatile memory during execution. The use of an MEE and the
-number of encryption domains supported is implementation-specific. For
+number of supported encryption domains is implementation-specific. For
 example, The hardware may use the Supervisor Domain Identifier during execution
 (and memory access) to cryptographically isolate memory associated with a
 TEE which may be encrypted and additionally cryptographically
@@ -470,7 +472,7 @@ of cache blocks.
 
 *TVM isolation* is the responsibility of the TSM via the G-stage
 address translation table (hgatp). The TSM must track memory assignment of
-TVMs (by the untrusted VMM/OS) to ensure memory assignment is
+TVMs (by the untrusted OS/VMM) to ensure memory assignment is
 non-overlapping, along with additional security requirements. The security
 requirements/invariants for enforcement of the memory
 access-control for memory assigned to the TVMs is described in <<TVM Memory
@@ -478,23 +480,22 @@ management>>.
 
 === TVM Execution
 
-As described above, TVMs can access both classes of memory - isolated memory
-- which has confidentiality and access-control properties for memory exclusive
-to the TVM, and non-confidential memory which is memory accessible to the host
-OS/VMM and is used for untrusted operations (e.g., virtio, gRPC communication
-with the host). If the confidential memory is access-controlled only, the TSM
+As described above, TVMs can access both classes of memory: (1) confidential memory
+which has confidentiality and access-control properties for memory exclusive
+to the TVM, and (2) non-confidential memory which is memory accessible to the 
+OS/VMM and is used for untrusted operations, such as, virtio, gRPC communication
+with the host. If the confidential memory is access-controlled only, the TSM
 and TSM-driver are the authority over the access-control enforcement. If the
 confidential memory is using memory encryption (instead or in addition), the
 encryption keys used for confidential memory must be different from
 non-confidential memory.
 
 All TVM memory is mapped in the second-stage page tables controlled by the
-TSM explicitly - the allocation of memory for the G-stage paging
-structures pages used for the G-stage mapping is also performed by the
-OS/VMM but the security properties of the G-stage mapping are enforced
-by the TSM. By default any memory mapped to a TVM is confidential. A TVM
-may then explicitly request that confidential memory be converted to
-non-confidential memory regions using services provided by the TSM. More
+TSM explicitly. CoVE implementations that support dynamic conversions between confidential 
+and non-confidential memory might delegate the allocation of memory for the G-stage paging
+structures to the OS/VMM, while relying on TSM to enforce the security properties of the G-stage mapping. 
+By default any memory mapped to a TVM is confidential. A TVM may then explicitly request that 
+confidential memory be converted to non-confidential memory regions using services provided by the TSM. More
 information about TVM Execution and the lifecycle of a TVM is described in
 the <<TVM Lifecycle>> section of this document.
 
