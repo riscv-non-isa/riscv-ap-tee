@@ -1682,12 +1682,12 @@ to EID, `a6` set to FID (See <<cove-fid>>), `a0`-`a5` set to ECALL args.
 [source, C]
 -----
 struct sbiret sbi_covg_promote_to_tvm(unsigned long fdt_addr,
-                                      unsigned long auth_addr);
+                                      unsigned long lap_addr);
 -----
 A VM requests a TSM to be promoted to a TVM. The `fdt_addr` is the guest physical address 
-of the flattened device tree (FDT). `auth_addr` is the guest physical address of the `authentication blob` 
-used for `local attestation`. VMs that do not require local attestation (only the remote attestation)
-must write `0` to `auth_addr`.
+of the flattened device tree (FDT). `lap_addr` is the guest physical address of the 
+`local attestation payload` used for `local attestation`. VMs that do not require 
+local attestation (only the remote attestation) must write `0` to `lap_addr`.
 
 The VM must make this call early during the boot process, so that the content of memory
 is known and the resulting integrity measurement hash is deterministic. TSM uses VM page table to copy
@@ -1711,6 +1711,29 @@ are shown below.
 | SBI_ERR_AUTH            | Local attestation failed.
 | SBI_ERR_OUT_OF_MEMORY   | Not enough memory to store TVM
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+[#covg_retrieve_secret]
+=== Function: COVE Guest Retrieve Secret (FID #0)
+[source, C]
+-----
+struct sbiret covg_retrieve_secret();
+-----
+Requests a TSM a secret available after successful local attestation. TSM reads this secret during
+local attestation from the local attestation payload (LAP). LAP is part of the VM image and is 
+presented to TSM during the creation of TVM via `sbi_covg_promote_to_tvm()`. Only TVMs correctly 
+authenticated and authorized during local attestation, can receive the secret embedded in LAP.
+
+If the call fails, the TSM returns SBI error code in `sbiret.error` to the VM. The possible error codes 
+are shown below.
+
+[#table_covg_retrieve_secret_errors]
+.COVE Guest Retrieve Secret Errors
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_AUTH            | Local attestation failed.
 |===
 
 [#sbi_covg_add_mmio_region]
