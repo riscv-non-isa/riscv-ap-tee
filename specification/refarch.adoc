@@ -52,8 +52,8 @@ between the TVM/TSM and the non-TCB host software and/or non-TCB IO devices.
 
 The split of memory into confidential and non-confidential may be static or dynamic. 
 Static partitioning occurs during platform initialization while the dynamic partitioning 
-occurs during runtime. The dynamic partitioning allows for better resource utilization 
-at the cost of more complex hardware and software implementation. 
+occurs during runtime. The dynamic partitioning allows for better resource utilization, 
+but has additional hardware and software requirements. 
 
 To support the dynamic memory partitioning, TSM implements COVH ABI enabling OS/VMM to 
 convert / donate memory from the hosting supervisor domain to the confidential supervisor domain. 
