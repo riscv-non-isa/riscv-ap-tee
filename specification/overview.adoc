@@ -52,8 +52,9 @@ objectives accorded to TEE workloads (TVMs) assigned to that supervisor domain. 
 VMM is expected to continue to manage the security for non-confidential
 workloads, and importantly the resource-assignment and scheduling management
 functions for all confidential and non-confidential workloads.
-Note that CoVE implementations that support only one Confidential Supervisor
-Domain might combine TSM and TSM-driver functionality in a single deployment unit.
+Note that CoVE implementations may partition the TSM and TSM-driver functionality
+as required by implementations. For e.g. <<depd>> shows the TSM and TSM-driver
+functionality in a single deployment unit.
 
 CoVE supports models with dynamic resource allocations, where 
 compute resources, such as memory, start off as traditional
