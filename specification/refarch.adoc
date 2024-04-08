@@ -44,6 +44,7 @@ To enforce isolation across Host and Confidential supervisor domains, CoVE
 requires isolation of physical memory (that supports paging when enabled). 
 
 CoVE defines two types of memory:
+
 * Confidential memory - used for TVM/TSM code and security-sensitive data;
 including state such as 1st-stage, G-stage page tables.
 * Non-confidential memory - used only for shared data, e.g., communication
