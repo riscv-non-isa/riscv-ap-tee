@@ -62,7 +62,7 @@ that hosts multiple mutually distrusting software owned by different tenants.
 
 | MTT | Memory Tracking Table (MTT).
 
-| Relying party | A relying party refer to a system providing access to a secured software application.
+| Relying party | An entity that depends on the validity of information about another entity, typically for purposes of authorization cite:[RATS].
 
 | RISC-V Supervisor Domains | RISC-V privileged architecture <<R0>> defines
 the S-mode for execution of supervisor software. S-mode software may optionally
