@@ -15,7 +15,7 @@ image::img_11.png[align=center]
 the TSM runs along with the TSM driver in the M-mode. This single confidential supervisor domain can run multiple 
 TVMs that are isolated from each other using the MMU, i.e., G-stage page tables managed by TSM. TSM isolates the 
 hosting supervisor domain (i.e., OS/VMM and non-confidential applications and VMs) from the confidential supervisor 
-domain (TSM and TVMs) using a hardware memory isolation mechanism, like PMP. The Smmtt extension is therefore not required. 
+domain (TSM and TVMs) using a hardware memory isolation mechanism, like PMP. The Smmtt extension is therefore not required in this model but not precluded. 
 IO accesses to confidential memory must be prevented, for example, with IOPMP.
 
 [NOTE]
@@ -31,7 +31,10 @@ formal reasoning about the correctness of the TVM execution and isolation. TSM p
 during the boot of the platform, resulting in the following advantages: (1) simplified formal reasoning about the 
 ownership of memory, (2) attestation that covers static system configuration (e.g., values of PMP registers), 
 (3) reduced attack surface between OS/VMM and TSM (narrower ABI). A possible negative consequence of 
-static partitioning is underutilization of resources.
+static partitioning is underutilization of resources. Specifically, confidential memory created at platform
+initialization might be larger than the required amount of memory utilized by TVMs and TSM during runtime. 
+Lack of the conversion mechanism of confidential memory pages to non-confidential memory (enabled for example by Smmtt) 
+prevents the OS/VMM from using the over-provisioned memory.
 
 === TVM creation
 To reduce the complexity of the TSM implementation, the TSM creates a TVM as a result of a single operation triggered with 
@@ -55,25 +58,20 @@ Attestation for embedded systems utilizes one or both of the following propertie
 
 Separate mechanisms may be used to achieve these goals.
 
-====VM (TVM) Authorization
+==== VM (TVM) Authorization
 The TSM must have a list of public keys of those authorized to sign VMs (TVMs) for execution on the platform. The 
 local attestation payload associated with the TVM will be
 signed with a private key. When the VM request to be promoted to a TVM, TSM checks the signature on the LAP. 
 If the signature is not valid, the TSM will not convert the VM and will terminate execution of the
 VM. The method for provisioning these public keys into the TSM is outside the scope of this specification.
 
-====Verifying Platform configuration
-When the creator of the (authorized) TVM does not want it to execute on improperly configured or unauthorized hardware,
-there should be a mechanism supported by hardware (and firmware) for verification. 
-Assuming such hardware exists, for example a trusted platform module (TPM), the VM can be created with an encrypted disk. 
-The key that is used to decrypt the disk can be sealed to the measurments (PCRs and CSRs) of the platform. 
-The creator of the VM using the specifications for the platform decides what
-values are required in order for the key to be released. When the request to promote VM to a TVM is called, the TSM
-useals the key (e.g., for example with help of secure element, like TPM). 
-If the request fails, the promotion of VM to TVM fails and the TSM returns error to the VM. When the 
-request succeeds, the TSM completes the transistion by informing the OS/VMM about the VM promotion to TVM, 
-and the control eventually returns to the TVM. At the point where the TVM needs to
-decrypt its disk (e.g., for mounting the filesystem), the TVM utilizes an ABI call (`covg_retrieve_secret()`) to TSM to retrieve the decryption key.
+==== Verifying Platform configuration
+When the creator of the (authorized) TVM does not want it to execute on improperly configured or unauthorized hardware, there should be a mechanism supported by hardware (and firmware) for verification. 
+Assuming presence of the hardware root-of-trust for measurement and hardware root-of-trust for storage, the VM can be created with an encrypted disk and the key that is used to decrypt the disk can be sealed to the measurments of the platform. 
+The creator of the VM using the specifications for the platform decides what values are required in order for the key to be released. 
+When the request to promote VM to a TVM is called, the TSM useals the key with help of the hardware root-of-trust. 
+If the request fails, the promotion of VM to TVM fails and the TSM returns error to the VM. 
+When the request succeeds, the TSM completes the transistion by informing the OS/VMM about the VM promotion to TVM, and the control eventually returns to the TVM. At the point where the TVM needs to decrypt its disk (e.g., for mounting the filesystem), the TVM utilizes an ABI call (`covg_retrieve_secret()`) to TSM to retrieve the decryption key.
 
 === Further recommendations
 Embedded systems with real-time requirements must have a fixed upper bounded execution time. This requires determining 

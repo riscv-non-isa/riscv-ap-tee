@@ -69,7 +69,7 @@ The TCB elements for each of them is summarized in the following table:
 .4+.^|Platform
     <| HW RoT for boot, measurement and storage
  .4+<| All M-mode firmwares, including the TSM-driver
-    <| All CPU hardware logic, including Debug, MMU and caches
+    <| All CPU hardware logic
     <| All SoC subsystems, including memory confidentiality, integrity and replay-protection for volatile memory
     <| IOMMU and translation agents
 
@@ -145,7 +145,7 @@ CoVE implementation may look like the following table:
 
      | 5
      | TVM Configuration
-    <| TVM Entry Point, Initial Arguments, Debug CSRs, and Performance CSRs
+    <| TVM Entry Point, Initial Arguments, and the vCPU state
      | TSM
 |===
 
