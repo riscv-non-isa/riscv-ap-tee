@@ -30,7 +30,8 @@ hosting supervisor domain and OS/VMM are used interchangeably in this
 specification. The underlying memory isolation mechanisms for supervisor domains
 (Smmtt) is agnostic of the number of supervisor domains. On processors that do not support 
 multiple supervisor domains where Smmtt is not mandated, a single confidential supervisor 
-domain and a single hosting supervisor domain can be supported (see <<depd>>).
+domain and a single hosting supervisor domain can be supported (for e.g. <<depd>>, 
+other deployment models are also possible).
 
 [id=dep1]
 [caption="Figure {counter:image}", reftext="Figure {image}"]
