@@ -1719,7 +1719,7 @@ are shown below.
 -----
 struct sbiret covg_retrieve_secret();
 -----
-Requests a TSM a secret available after successful local attestation. TSM reads this secret during
+Requests TSM for a secret available after successful local attestation. TSM reads this secret during
 local attestation from the local attestation payload (LAP). LAP is part of the VM image and is 
 presented to TSM during the creation of TVM via `sbi_covg_promote_to_tvm()`. Only TVMs correctly 
 authenticated and authorized during local attestation, can receive the secret embedded in LAP.
