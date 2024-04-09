@@ -126,7 +126,7 @@ The host is responsible for the following memory management functions:
 ====
 The division into confidential and non-confidential memory might be done statically or dynamically. 
 CoVE implementations that support only static partitioning of confidential and 
-non-confidential memory (for example, high-assurance systems that must be formally verified, see <<appendix_d>>) 
+non-confidential memory (for example, see <<appendix_d>>) 
 might partition the memory during platform initialization before execution of untrusted code, 
 and thus do not need to implement above ABI.
 ====
