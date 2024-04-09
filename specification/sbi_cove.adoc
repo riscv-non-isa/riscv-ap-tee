@@ -99,7 +99,7 @@ to a TVM, (2) VMM assembles a TVM under the TSM supervision.
 The promotion of a non-confidential VM to a TVM happens when a regular (non-confidential) VM
 executes a `sbi_covg_promote_to_tvm()` call. TSM handles this call by copying the entire
 VMs state (the CPU state, VM memory, page tables) into confidential memory. This is performed as a single 
-operation after which the newly created TSM is in the `TVM_RUNNABLE` state. 
+operation after which the newly created TVM is in the `TVM_RUNNABLE` state. 
 
 [NOTE]
 ====
@@ -107,7 +107,7 @@ Creating a TVM in a single step reduces the number of ABI calls, thus simplifies
 However, it will block the CPU for the duration of the TVM creation.
 ====
 
-In the second approach, VMM assembles the TVM in a sequences of calls to TSM. The first 
+In the second approach, VMM assembles the TVM in a sequence of calls to TSM. The first 
 call is `sbi_covh_create_tvm()` that creates a TVM in `TVM_INITIALIZING` state. With 
 subsequent calls to TSM, VMM requests assignment of confidential memory for page tables, 
 payload mapping, and vCPUs. The last call transitions TVM into the `TVM_RUNNABLE` state.

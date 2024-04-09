@@ -69,9 +69,9 @@ VM. The method for provisioning these public keys into the TSM is outside the sc
 When the creator of the (authorized) TVM does not want it to execute on improperly configured or unauthorized hardware, there should be a mechanism supported by hardware (and firmware) for verification. 
 Assuming presence of the hardware root-of-trust for measurement and hardware root-of-trust for storage, the VM can be created with an encrypted disk and the key that is used to decrypt the disk can be sealed to the measurments of the platform. 
 The creator of the VM using the specifications for the platform decides what values are required in order for the key to be released. 
-When the request to promote VM to a TVM is called, the TSM useals the key with help of the hardware root-of-trust. 
+When the request to promote VM to a TVM is called, the TSM unseals the key with help of the hardware root-of-trust. 
 If the request fails, the promotion of VM to TVM fails and the TSM returns error to the VM. 
-When the request succeeds, the TSM completes the transistion by informing the OS/VMM about the VM promotion to TVM, and the control eventually returns to the TVM. At the point where the TVM needs to decrypt its disk (e.g., for mounting the filesystem), the TVM utilizes an ABI call (`covg_retrieve_secret()`) to TSM to retrieve the decryption key.
+When the request succeeds, the TSM completes the transition by informing the OS/VMM about the VM promotion to TVM, and the control eventually returns to the TVM. At the point where the TVM needs to decrypt its disk (e.g., for mounting the filesystem), the TVM utilizes an ABI call (`covg_retrieve_secret()`) to TSM to retrieve the decryption key.
 
 === Further recommendations
 Embedded systems with real-time requirements must have a fixed upper bounded execution time. This requires determining 
