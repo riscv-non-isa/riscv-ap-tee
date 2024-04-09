@@ -21,8 +21,8 @@ IO accesses to confidential memory must be prevented, for example, with IOPMP.
 [NOTE]
 ====
 Since the TSM is not required to run in the HS-mode, this deployment model supports systems that emulate the 
-hypervisor extension or run TVMs and OS/VMM in S-mode. The latter requires use of other mechanism to enforce 
-memory accesses to confidential memory, e.g., PMP. 
+hypervisor extension or run TVMs and OS/VMM in S-mode. The latter requires use of a hardware memory isolation mechanism
+that enforces memory accesses to confidential memory while being only controlled by the TSM, e.g., PMP. 
 ====
 
 === Static memory partitioning
@@ -34,7 +34,8 @@ ownership of memory, (2) attestation that covers static system configuration (e.
 static partitioning is underutilization of resources. Specifically, confidential memory created at platform
 initialization might be larger than the required amount of memory utilized by TVMs and TSM during runtime. 
 Lack of the conversion mechanism of confidential memory pages to non-confidential memory (enabled for example by Smmtt) 
-prevents the OS/VMM from using the over-provisioned memory.
+prevents the hosting supervisor domain (OS/VMM, applications, and VMs) from using the memory over-provisioned by 
+the confidential supervisor domain (TSM, TVMs).
 
 === TVM creation
 To reduce the complexity of the TSM implementation, the TSM creates a TVM as a result of a single operation triggered with 
@@ -83,4 +84,4 @@ interrupts during TVM execution trap in TSM due to the `mideleg` configuration.
 [id=depd2]
 [caption="Figure {counter:image}"]
 [title= ": TSM operation"]
-image::img_13.png[align=center]
+image::img_12.png[align=center]
