@@ -18,7 +18,7 @@ between confidential and non-confidential memory, the TSM might allow the
 OS/VMM to manage the assignment of confidential memory by providing a two stage 
 TEE memory management model, described below. However, this memory management 
 model is not required for CoVE implementations that statically partition memory into
-confidential and non-confidential, e.g., durich platform initialization.
+confidential and non-confidential, e.g., during platform initialization.
 
 1. Creation of confidential memory regions - this process converts memory
 pages from non-confidential to confidential memory (and in that process
