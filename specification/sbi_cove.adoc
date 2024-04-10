@@ -315,8 +315,10 @@ accessible to the host.
 During assembly of a TVM, the host must register CPUs/harts with the TSM before they can be used for TVM
 execution by calling `sbi_covh_create_tvm_vcpu()`. The NACL shared memory
 interface is used between the host and the TSM for processing TVM exits from
-`sbi_covh_run_tvm_vcpu()`. The vCPU creation is not required for TVMs created
-using `sbi_covg_promote_to_tvm()` because TSM reuses vCPUs number defined in the
+`sbi_covh_run_tvm_vcpu()`. 
+
+Note that the vCPU creation procedure is not required for TVMs created
+using `sbi_covg_promote_to_tvm()` because TSM reuses the vCPUs number defined in the
 flattened device tree (FDT).
 
 ===== Finalization of TVM creation 
@@ -1682,12 +1684,12 @@ to EID, `a6` set to FID (See <<cove-fid>>), `a0`-`a5` set to ECALL args.
 [source, C]
 -----
 struct sbiret sbi_covg_promote_to_tvm(unsigned long fdt_addr,
-                                      unsigned long lap_addr);
+                                      unsigned long tap_addr);
 -----
 A VM requests a TSM to be promoted to a TVM. The `fdt_addr` is the guest physical address 
-of the flattened device tree (FDT). `lap_addr` is the guest physical address of the 
-`local attestation payload` used for `local attestation`. VMs that do not require 
-local attestation (only the remote attestation) must write `0` to `lap_addr`.
+of the flattened device tree (FDT). `tap_addr` is the guest physical address of the 
+`TVM attestation payload` used for local attestation. VMs that do not require 
+local attestation (only the remote attestation) must write `0` to `tap_addr`.
 
 The VM must make this call early during the boot process, so that the content of memory
 is known and the resulting integrity measurement hash is deterministic. TSM uses VM page table to copy
@@ -1695,8 +1697,9 @@ VM's data to confidential memory. TSM extracts from FDT information about the nu
 required amount of memory and populating one with the vCPU state of the caller.
 
 On success, TSM reflects an SBI call `sbi_register_tvm(unsigned long tvm_guest_id)` to the hypervisor.
-The hypervisor marks the VM as TVM and releases the VM memory. For now on, OS/VMM interacts with TVM
-with help of TSM using the COVH ABI. For example, it resumes TVM using the `sbi_covh_run_tvm_vcpu()` call.
+The hypervisor marks the VM as a TVM and frees the VM memory. For now on, OS/VMM interacts with a TVM
+with help of the TSM using the COVH ABI. It resumes TVM using the `sbi_covh_run_tvm_vcpu()`
+call.
 
 If the call fails, the TSM returns SBI error code in `sbiret.error` to the VM. The possible error codes 
 are shown below.
@@ -1713,31 +1716,8 @@ are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#covg_retrieve_secret]
-=== Function: COVE Guest Retrieve Secret (FID #0)
-[source, C]
------
-struct sbiret covg_retrieve_secret();
------
-Requests TSM for a secret available after successful local attestation. TSM reads this secret during
-local attestation from the local attestation payload (LAP). LAP is part of the VM image and is 
-presented to TSM during the creation of TVM via `sbi_covg_promote_to_tvm()`. Only TVMs correctly 
-authenticated and authorized during local attestation, can receive the secret embedded in LAP.
-
-If the call fails, the TSM returns SBI error code in `sbiret.error` to the VM. The possible error codes 
-are shown below.
-
-[#table_covg_retrieve_secret_errors]
-.COVE Guest Retrieve Secret Errors
-[cols="2,3", width=90%, align="center", options="header"]
-|===
-| Error code              | Description
-| SBI_SUCCESS             | The operation completed successfully.
-| SBI_ERR_AUTH            | Local attestation failed.
-|===
-
 [#sbi_covg_add_mmio_region]
-=== Function: COVE Guest Add MMIO Region (FID #0)
+=== Function: COVE Guest Add MMIO Region (FID #1)
 [source, C]
 -------
 struct sbiret sbi_covg_add_mmio_region(unsigned long tvm_gpa_addr,
@@ -1764,7 +1744,7 @@ resume of execution.
 |===
 
 [#sbi_covg_remove_mmio_region]
-=== Function: COVE Guest Remove MMIO Region (FID #1)
+=== Function: COVE Guest Remove MMIO Region (FID #2)
 [source, C]
 -------
 struct sbiret sbi_covg_remove_mmio_region(unsigned long tvm_gpa_addr,
@@ -1791,7 +1771,7 @@ resume of execution.
 |===
 
 [#sbi_covg_share_memory_region]
-=== Function: COVE Guest Share Memory Region (FID #2)
+=== Function: COVE Guest Share Memory Region (FID #3)
 [source, C]
 -------
 struct sbiret sbi_covg_share_memory_region(unsigned long tvm_gpa_addr,
@@ -1809,6 +1789,11 @@ The calling TVM vCPU is considered blocked until the assignment-change is
 completed. Attempts to run it with `sbi_covh_run_tvm_vcpu()` will fail. Any
 guest page faults taken by other TVM vCPUs in the invalidated pages continue to
 be reported to the host.
+
+In CoVE implementations that do not support dynamic page conversions between confidential 
+and non-confidential memory, the TSM reflects this call to the OS/VMM, which then 
+allocates contiguous non-confidential pages and returns the host physical address of the first
+page to the TSM. The TSM maps the non-confidential pages to the TVM's address space. 
 
 Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned.
 
@@ -1829,7 +1814,7 @@ resume of execution.
 |===
 
 [#sbi_covg_unshare_memory_region]
-=== Function: COVE Guest Unshare Memory Region (FID #3)
+=== Function: COVE Guest Unshare Memory Region (FID #4)
 [source, C]
 -------
 struct sbiret sbi_covg_unshare_memory_region(unsigned long tvm_gpa_addr,
@@ -1841,7 +1826,7 @@ shared to confidential. The requested range must lie within an existing region
 of non-confidential
 address space, and may or may not be populated. This ECALL results in an exit
 to the TSM which
-enforces the security properties on the mapping and exits to the VMM host. The
+enforces the security properties on the mapping and exits to the OS/VMM. The
 host then removes
 any non-confidential pages already populated in the region and inserts
 confidential pages on page-faults.
@@ -1870,7 +1855,7 @@ doesn't
 |===
 
 [#sbi_covg_allow_external_interrupt]
-=== Function: COVE Guest Allow External Interrupt (FID #4)
+=== Function: COVE Guest Allow External Interrupt (FID #5)
 [source, C]
 -------
 struct sbiret sbi_covg_allow_external_interrupt(unsigned long interrupt_id);
@@ -1896,7 +1881,7 @@ resume of execution.
 |===
 
 [#sbi_covg_deny_external_interrupt]
-=== Function: COVE Guest Deny External Interrupt (FID #5)
+=== Function: COVE Guest Deny External Interrupt (FID #6)
 [source, C]
 -------
 struct sbiret sbi_covg_deny_external_interrupt(unsigned long interrupt_id);
@@ -1920,7 +1905,7 @@ resume of execution.
 |===
 
 [#sbi_covg_get_attcaps]
-=== Function: COVE Guest Get Attestation Capabilities (FID #6)
+=== Function: COVE Guest Get Attestation Capabilities (FID #7)
 [source, C]
 -------
 struct sbiret sbi_covg_get_attcaps(unsigned long tvm_gpa_cap_addr,
@@ -2036,7 +2021,7 @@ struct MeasurementRegisterDescriptor {
 
 
 [#sbi_covg_extend_measurememt]
-=== Function: COVE Guest Extend Measurement (FID #7)
+=== Function: COVE Guest Extend Measurement (FID #8)
 [source, C]
 -------
 struct sbiret sbi_covg_extend_measurement(unsigned long msmt_buf_addr,
@@ -2073,7 +2058,7 @@ attestation capabilities reported via `sbi_covg_get_attcaps`.
 |===
 
 [#sbi_covg_get_evidence]
-=== Function: COVE Guest Get Evidence (FID #8)
+=== Function: COVE Guest Get Evidence (FID #9)
 [source, C]
 -------
 struct sbiret sbi_covg_get_evidence(unsigned long pub_key_addr,
@@ -2127,8 +2112,31 @@ confidential memory.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
+[#covg_retrieve_secret]
+=== Function: COVE Guest Retrieve Secret (FID #10)
+[source, C]
+-----
+struct sbiret covg_retrieve_secret();
+-----
+Requests TSM for a secret available after successful local attestation. TSM reads this secret during
+local attestation from the `TVM attestation payload` (TAP). TAP is part of the VM image and is 
+presented to TSM during the creation of TVM via `sbi_covg_promote_to_tvm()`. Only TVMs correctly 
+authenticated and authorized during local attestation, can receive the secret embedded in TAP.
+
+If the call fails, the TSM returns SBI error code in `sbiret.error` to the VM. The possible error codes 
+are shown below.
+
+[#table_covg_retrieve_secret_errors]
+.COVE Guest Retrieve Secret Errors
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_AUTH            | Local attestation failed.
+|===
+
 [#sbi_covg_read_measurement]
-=== Function: COVE Guest Read Measurement (FID #9)
+=== Function: COVE Guest Read Measurement (FID #11)
 [source, C]
 -------
 struct sbiret sbi_covg_read_measurememt(unsigned long msmt_buf_addr_out,
@@ -2254,7 +2262,7 @@ considered trustworthy.
 | <<sbi_covh_add_tvm_zero_pages, sbi_covh_add_tvm_zero_pages>> | Add a
 zero page for an existing mapping for a TVM page (post initialization).
 This operation adds a zero page into a mapping and keeps the mapping as
-pending (i.e. access from the TVM will fault until the TVM accepts that GPA.
+pending, i.e., access from the TVM will fault until the TVM accepts that GPA.
 
 | <<sbi_covh_add_tvm_shared_pages, sbi_covh_add_tvm_shared_pages>> | Maps
 the given number of pages of non-confidential memory into the TVM's physical

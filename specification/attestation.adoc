@@ -92,7 +92,7 @@ measurements and a runtime one.
 TVM initial measurements are generated from the CoVE workload TCB elements
 involved in the TVM construction. Any TCB element that directly or indirectly
 supports a TVM must be measured into the TVM initial measurement registers. Once
-a TVM is finalized, i.e. after the `sbi_tee_host_finalize_tvm()` TH-ABI is
+a TVM is finalized, i.e., after the `sbi_tee_host_finalize_tvm()` TH-ABI is
 called, the TVM initial measurements must no longer be extended.
 
 Each TVM's initial measurements are stored in dedicated measurement registers and
@@ -653,9 +653,9 @@ The TVM identity claim value is a `sbi_tee_host_finalize_tvm()` provided
 argument. It is an optional claim and is not included in the TVM token when
 the TVM identity argument is set to 0.
 
-It is used by the host TVM creator (e.g. the host VMM) to bind a TVM to an
+It is used by the host TVM creator (e.g., the host VMM) to bind a TVM to an
 identity or more generically a specific piece of data (e.g. an Attestation
-Service public key, a configuration blob, etc) through its hash value.
+Service public key, a configuration blob, etc.) through its hash value.
 
 TVM identity allows for untrusted hosts to provide a TVM with unmeasured but
 attestable pieces of data. A Relying Party can then verify the TVM measurements
