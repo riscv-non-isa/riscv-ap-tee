@@ -1686,20 +1686,20 @@ to EID, `a6` set to FID (See <<cove-fid>>), `a0`-`a5` set to ECALL args.
 struct sbiret sbi_covg_promote_to_tvm(unsigned long fdt_addr,
                                       unsigned long tap_addr);
 -----
-A VM requests a TSM to be promoted to a TVM. The `fdt_addr` is the guest physical address 
+A VM requests a TSM to be promoted to a TVM. The VM must not operate as a TVM. If this call is invoked 
+from a TVM, this ABI will return `SBI_ERR_FAILED` error. The `fdt_addr` is the guest physical address 
 of the flattened device tree (FDT). `tap_addr` is the guest physical address of the 
-`TVM attestation payload` used for local attestation. VMs that do not require 
-local attestation (only the remote attestation) must write `0` to `tap_addr`.
+`TVM attestation payload` used for local attestation. VMs that do not require local attestation 
+(only the remote attestation) must write `0` to `tap_addr`.
 
 The VM must make this call early during the boot process, so that the content of memory
-is known and the resulting integrity measurement hash is deterministic. TSM uses VM page table to copy
-VM's data to confidential memory. TSM extracts from FDT information about the number of vCPUs, allocating
+is known and the resulting integrity measurement hash is deterministic. The TSM uses the VM page table configuration
+to copy VM's data to confidential memory. TSM extracts from FDT information about the number of vCPUs, allocating
 required amount of memory and populating one with the vCPU state of the caller.
 
-On success, TSM reflects an SBI call `sbi_register_tvm(unsigned long tvm_guest_id)` to the hypervisor.
-The hypervisor marks the VM as a TVM and frees the VM memory. For now on, OS/VMM interacts with a TVM
-with help of the TSM using the COVH ABI. It resumes TVM using the `sbi_covh_run_tvm_vcpu()`
-call.
+On success, the TSM reflects an SBI call `sbi_register_tvm(unsigned long tvm_guest_id)` to the OS/VMM, which marks
+the VM as a TVM and frees the VM memory. For now on, OS/VMM interacts with this TVM via the TSM using the 
+COVH ABI. It resumes the TVM using the `sbi_covh_run_tvm_vcpu()` call.
 
 If the call fails, the TSM returns SBI error code in `sbiret.error` to the VM. The possible error codes 
 are shown below.
