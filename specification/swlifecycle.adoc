@@ -18,7 +18,7 @@ between confidential and non-confidential memory, the TSM might allow the
 OS/VMM to manage the assignment of confidential memory by providing a two stage 
 TEE memory management model, described below. However, this memory management 
 model is not required for CoVE implementations that statically partition memory into
-confidential and non-confidential, e.g., during platform initialization.
+confidential and non-confidential.
 
 1. Creation of confidential memory regions - this process converts memory
 pages from non-confidential to confidential memory (and in that process
@@ -29,7 +29,7 @@ controls described earlier).
 confidential memory regions for various purposes like creating TVM workloads
 etc.
 
-This specification allows two ways of creating a TVM, an implementation must
+This specification defines two ways of creating a TVM, an implementation must
 provide at least one of them: (1) Multi-step TVM creation, (2) Single-step TVM creation.
 In the multi-step TVM creation, OS/VMM constructs a TVM in a sequence of calls to TSM. 
 During this process, the TVM is in an intermediate state and cannot be executed until 

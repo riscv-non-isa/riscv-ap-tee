@@ -317,9 +317,9 @@ execution by calling `sbi_covh_create_tvm_vcpu()`. The NACL shared memory
 interface is used between the host and the TSM for processing TVM exits from
 `sbi_covh_run_tvm_vcpu()`. 
 
-Note that the vCPU creation procedure is not required for TVMs created
-using `sbi_covg_promote_to_tvm()` because TSM reuses the vCPUs number defined in the
-flattened device tree (FDT).
+Note that the vCPU creation procedure is not required for TVMs created in a single step 
+(via `sbi_covg_promote_to_tvm()`) because TSM creates TVM's vCPUs based on the TVM's flattened 
+device tree (FDT) and the state of the vCPU that requested VM promotion.
 
 ===== Finalization of TVM creation 
 The OS/VMM that finishes the assembly of a TVM, i.e., assignment of memory and 
@@ -329,6 +329,10 @@ The host must set up TVM Boot vCPU execution parameters like the
 entrypoint (`ENTRY_PC`) and boot argument (`ENTRY_ARG`) using arguments to
 `sbi_covh_finalize_tvm()`. Note that some COVH calls are no longer permissible
 after this transition. 
+
+Note that a TVM created via `sbi_covg_promote_to_tvm()` does not require finalization, 
+because it is already in the `TVM_RUNNABLE` state with a valid entrypoint, which
+corresponds to the state of the VM's vCPU that requested promotion to a TVM.
 
 ===== TVM execution
 The host can then call `sbi_covh_run_tvm_vcpu()` to begin execution. The host
