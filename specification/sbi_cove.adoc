@@ -2160,7 +2160,7 @@ vCPUs from FDT, allocates required amount of memory, and populates one of the vC
 the caller's thread.
 
 If successful, the TSM reflects an SBI call `sbi_register_tvm(unsigned long tvm_guest_id)` to the OS/VMM, 
-which marks the VM as TVM and frees the VM memory. From now on, OS/VMM will interact with this TVM via 
+which marks the VM as TVM and frees the VM memory. As a result of this call the OS/VMM will interact with this TVM via 
 the TSM using the COVH ABI, i.e., it will resume the TVM using the `sbi_covh_run_tvm_vcpu()` call.
 
 If the call fails, the TSM returns the SBI error code in `sbiret.error` to the VM. The possible error codes 
