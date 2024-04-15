@@ -5,13 +5,13 @@ This deployment model targets high-assurance systems whose design might be const
 by real-time and formal verification requirements. It trade offs a feature-rich design supporting 
 dynamic resource allocation, for simpler implementation, where the correctness can be formally verified.
 
-[id=depd]
+[id=dep3]
 [caption="Figure {counter:image}"]
 [title= ": M-mode TSM based deployment model for CoVE"]
 image::img_11.png[align=center]
 
 === Overview
-<<depd>> shows that the deployment model supports a single confidential supervisor domain in which 
+<<dep3>> shows that the deployment model supports a single confidential supervisor domain in which 
 the TSM runs along with the TSM driver in the M-mode. This single confidential supervisor domain can run multiple 
 TVMs that are isolated from each other using the MMU, i.e., G-stage page tables managed by TSM. TSM isolates the 
 hosting supervisor domain (i.e., OS/VMM and non-confidential applications and VMs) from the confidential supervisor 

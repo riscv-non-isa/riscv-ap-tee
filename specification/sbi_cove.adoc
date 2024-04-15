@@ -1675,7 +1675,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 == COVE Guest Extension (EID #0x434F5647 "COVG")
-The COVE Guest extension supplements the COVE Host extension, and allows TVMs
+The COVE Guest extension supplements the COVE Host extension, and allows COVE-Guests
 to communicate with the TSM for the supervisor domain the guest was instantiated
 within.
 A typical use case for this extension is to relay information to the host.
@@ -1683,45 +1683,8 @@ COVE-Guest calls cause a trap to the TSM. TSM should do any processing required
 and then must forward the ECALL to the host with `scause` set to ECALL, `a7` set
 to EID, `a6` set to FID (See <<cove-fid>>), `a0`-`a5` set to ECALL args.
 
-[#sbi_covg_promote_to_tvm]
-=== Function: COVE Guest Promote to TVM (FID #0)
-[source, C]
------
-struct sbiret sbi_covg_promote_to_tvm(unsigned long fdt_addr,
-                                      unsigned long tap_addr);
------
-A VM requests a TSM to be promoted to a TVM. The VM must not operate as a TVM. If this call is invoked 
-from a TVM, this ABI will return `SBI_ERR_FAILED` error. The `fdt_addr` is the guest physical address 
-of the flattened device tree (FDT). `tap_addr` is the guest physical address of the 
-`TVM attestation payload` used for local attestation. VMs that do not require local attestation 
-(only the remote attestation) must write `0` to `tap_addr`.
-
-The VM must make this call early during the boot process, so that the content of memory
-is known and the resulting integrity measurement hash is deterministic. The TSM uses the VM page table configuration
-to copy VM's data to confidential memory. TSM extracts from FDT information about the number of vCPUs, allocating
-required amount of memory and populating one with the vCPU state of the caller.
-
-On success, the TSM reflects an SBI call `sbi_register_tvm(unsigned long tvm_guest_id)` to the OS/VMM, which marks
-the VM as a TVM and frees the VM memory. For now on, OS/VMM interacts with this TVM via the TSM using the 
-COVH ABI. It resumes the TVM using the `sbi_covh_run_tvm_vcpu()` call.
-
-If the call fails, the TSM returns SBI error code in `sbiret.error` to the VM. The possible error codes 
-are shown below.
-
-[#table_sbi_covg_promote_to_tvm_errors]
-.COVE Guest Promote to TVM Errors
-[cols="2,3", width=90%, align="center", options="header"]
-|===
-| Error code              | Description
-| SBI_SUCCESS             | The operation completed successfully.
-| SBI_ERR_INVALID_ADDRESS | `fdt_addr` was invalid.
-| SBI_ERR_AUTH            | Local attestation failed.
-| SBI_ERR_OUT_OF_MEMORY   | Not enough memory to store TVM
-| SBI_ERR_FAILED          | The operation failed for unknown reasons.
-|===
-
 [#sbi_covg_add_mmio_region]
-=== Function: COVE Guest Add MMIO Region (FID #1)
+=== Function: COVE Guest Add MMIO Region (FID #0)
 [source, C]
 -------
 struct sbiret sbi_covg_add_mmio_region(unsigned long tvm_gpa_addr,
@@ -1748,7 +1711,7 @@ resume of execution.
 |===
 
 [#sbi_covg_remove_mmio_region]
-=== Function: COVE Guest Remove MMIO Region (FID #2)
+=== Function: COVE Guest Remove MMIO Region (FID #1)
 [source, C]
 -------
 struct sbiret sbi_covg_remove_mmio_region(unsigned long tvm_gpa_addr,
@@ -1775,7 +1738,7 @@ resume of execution.
 |===
 
 [#sbi_covg_share_memory_region]
-=== Function: COVE Guest Share Memory Region (FID #3)
+=== Function: COVE Guest Share Memory Region (FID #2)
 [source, C]
 -------
 struct sbiret sbi_covg_share_memory_region(unsigned long tvm_gpa_addr,
@@ -1818,7 +1781,7 @@ resume of execution.
 |===
 
 [#sbi_covg_unshare_memory_region]
-=== Function: COVE Guest Unshare Memory Region (FID #4)
+=== Function: COVE Guest Unshare Memory Region (FID #3)
 [source, C]
 -------
 struct sbiret sbi_covg_unshare_memory_region(unsigned long tvm_gpa_addr,
@@ -1859,7 +1822,7 @@ doesn't
 |===
 
 [#sbi_covg_allow_external_interrupt]
-=== Function: COVE Guest Allow External Interrupt (FID #5)
+=== Function: COVE Guest Allow External Interrupt (FID #4)
 [source, C]
 -------
 struct sbiret sbi_covg_allow_external_interrupt(unsigned long interrupt_id);
@@ -1885,7 +1848,7 @@ resume of execution.
 |===
 
 [#sbi_covg_deny_external_interrupt]
-=== Function: COVE Guest Deny External Interrupt (FID #6)
+=== Function: COVE Guest Deny External Interrupt (FID #5)
 [source, C]
 -------
 struct sbiret sbi_covg_deny_external_interrupt(unsigned long interrupt_id);
@@ -1909,7 +1872,7 @@ resume of execution.
 |===
 
 [#sbi_covg_get_attcaps]
-=== Function: COVE Guest Get Attestation Capabilities (FID #7)
+=== Function: COVE Guest Get Attestation Capabilities (FID #6)
 [source, C]
 -------
 struct sbiret sbi_covg_get_attcaps(unsigned long tvm_gpa_cap_addr,
@@ -2025,7 +1988,7 @@ struct MeasurementRegisterDescriptor {
 
 
 [#sbi_covg_extend_measurememt]
-=== Function: COVE Guest Extend Measurement (FID #8)
+=== Function: COVE Guest Extend Measurement (FID #7)
 [source, C]
 -------
 struct sbiret sbi_covg_extend_measurement(unsigned long msmt_buf_addr,
@@ -2062,7 +2025,7 @@ attestation capabilities reported via `sbi_covg_get_attcaps`.
 |===
 
 [#sbi_covg_get_evidence]
-=== Function: COVE Guest Get Evidence (FID #9)
+=== Function: COVE Guest Get Evidence (FID #8)
 [source, C]
 -------
 struct sbiret sbi_covg_get_evidence(unsigned long pub_key_addr,
@@ -2117,7 +2080,7 @@ confidential memory.
 |===
 
 [#covg_retrieve_secret]
-=== Function: COVE Guest Retrieve Secret (FID #10)
+=== Function: COVE Guest Retrieve Secret (FID #9)
 [source, C]
 -----
 struct sbiret covg_retrieve_secret();
@@ -2140,7 +2103,7 @@ are shown below.
 |===
 
 [#sbi_covg_read_measurement]
-=== Function: COVE Guest Read Measurement (FID #11)
+=== Function: COVE Guest Read Measurement (FID #10)
 [source, C]
 -------
 struct sbiret sbi_covg_read_measurememt(unsigned long msmt_buf_addr_out,
@@ -2171,6 +2134,47 @@ register indexes.
 | SBI_ERR_INVALID_ADDRESS | `msmt_buf_addr_out` was invalid.
 | SBI_ERR_INVALID_PARAM   | `msmt_buf_size` was invalid, or the entire range
                             doesn't span a `CONFIDENTIAL_MEMORY_REGION`
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+[#sbi_covg_promote_to_tvm]
+=== Function: COVE Guest Promote to TVM (FID #11)
+[source, C]
+-----
+struct sbiret sbi_covg_promote_to_tvm(unsigned long fdt_addr,
+                                      unsigned long tap_addr);
+-----
+This intrisic is used by a VM to be promoted to a TVM. A VM must not operate as a TVM at the time of this 
+call, otherwise this ABI will return error. It is primarily inteded for COVE deployment models that require 
+single-step TVM creation (e.g., see <<dep3>>). Deployment models that offer multi-step TVM creation 
+(e.g., <<dep1>>) may, but are not required to, support this ABI as an additional mechanism for creating TVMs. 
+
+The `fdt_addr` is the 8-bytes aligned guest physical address of the flattened device tree (FDT). `tap_addr` 
+is the 8-bytes aligned guest physical address of the `TVM attestation payload` used for local attestation. 
+VMs that do not require local attestation (only the remote attestation) must write `0` to `tap_addr`.
+
+The VM must make this call early in the boot process so that the contents of the memory are known and the 
+resulting integrity measurement hashes are deterministic. The TSM receives this call and uses the VM page 
+table configuration to copy VM's data to confidential memory. TSM extracts information about the number of 
+vCPUs from FDT, allocates required amount of memory, and populates one of the vCPUs state with the state of 
+the caller's thread.
+
+If successful, the TSM reflects an SBI call `sbi_register_tvm(unsigned long tvm_guest_id)` to the OS/VMM, 
+which marks the VM as TVM and frees the VM memory. From now on, OS/VMM will interact with this TVM via 
+the TSM using the COVH ABI, i.e., it will resume the TVM using the `sbi_covh_run_tvm_vcpu()` call.
+
+If the call fails, the TSM returns the SBI error code in `sbiret.error` to the VM. The possible error codes 
+are shown below.
+
+[#table_sbi_covg_promote_to_tvm_errors]
+.COVE Guest Promote to TVM Errors
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `fdt_addr` was invalid.
+| SBI_ERR_AUTH            | Local attestation failed.
+| SBI_ERR_OUT_OF_MEMORY   | Not enough memory to store TVM
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
