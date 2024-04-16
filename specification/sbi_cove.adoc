@@ -2153,11 +2153,11 @@ The `fdt_addr` is the 8-bytes aligned guest physical address of the flattened de
 is the 8-bytes aligned guest physical address of the `TVM attestation payload` used for local attestation. 
 VMs that do not require local attestation (only the remote attestation) must write `0` to `tap_addr`.
 
-The VM must make this call early in the boot process so that the contents of the memory are known and the 
-resulting integrity measurement hashes are deterministic. The TSM receives this call and uses the VM page 
-table configuration to copy VM's data to confidential memory. TSM extracts information about the number of 
-vCPUs from FDT, allocates required amount of memory, and populates one of the vCPUs state with the state of 
-the caller's thread.
+The VM should issue this call as early in the boot process as possible to minimize changes in contents of 
+memory so that the resulting integrity measurement hashes are deterministic. The TSM receives this call and 
+uses the VM page table configuration to copy VM's data to confidential memory. TSM extracts information about 
+the number of vCPUs from FDT, allocates required amount of memory, and populates one of the vCPUs state with 
+the state of the caller's thread.
 
 If successful, the TSM reflects an SBI call `sbi_register_tvm(unsigned long tvm_guest_id)` to the OS/VMM, 
 which marks the VM as TVM and frees the VM memory. As a result of this call the OS/VMM will interact with this TVM via 
