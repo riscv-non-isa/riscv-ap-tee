@@ -93,13 +93,14 @@ the current status of the TSM. The TSM must be in `TSM_READY` in order to
 process further ECALLs.
 
 ===== TVM creation
-A TVM might be created in two ways: (1) a non-confidential VM requests TSM to be promoted 
-to a TVM, (2) VMM assembles a TVM under the TSM supervision.
+A TVM might be created in two ways: 
+(1) the OS/VMM requests the TSM to promote an existing VM to a TVM using a single COVH call, 
+(2) the OS/VMM assembles a TVM under the TSM's supervision in a serie of COVH calls. 
 
-The promotion of a non-confidential VM to a TVM happens when a regular (non-confidential) VM
-executes a `sbi_covg_promote_to_tvm()` call. TSM handles this call by copying the entire
-VMs state (the CPU state, VM memory, page tables) into confidential memory. This is performed as a single 
-operation after which the newly created TVM is in the `TVM_RUNNABLE` state. 
+To promote a non-confidential VM to a TVM, the OS/VMM invokes the `sbi_covh_promote_to_tvm()` call,
+presenting the VM state (the CPU state, VM's data, page tables) to the TSM. The TSM handles this call 
+by copying the entire VMs state into confidential memory. This is performed as a single operation after 
+which the newly created TVM is in the `TVM_RUNNABLE` state. 
 
 [NOTE]
 ====
@@ -317,9 +318,13 @@ execution by calling `sbi_covh_create_tvm_vcpu()`. The NACL shared memory
 interface is used between the host and the TSM for processing TVM exits from
 `sbi_covh_run_tvm_vcpu()`. 
 
+[NOTE]
+====
 Note that the vCPU creation procedure is not required for TVMs created in a single step 
-(via `sbi_covg_promote_to_tvm()`) because TSM creates TVM's vCPUs based on the TVM's flattened 
-device tree (FDT) and the state of the vCPU that requested VM promotion.
+(via `sbi_covh_promote_to_tvm()`) because TSM creates all TVM's vCPUs in one operation.
+TVM's vCPUs are in the reset state, except for the one whose state was presented to TSM
+at the time of promotion and included in the TVM's measurement.
+====
 
 ===== Finalization of TVM creation 
 The OS/VMM that finishes the assembly of a TVM, i.e., assignment of memory and 
@@ -330,9 +335,12 @@ entrypoint (`ENTRY_PC`) and boot argument (`ENTRY_ARG`) using arguments to
 `sbi_covh_finalize_tvm()`. Note that some COVH calls are no longer permissible
 after this transition. 
 
-Note that a TVM created via `sbi_covg_promote_to_tvm()` does not require finalization, 
+[NOTE]
+====
+Note that a TVM created via `sbi_covh_promote_to_tvm()` does not require finalization, 
 because it is already in the `TVM_RUNNABLE` state with a valid entrypoint, which
-corresponds to the state of the VM's vCPU that requested promotion to a TVM.
+corresponds to the vCPU state presented to TSM at the time of promotion to a TVM.
+====
 
 ===== TVM execution
 The host can then call `sbi_covh_run_tvm_vcpu()` to begin execution. The host
@@ -843,8 +851,59 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
 
+[#sbi_covh_promote_to_tvm]
+=== Function: COVE Host Promote to TVM (FID #7)
+[source, C]
+-----
+struct sbiret sbi_covh_promote_to_tvm(unsigned long fdt_addr,
+                                      unsigned long number_of_vcpus,
+                                      unsigned long tap_addr);
+-----
+This intrisic is used by the host to promote a VM to a TVM. It is primarily inteded for COVE deployment 
+models that require single-step TVM creation (e.g., see <<dep3>>). Deployment models that offer multi-step TVM creation 
+(e.g., <<dep1>>) may, but are not required to, support this ABI as an additional mechanism for creating TVMs. 
+
+The `fdt_addr` is the 8-bytes aligned guest physical address of the flattened device tree (FDT). The `fdt_addr` is 
+a number representing a maximum number of vCPUs that this TVM can have. The `tap_addr` is the 8-bytes aligned guest physical 
+address of the `TVM attestation payload` used for local attestation. For VMs that do not require local attestation 
+(only the remote attestation), `tap_addr` must be `0`.
+
+The VM should be promoted as early in the boot process as possible to minimize changes in contents of memory so 
+that the resulting integrity measurement hashes are deterministic. The state of the processor (i.e., GPRs and VS-level CSRs) 
+that trapped to TSM with this call, must correspond to the state of the vCPU that will resume execution as part of the TVM. 
+The TSM copies VM's data to confidential memory, while recreating page table hierarchy in confidential memory following
+the VM page table configuration stored in non-confidential memory and pointed by the HGATP. The TSM populates one of the vCPUs 
+state with the state of the trapped thread, all other vCPUs are in the reset state and controlled by the TVM using the SBI HSM
+extension.
+
+[NOTE]
+====
+To simplify the implementation of this ABI, it is recommended that this call is already invoked by the VM and then only reflected 
+to the TSM by the OS/VMM. The advantage is that the OS/VMM does not need any specific mechanism for creating a TVM because it can
+construct a TVM as a regular VM and rely on the VM to select the time to promote it to TVM.
+====
+
+If successful, the TSM sets the TVM state to `TVM_RUNNABLE` and returns a unique TVM identifier (`tvm_guest_id`) to the OS/VMM, 
+which should free the contents of non-confidential memory containing VM's data and page tables. Since now on, the OS/VMM must 
+interact with this TVM via the TSM using the COVH ABI, i.e., resuming the TVM using the `sbi_covh_run_tvm_vcpu()` call.
+
+If the call fails, the TSM returns the SBI error code in `sbiret.error` to the OS/VMM. The possible error codes 
+are shown below.
+
+[#table_sbi_covh_promote_to_tvm_errors]
+.COVE Host Promote to TVM Errors
+[cols="2,3", width=90%, align="center", options="header"]
+|===
+| Error code              | Description
+| SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `fdt_addr` was invalid.
+| SBI_ERR_AUTH            | Local attestation failed.
+| SBI_ERR_OUT_OF_MEMORY   | Not enough confidential memory to store TVM
+| SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
 [#sbi_covh_destroy_tvm]
-=== Function: COVE Host Destroy TVM (FID #7)
+=== Function: COVE Host Destroy TVM (FID #8)
 [source, C]
 -------
 struct sbiret sbi_covh_destroy_tvm(unsigned long tvm_guest_id);
@@ -875,7 +934,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_covh_add_tvm_memory_region]
-=== Function: COVE Host Add TVM Memory Region (FID #8)
+=== Function: COVE Host Add TVM Memory Region (FID #9)
 [source, C]
 -----
 struct sbiret sbi_covh_add_tvm_memory_region(unsigned long tvm_guest_id,
@@ -906,7 +965,7 @@ TVM wasn't
 |===
 
 [#sbi_covh_add_tvm_page_table_pages]
-=== Function: COVE Host Add TVM Page Table Pages (FID #9)
+=== Function: COVE Host Add TVM Page Table Pages (FID #10)
 [source, C]
 -----
 struct sbiret sbi_covh_add_tvm_page_table_pages(unsigned long tvm_guest_id,
@@ -935,7 +994,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_covh_add_tvm_measured_pages]
-=== Function: COVE Host Add TVM Measured Pages (FID #10)
+=== Function: COVE Host Add TVM Measured Pages (FID #11)
 [source, C]
 -----
 struct sbiret sbi_covh_add_tvm_measured_pages(unsigned long tvm_guest_id,
@@ -982,7 +1041,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_covh_add_tvm_zero_pages]
-=== Function: COVE Host Add TVM Zero Pages (FID #11)
+=== Function: COVE Host Add TVM Zero Pages (FID #12)
 [source, C]
 -----
 struct sbiret sbi_covh_add_tvm_zero_pages(unsigned long tvm_guest_id,
@@ -1017,7 +1076,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_covh_add_tvm_shared_pages]
-=== Function: COVE Host Add TVM Shared Pages (FID #12)
+=== Function: COVE Host Add TVM Shared Pages (FID #13)
 [source, C]
 -----
 struct sbiret sbi_covh_add_tvm_shared_pages(unsigned long tvm_guest_id,
@@ -1053,7 +1112,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_covh_create_tvm_vcpu]
-=== Function: COVE Host Create TVM vCPU (FID #13)
+=== Function: COVE Host Create TVM vCPU (FID #14)
 [source, C]
 -----
 struct sbiret sbi_covh_create_tvm_vcpu(unsigned long tvm_guest_id,
@@ -1081,7 +1140,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_covh_run_tvm_vcpu]
-=== Function: COVE Host Run TVM vCPU (FID #14)
+=== Function: COVE Host Run TVM vCPU (FID #15)
 [source, C]
 -----
 struct sbiret sbi_covh_run_tvm_vcpu(unsigned long tvm_guest_id,
@@ -1203,7 +1262,7 @@ enum Exception {
 -------
 
 [#sbi_covh_tvm_fence]
-=== Function: COVE Host Initiate TVM Fence (FID #15)
+=== Function: COVE Host Initiate TVM Fence (FID #16)
 [source, C]
 -----
 struct sbiret sbi_covh_tvm_fence(unsigned long tvm_guest_id);
@@ -1230,7 +1289,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_covh_tvm_invalidate_pages]
-=== Function: COVE Host TVM Invalidate Pages (FID #16)
+=== Function: COVE Host TVM Invalidate Pages (FID #17)
 [source, C]
 -----
 struct sbiret sbi_covh_tvm_invalidate_pages(unsigned long tvm_guest_id,
@@ -1271,7 +1330,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_covh_tvm_validate_pages]
-=== Function: COVE Host TVM Validate Pages (FID #17)
+=== Function: COVE Host TVM Validate Pages (FID #18)
 [source, C]
 -----
 struct sbiret sbi_covh_tvm_validate_pages(unsigned long tvm_guest_id,
@@ -1303,7 +1362,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 [#sbi_covh_tvm_remove_pages]
-=== Function: COVE Host TVM Remove Pages (FID #18)
+=== Function: COVE Host TVM Remove Pages (FID #19)
 [source, C]
 -----
 struct sbiret sbi_covh_tvm_remove_pages(unsigned long tvm_guest_id,
@@ -2087,7 +2146,7 @@ struct sbiret covg_retrieve_secret();
 -----
 Requests TSM for a secret available after successful local attestation. TSM reads this secret during
 local attestation from the `TVM attestation payload` (TAP). TAP is part of the VM image and is 
-presented to TSM during the creation of TVM via `sbi_covg_promote_to_tvm()`. Only TVMs correctly 
+presented to TSM during the TVM creation via `sbi_covh_promote_to_tvm()`. Only TVMs correctly 
 authenticated and authorized during local attestation, can receive the secret embedded in TAP.
 
 If the call fails, the TSM returns SBI error code in `sbiret.error` to the VM. The possible error codes 
@@ -2134,47 +2193,6 @@ register indexes.
 | SBI_ERR_INVALID_ADDRESS | `msmt_buf_addr_out` was invalid.
 | SBI_ERR_INVALID_PARAM   | `msmt_buf_size` was invalid, or the entire range
                             doesn't span a `CONFIDENTIAL_MEMORY_REGION`
-| SBI_ERR_FAILED          | The operation failed for unknown reasons.
-|===
-
-[#sbi_covg_promote_to_tvm]
-=== Function: COVE Guest Promote to TVM (FID #11)
-[source, C]
------
-struct sbiret sbi_covg_promote_to_tvm(unsigned long fdt_addr,
-                                      unsigned long tap_addr);
------
-This intrisic is used by a VM to be promoted to a TVM. A VM must not operate as a TVM at the time of this 
-call, otherwise this ABI will return error. It is primarily inteded for COVE deployment models that require 
-single-step TVM creation (e.g., see <<dep3>>). Deployment models that offer multi-step TVM creation 
-(e.g., <<dep1>>) may, but are not required to, support this ABI as an additional mechanism for creating TVMs. 
-
-The `fdt_addr` is the 8-bytes aligned guest physical address of the flattened device tree (FDT). `tap_addr` 
-is the 8-bytes aligned guest physical address of the `TVM attestation payload` used for local attestation. 
-VMs that do not require local attestation (only the remote attestation) must write `0` to `tap_addr`.
-
-The VM should issue this call as early in the boot process as possible to minimize changes in contents of 
-memory so that the resulting integrity measurement hashes are deterministic. The TSM receives this call and 
-uses the VM page table configuration to copy VM's data to confidential memory. TSM extracts information about 
-the number of vCPUs from FDT, allocates required amount of memory, and populates one of the vCPUs state with 
-the state of the caller's thread.
-
-If successful, the TSM reflects an SBI call `sbi_register_tvm(unsigned long tvm_guest_id)` to the OS/VMM, 
-which marks the VM as TVM and frees the VM memory. As a result of this call the OS/VMM will interact with this TVM via 
-the TSM using the COVH ABI, i.e., it will resume the TVM using the `sbi_covh_run_tvm_vcpu()` call.
-
-If the call fails, the TSM returns the SBI error code in `sbiret.error` to the VM. The possible error codes 
-are shown below.
-
-[#table_sbi_covg_promote_to_tvm_errors]
-.COVE Guest Promote to TVM Errors
-[cols="2,3", width=90%, align="center", options="header"]
-|===
-| Error code              | Description
-| SBI_SUCCESS             | The operation completed successfully.
-| SBI_ERR_INVALID_ADDRESS | `fdt_addr` was invalid.
-| SBI_ERR_AUTH            | Local attestation failed.
-| SBI_ERR_OUT_OF_MEMORY   | Not enough memory to store TVM
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 

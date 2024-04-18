@@ -15,7 +15,8 @@ image::img_11.png[align=center]
 the TSM runs along with the TSM driver in the M-mode. This single confidential supervisor domain can run multiple 
 TVMs that are isolated from each other using the MMU, i.e., G-stage page tables managed by TSM. TSM isolates the 
 hosting supervisor domain (i.e., OS/VMM and non-confidential applications and VMs) from the confidential supervisor 
-domain (TSM and TVMs) using a hardware memory isolation mechanism, like PMP. The Supervisor Domain Access Protection (Smmtt) extension is therefore not required in this model but not precluded. 
+domain (TSM and TVMs) using a hardware memory isolation mechanism, like PMP. 
+The Supervisor Domain Access Protection (Smmtt) extension is therefore not required in this model but not precluded. 
 IO accesses to confidential memory must be prevented, for example, with IOPMP.
 
 [NOTE]
@@ -32,39 +33,37 @@ during the boot of the platform, resulting in the following advantages: (1) simp
 ownership of memory, (2) attestation that covers static system configuration (e.g., values of PMP registers), 
 (3) reduced attack surface between OS/VMM and TSM due to narrower ABI. A possible negative consequence of 
 static partitioning is underutilization of resources. Specifically, confidential memory created at platform
-initialization might be larger than the required amount of memory utilized by TVMs and TSM during runtime. 
+initialization might be larger than the required amount of memory utilized by TVMs and the TSM during runtime. 
 Lack of the conversion mechanism of confidential memory pages to non-confidential memory (enabled for example by Smmtt) 
 prevents the hosting supervisor domain (OS/VMM, applications, and VMs) from using the memory over-provisioned by 
 the confidential supervisor domain (TSM, TVMs).
 
 === TVM creation
 To reduce the complexity of the TSM implementation, the TSM creates a TVM as a result of a single operation triggered with 
-the `sbi_covg_promote_to_tvm()` call. Specifically, OS/VMM initializes and starts a regular VM, which early during the 
-boot process requests to be promoted to TVM. This call is reflected to the TSM which copies TVM data, the page table 
-configuration, and the vCPU state into confidential memory. 
-If the request fails, the promotion of VM to TVM fails and the TSM returns error to the VM. 
-When the request succeeds, the TSM completes the transition by informing the OS/VMM about the VM promotion to TVM (`sbi_register_tvm()`).
-In response to this call, OS/VMM marks the VM as a TVM, so that it can then properly resume its execution.
+the `sbi_covh_promote_to_tvm()` call. Specifically, OS/VMM initializes and starts a regular VM, which early during the 
+boot process requests to be promoted to a TVM. This call traps in the OS/VMM and is reflected to the TSM, which copies 
+VM's data, the page table configuration, and the vCPU state into confidential memory. If the request fails, the promotion 
+of a VM to a TVM fails and error is returned to the VM. When the request succeeds, OS/VMM marks the VM as a TVM, 
+so that it can then properly resume its execution via TSM.
 
 === Local attestation
 Embedded systems might operate without access to a network, which prevents use of remote attestation. For this 
 reason, this deployment model also supports local attestation, in which the TSM attests to the integrity of the TVM image 
 during its creation and allows its creation only when it contains a specfic `TVM attestation payload` (TAP). This 
 payload carries a cryptographic proof issued with the expected attestation key specific to the TSM integrity 
-and platform configuration. The call to promote to a TVM requires two parameters: (1) a pointer to the flatten device tree (FDT) 
-and (2) a pointer to TAP. If the pointer to TAP is zero, then remote attestation is used, otherwise local attestation is used. 
-Local attestation is strongest when it is hardware enforced.  
+and platform configuration. The pointer to TAP is passed in a call to promote a VM to a TVM. If it is zero, 
+then remote attestation is used, otherwise local attestation is used. Local attestation is strongest when it is hardware enforced.  
 
 Attestation for embedded systems utilizes one or both of the following properties:
 
-. The embedded platform must be able to verify that the VM/TVM is authorized to run on the platform. 
+. The embedded platform must be able to verify that the TVM is authorized to run on the platform. 
 . The TVM must be able to verify that the configuration of the hardware platform is acceptable/correct.
 
 Separate mechanisms may be used to achieve these goals.
 
-==== VM (TVM) Authorization
+==== TVM Authorization
 The TSM must have a list of public keys of those authorized to sign VMs (TVMs) for execution on the platform. The attestation payload associated with the TVM will be
-signed with a private key. When the VM request to be promoted to a TVM, TSM checks the signature inside the TAP. 
+signed with a private key. When the VM is being promoted to a TVM, TSM checks the signature inside the TAP. 
 If the signature is not valid, the TSM will not convert the VM and will terminate execution of the
 VM. The method for provisioning these public keys into the TSM is outside the scope of this specification.
 

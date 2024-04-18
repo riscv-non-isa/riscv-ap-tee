@@ -83,11 +83,11 @@ finalized.
 Similarly to the multi-step TVM creation, also in this method, the OS/VMM is involved in
 the TVM creation. Specifically, it constructs a regular VM by allocating memory for VM's data,
 vCPUs, and creating the G-stage page table configuration. This is the standard process of 
-creating non-confidential VMs implemented by existing OS/VMMs. To become a TVM, a VM makes 
-the `sbi_covg_promote_to_tvm()` call to the TSM, which uses then the VM state (TVM data, page table
-configuration, vCPU state) to recreate the TVM in confidential memory. The promotion of VM to 
-TVM must be communicated to the OS/VMM, so that OS/VMM releases the unnecessary resources and 
-begins to interact with the TVM in an appropiate way, described in next sections.
+creating non-confidential VMs implemented by existing OS/VMMs. To promote a VM to TVM, the 
+OS/VMM reflects the `sbi_covh_promote_to_tvm()` call to the TSM. The TSM uses then the VM state 
+(VM data, page table configuration, vCPU state) located in non-confidential memory to recreate 
+the TVM in confidential memory. After the promotion, the OS/VMM frees the unnecessary VM resources 
+and begins to interact with the TVM in an appropiate way, described in next sections.
 
 [NOTE]
 ====
