@@ -33,9 +33,9 @@ This specification defines two ways of creating a TVM, an implementation must
 provide at least one of them: (1) Multi-step TVM creation, (2) Single-step TVM creation.
 In the multi-step TVM creation, OS/VMM constructs a TVM in a sequence of calls to TSM. 
 During this process, the TVM is in an intermediate state and cannot be executed until 
-the explicit call to finalize the TVM creation. In the single-step TVM creation, a TVM 
-starts executing as a regular VM and requests that the TSM converts it into a TVM. 
-TSM creates then a TVM in a single operation by copying the VM to confidential memory.
+the explicit call to finalize the TVM creation. In the single-step TVM creation, the TSM
+converts an existing VM into a TVM in a single operation by copying the VM data and state 
+to confidential memory.
 
 ==== Multi-step TVM Creation
 
@@ -83,11 +83,11 @@ finalized.
 Similarly to the multi-step TVM creation, also in this method, the OS/VMM is involved in
 the TVM creation. Specifically, it constructs a regular VM by allocating memory for VM's data,
 vCPUs, and creating the G-stage page table configuration. This is the standard process of 
-creating non-confidential VMs implemented by existing OS/VMMs. To promote a VM to TVM, the 
+creating non-confidential VMs implemented by existing OS/VMMs. To promote a VM to a TVM, the 
 OS/VMM reflects the `sbi_covh_promote_to_tvm()` call to the TSM. The TSM uses then the VM state 
 (VM data, page table configuration, vCPU state) located in non-confidential memory to recreate 
 the TVM in confidential memory. After the promotion, the OS/VMM frees the unnecessary VM resources 
-and begins to interact with the TVM in an appropiate way, described in next sections.
+and begins to interact with the TVM via the TSM, as described in next sections.
 
 [NOTE]
 ====
@@ -199,7 +199,7 @@ maintain compatibility with OS/VMM memory management, and is also enforced by th
 memory management unit (MMU). The correct operation of this access-control level is dependent 
 on trusted enforcement of item 1 above.
 
-In CoVE implementation that support MTT, the TSM-driver configures the MTT
+In CoVE implementations that support MTT, the TSM-driver configures the MTT
 after enforcing the security requirements to track the assignment of memory pages to
 a supervisor domain/TSM. The TSM manages subsequent assignment of memory to TVMs. In implementations
 that do not implement MTT, memory must be statically partitioned into confidential and 

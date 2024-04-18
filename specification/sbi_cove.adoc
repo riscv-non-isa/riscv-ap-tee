@@ -95,7 +95,7 @@ process further ECALLs.
 ===== TVM creation
 A TVM might be created in two ways: 
 (1) the OS/VMM requests the TSM to promote an existing VM to a TVM using a single COVH call, 
-(2) the OS/VMM assembles a TVM under the TSM's supervision in a serie of COVH calls. 
+(2) the OS/VMM assembles a TVM under the TSM's supervision in a sequence of COVH calls. 
 
 To promote a non-confidential VM to a TVM, the OS/VMM invokes the `sbi_covh_promote_to_tvm()` call,
 presenting the VM state (the CPU state, VM's data, page tables) to the TSM. The TSM handles this call 
@@ -321,9 +321,9 @@ interface is used between the host and the TSM for processing TVM exits from
 [NOTE]
 ====
 Note that the vCPU creation procedure is not required for TVMs created in a single step 
-(via `sbi_covh_promote_to_tvm()`) because TSM creates all TVM's vCPUs in one operation.
-TVM's vCPUs are in the reset state, except for the one whose state was presented to TSM
-at the time of promotion and included in the TVM's measurement.
+(via `sbi_covh_promote_to_tvm()`) because TSM creates all TVM's vCPUs at once.
+All TVM's vCPUs are in the reset state, except for the vCPU whose state was presented to the TSM
+at the time of promotion. The vCPUs initial states are part of the TVM's measurement.
 ====
 
 ===== Finalization of TVM creation 
@@ -859,8 +859,8 @@ struct sbiret sbi_covh_promote_to_tvm(unsigned long fdt_addr,
                                       unsigned long number_of_vcpus,
                                       unsigned long tap_addr);
 -----
-This intrisic is used by the host to promote a VM to a TVM. It is primarily inteded for COVE deployment 
-models that require single-step TVM creation (e.g., see <<dep3>>). Deployment models that offer multi-step TVM creation 
+This intrisic is used by the host to promote a VM to a TVM. It is primarily inteded for CoVE deployment 
+models that require the single-step TVM creation (e.g., see <<dep3>>). Deployment models that offer the multi-step TVM creation 
 (e.g., <<dep1>>) may, but are not required to, support this ABI as an additional mechanism for creating TVMs. 
 
 The `fdt_addr` is the 8-bytes aligned guest physical address of the flattened device tree (FDT). The `fdt_addr` is 
@@ -874,17 +874,17 @@ that trapped to TSM with this call, must correspond to the state of the vCPU tha
 The TSM copies VM's data to confidential memory, while recreating page table hierarchy in confidential memory following
 the VM page table configuration stored in non-confidential memory and pointed by the HGATP. The TSM populates one of the vCPUs 
 state with the state of the trapped thread, all other vCPUs are in the reset state and controlled by the TVM using the SBI HSM
-extension.
+extension. TSM measures the initial TVM's state and uses during local or remote attestation.
 
 [NOTE]
 ====
-To simplify the implementation of this ABI, it is recommended that this call is already invoked by the VM and then only reflected 
-to the TSM by the OS/VMM. The advantage is that the OS/VMM does not need any specific mechanism for creating a TVM because it can
-construct a TVM as a regular VM and rely on the VM to select the time to promote it to TVM.
+To simplify the implementation of this ABI, it is recommended that this call is already invoked by the VM and then OS/VMM just reflects 
+it to the TSM. The advantage is that the OS/VMM does not need to implement any specific mechanism for creating a TVM because it can
+construct a TVM as a regular VM, relying on the VM to select the time of promotion to a TVM.
 ====
 
-If successful, the TSM sets the TVM state to `TVM_RUNNABLE` and returns a unique TVM identifier (`tvm_guest_id`) to the OS/VMM, 
-which should free the contents of non-confidential memory containing VM's data and page tables. Since now on, the OS/VMM must 
+If successful, the TSM sets the TVM state to `TVM_RUNNABLE` and returns a unique TVM identifier (`tvm_guest_id`) to the OS/VMM. 
+The OS/VMM should free the contents of non-confidential memory that contains VM's data and page tables. Since now on, the OS/VMM must 
 interact with this TVM via the TSM using the COVH ABI, i.e., resuming the TVM using the `sbi_covh_run_tvm_vcpu()` call.
 
 If the call fails, the TSM returns the SBI error code in `sbiret.error` to the OS/VMM. The possible error codes 
@@ -1734,7 +1734,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 
 == COVE Guest Extension (EID #0x434F5647 "COVG")
-The COVE Guest extension supplements the COVE Host extension, and allows COVE-Guests
+The COVE Guest extension supplements the COVE Host extension, and allows TVMs
 to communicate with the TSM for the supervisor domain the guest was instantiated
 within.
 A typical use case for this extension is to relay information to the host.
@@ -2146,8 +2146,10 @@ struct sbiret covg_retrieve_secret();
 -----
 Requests TSM for a secret available after successful local attestation. TSM reads this secret during
 local attestation from the `TVM attestation payload` (TAP). TAP is part of the VM image and is 
-presented to TSM during the TVM creation via `sbi_covh_promote_to_tvm()`. Only TVMs correctly 
-authenticated and authorized during local attestation, can receive the secret embedded in TAP.
+presented to TSM during the TVM creation via `sbi_covh_promote_to_tvm()`. Only the TVMs that were correctly 
+authenticated and authorized during local attestation can receive the secret embedded in TAP.
+
+This ABI will become part of the `Sealing Interface` planned for the CoVE in version 2.0.
 
 If the call fails, the TSM returns SBI error code in `sbiret.error` to the VM. The possible error codes 
 are shown below.

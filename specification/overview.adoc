@@ -62,7 +62,7 @@ compute resources, such as memory, start off as traditional
 untrusted resources owned by the non-confidential/hosting supervisor domain, and
 are expected to be donated/transitioned to the confidential supervisor domain
 via application binary interface (ABI) supported by the TSM. Once the conversion process is complete,
-TSM may may assign confidential memory to one or more TVMs.
+TSM may assign confidential memory to one or more TVMs.
 A converted confidential resource may be freely assigned to another TVM within
 the same supervisor domain when it is no longer in use. However, an
 unused confidential resource must be explicitly reclaimed for use in the
