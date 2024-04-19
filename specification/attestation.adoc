@@ -3,11 +3,11 @@
 [[attestation]]
 == TVM Attestation and Measurements
 
-The CoVE TVM attestation framework allows for CoVE workload owners to assert
-the trustworthiness of the hardware and software environment their workload is
-running in. This framework allows for Remote and Local attestation.
+The CoVE TVM attestation framework allows CoVE workload owners to assert
+the trustworthiness of the hardware and software environment in which their workload is
+running. This framework allows for *remote* and *local attestation*.
 
-Remote attestation relies on the ability for the SoC to generate a cryptographic evidence
+Remote attestation relies on the ability for the system on chip (SoC) to generate a cryptographic evidence
 for a workload executing in a CoVE TVM. The workload executing in a TVM may
 request this cryptographic evidence to relay to a remote relying party which
 verifies that the evidence is valid (per some appraisal policy). If valid, the 
@@ -16,7 +16,8 @@ can release secrets or attestation result tokens to the TVM.
 
 Local attestation is a model where the TVM presents cryptographic evidence to the TSM 
 that enables the TSM to release a secret to the TVM if it is authorized to
-run on the platform. 
+run on the platform. This form of attestation meets the needs of systems that
+have limited or no access to the network.
 
 This section describes the CoVE attestation evidence content, format and
 generation interface.

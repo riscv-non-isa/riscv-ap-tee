@@ -110,7 +110,7 @@ across multiple sockets.
 
 | TEE | Trusted execution environment (TEE) is a set of hardware and software mechanisms that allow creating attestable and isolated execution environment.
 
-| TVM | TEE VM (TVM) also known as Confidential VM. It is a VM instantiation of an confidential workload.
+| TVM | TEE VM (TVM) also known as Confidential VM. It is a VM instantiation of a confidential workload.
 
 | VM | Virtual Machine (VM) is a guest operating system hosted by a VMM.
 

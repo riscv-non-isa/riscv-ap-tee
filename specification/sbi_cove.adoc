@@ -97,10 +97,10 @@ A TVM might be created in two ways:
 (1) the OS/VMM requests the TSM to promote an existing VM to a TVM using a single COVH call, 
 (2) the OS/VMM assembles a TVM under the TSM's supervision in a sequence of COVH calls. 
 
-To promote a non-confidential VM to a TVM, the OS/VMM invokes the `sbi_covh_promote_to_tvm()` call,
-presenting the VM state (the CPU state, VM's data, page tables) to the TSM. The TSM handles this call 
-by copying the entire VMs state into confidential memory. This is performed as a single operation after 
-which the newly created TVM is in the `TVM_RUNNABLE` state. 
+To promote a non-confidential VM to a TVM, the OS/VMM invokes the `sbi_covh_promote_to_tvm()`,
+presenting the VM's state (the CPU state, VM's data, page tables) to the TSM. The TSM then 
+copies the entire VM's state into confidential memory. This is performed as a single operation after 
+which the newly created TVM is in the `TVM_RUNNABLE` state.
 
 [NOTE]
 ====
@@ -127,7 +127,7 @@ The host is responsible for the following memory management functions:
 ====
 The division into confidential and non-confidential memory might be done statically or dynamically. 
 CoVE implementations that support only static partitioning of confidential and 
-non-confidential memory (for example, see <<appendix_d>>) 
+non-confidential memory (for example <<appendix_d>>) 
 might partition the memory during platform initialization before execution of untrusted code, 
 and thus do not need to implement above ABI.
 ====
@@ -193,13 +193,16 @@ example, the host needs `htval` to determine the fault address, `a0`-`a7` GPRs
 to handle forwarded ECALLs and so on. For this purpose, the host and
 TSM use the Nested Acceleration (NACL) extension based shared memory interface <<R10>>, from now on called
 NACL shared memory to avoid confusion with shared memory pages between TVM and
-the host.
+the host. 
 
 The NACL shared memory interface is between TSM and the host and TSM is
 responsible for writing any trap-related CSRs and GPRs needed by the host to
-handle the exception. TSM is also responsible for reading the returned result
-and forwarding it to the TVM. Further details about which CSRs and GPRs are used
-by the TSM and the host can be found in <<table_tsm_csr_updates_in_nacl>>.
+handle the exception. The TSM is also responsible for reading the returned results
+from the NACL shared memory and forwarding it to the TVM.
+For single-step TVM creation, OS/VMM also uses NACL shared memory to reflect the 
+VM's state to the TSM. Further details about which CSRs and GPRs are used by the 
+TSM and the host can be found in <<table_tsm_csr_updates_in_nacl>>.
+
 The layout of NACL shared memory is shown below as `struct nacl_shmem` and
 `scratch` space layout for TSM is shown as
 `struct tsm_shmem_scratch`.
@@ -283,6 +286,8 @@ interrupt ticking.
                                 to check which interrupts are enabled. This is
                                 useful in waking up a guest's vcpu when it is
                                 sleeping due to a `WFI` instruction.
+| hgatp      |   R   |  W     | Host reflects the address of the page directory to the TSM during the single-step TVM creation.
+| vs*        |   R   |  W     | Host reflects the vCPU state to the TSM during the single-step TVM creation.
 | *GPRs*     |       |        |
 | a0         |  RW   |  RW    | Used for both passing argument and returning
                                 the result for ECALLs forwarded to the host.
@@ -301,7 +306,7 @@ interrupt ticking.
 | a7         |  W    |  R     | Used for passing an argument for ECALLs
                                 forwarded to the host.
 | x0-x31     |  RW   |  RW    | Any of the GPR used in load/store instruction
-                                trapped for MMIO emulation.
+                                trapped for MMIO emulation. All GPRs are reflected from the host to the TSM during the single-step TVM creation.
 |===
 
 [TIP]
@@ -321,7 +326,7 @@ interface is used between the host and the TSM for processing TVM exits from
 [NOTE]
 ====
 Note that the vCPU creation procedure is not required for TVMs created in a single step 
-(via `sbi_covh_promote_to_tvm()`) because TSM creates all TVM's vCPUs at once.
+(via `sbi_covh_promote_to_tvm()`) because the TSM creates all TVM's vCPUs at once.
 All TVM's vCPUs are in the reset state, except for the vCPU whose state was presented to the TSM
 at the time of promotion. The vCPUs initial states are part of the TVM's measurement.
 ====
@@ -339,7 +344,7 @@ after this transition.
 ====
 Note that a TVM created via `sbi_covh_promote_to_tvm()` does not require finalization, 
 because it is already in the `TVM_RUNNABLE` state with a valid entrypoint, which
-corresponds to the vCPU state presented to TSM at the time of promotion to a TVM.
+corresponds to the vCPU state presented to the TSM at the time of promotion to a TVM.
 ====
 
 ===== TVM execution
@@ -856,39 +861,33 @@ The possible error codes returned in `sbiret.error` are shown below.
 [source, C]
 -----
 struct sbiret sbi_covh_promote_to_tvm(unsigned long fdt_addr,
-                                      unsigned long number_of_vcpus,
                                       unsigned long tap_addr);
 -----
-This intrisic is used by the host to promote a VM to a TVM. It is primarily inteded for CoVE deployment 
-models that require the single-step TVM creation (e.g., see <<dep3>>). Deployment models that offer the multi-step TVM creation 
+This intrisic is used by the host to promote a VM to a TVM. It is primarily intended for CoVE deployment 
+models that require single-step TVM creation (e.g., <<appendix_d>>). Deployment models that offer multi-step TVM creation 
 (e.g., <<dep1>>) may, but are not required to, support this ABI as an additional mechanism for creating TVMs. 
 
-The `fdt_addr` is the 8-bytes aligned guest physical address of the flattened device tree (FDT). The `fdt_addr` is 
-a number representing a maximum number of vCPUs that this TVM can have. The `tap_addr` is the 8-bytes aligned guest physical 
-address of the `TVM attestation payload` used for local attestation. For VMs that do not require local attestation 
-(only the remote attestation), `tap_addr` must be `0`.
+The `fdt_addr` is the 8-bytes aligned guest physical address of the guest flattened device tree (FDT). 
+The `tap_addr` is the 8-bytes aligned guest physical address of the `TVM attestation payload` used for local attestation. 
+For VMs that do not require local attestation (only the remote attestation), `tap_addr` must be set to `0`.
 
-The VM should be promoted as early in the boot process as possible to minimize changes in contents of memory so 
-that the resulting integrity measurement hashes are deterministic. The state of the processor (i.e., GPRs and VS-level CSRs) 
-that trapped to TSM with this call, must correspond to the state of the vCPU that will resume execution as part of the TVM. 
-The TSM copies VM's data to confidential memory, while recreating page table hierarchy in confidential memory following
-the VM page table configuration stored in non-confidential memory and pointed by the HGATP. The TSM populates one of the vCPUs 
-state with the state of the trapped thread, all other vCPUs are in the reset state and controlled by the TVM using the SBI HSM
-extension. TSM measures the initial TVM's state and uses during local or remote attestation.
+The VM should be promoted as early in the boot process as possible to minimize changes in memory contents so 
+that the resulting integrity measurement hashes are deterministic. 
+The VM must not use registers associated with RISC-V extensions, e.g., vector, floating point, before promotion, because these registers will be zeroized during the promotion.
+The TSM recreates TVM vCPUs in confidential memory. All TVM vCPUs are in the reset state, except the
+TVM Boot vCPU, which is the state of the reflected VM's vCPU. This VM's vCPU state is reflected using
+NACL shared memory. The TSM recreates in confidential memory the reflected VM's data and the VM's page
+tables, following the page table configuration defined in HGATP. 
 
-[NOTE]
-====
-To simplify the implementation of this ABI, it is recommended that this call is already invoked by the VM and then OS/VMM just reflects 
-it to the TSM. The advantage is that the OS/VMM does not need to implement any specific mechanism for creating a TVM because it can
-construct a TVM as a regular VM, relying on the VM to select the time of promotion to a TVM.
-====
+Once the TVM's image is completed, the TSM calculates the TVM measurement.
+If `tap_addr` is defined, the TSM uses this TVM measurement to authenticate and authorize the TVM 
+as part of the local attestation procedure.
 
 If successful, the TSM sets the TVM state to `TVM_RUNNABLE` and returns a unique TVM identifier (`tvm_guest_id`) to the OS/VMM. 
-The OS/VMM should free the contents of non-confidential memory that contains VM's data and page tables. Since now on, the OS/VMM must 
-interact with this TVM via the TSM using the COVH ABI, i.e., resuming the TVM using the `sbi_covh_run_tvm_vcpu()` call.
+The OS/VMM should free the contents of non-confidential memory that contains the VM's data and the page tables. 
+Since now on, the OS/VMM must interact with this TVM via the TSM using the COVH ABI, i.e., resuming the TVM using the `sbi_covh_run_tvm_vcpu()` call.
 
-If the call fails, the TSM returns the SBI error code in `sbiret.error` to the OS/VMM. The possible error codes 
-are shown below.
+If the call fails, the TSM returns the SBI error code in `sbiret.error` to the OS/VMM. The possible error codes are shown below.
 
 [#table_sbi_covh_promote_to_tvm_errors]
 .COVE Host Promote to TVM Errors
@@ -898,7 +897,7 @@ are shown below.
 | SBI_SUCCESS             | The operation completed successfully.
 | SBI_ERR_INVALID_ADDRESS | `fdt_addr` was invalid.
 | SBI_ERR_AUTH            | Local attestation failed.
-| SBI_ERR_OUT_OF_MEMORY   | Not enough confidential memory to store TVM
+| SBI_ERR_OUT_OF_MEMORY   | Not enough confidential memory to store TVM.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
