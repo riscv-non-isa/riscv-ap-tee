@@ -198,7 +198,7 @@ the host.
 The NACL shared memory interface is between TSM and the host and TSM is
 responsible for writing any trap-related CSRs and GPRs needed by the host to
 handle the exception. The TSM is also responsible for reading the returned results
-from the NACL shared memory and forwarding it to the TVM.
+from NACL shared memory and forwarding it to the TVM.
 For single-step TVM creation, OS/VMM also uses NACL shared memory to reflect the 
 VM's state to the TSM. Further details about which CSRs and GPRs are used by the 
 TSM and the host can be found in <<table_tsm_csr_updates_in_nacl>>.
@@ -885,7 +885,7 @@ as part of the local attestation procedure.
 
 If successful, the TSM sets the TVM state to `TVM_RUNNABLE` and returns a unique TVM identifier (`tvm_guest_id`) to the OS/VMM. 
 The OS/VMM should free the contents of non-confidential memory that contains the VM's data and the page tables. 
-Since now on, the OS/VMM must interact with this TVM via the TSM using the COVH ABI, i.e., resuming the TVM using the `sbi_covh_run_tvm_vcpu()` call.
+After this call, the OS/VMM must interact with this TVM via the TSM using the COVH ABI, i.e., resuming the TVM using the `sbi_covh_run_tvm_vcpu()` call.
 
 If the call fails, the TSM returns the SBI error code in `sbiret.error` to the OS/VMM. The possible error codes are shown below.
 
