@@ -99,7 +99,7 @@ A TVM might be created in two ways:
 
 To promote a non-confidential VM to a TVM, the OS/VMM invokes the `sbi_covh_promote_to_tvm()`,
 presenting the VM's state (the CPU state, VM's data, page tables) to the TSM. The TSM then 
-copies the entire VM's state into confidential memory. This is performed as a single operation after 
+measures and then copies the entire VM's state into confidential memory. This is performed as a single operation after 
 which the newly created TVM is in the `TVM_RUNNABLE` state.
 
 [NOTE]
