@@ -3,16 +3,21 @@
 [[attestation]]
 == TVM Attestation and Measurements
 
-The CoVE TVM attestation framework allows for CoVE workload owners to assert
-the trustworthiness of the hardware and software environment their workload is
-running in.
+The CoVE TVM attestation framework allows CoVE workload owners to assert
+the trustworthiness of the hardware and software environment in which their workload is
+running. This framework allows for *remote* and *local attestation*.
 
-Attestation relies on the ability for the SoC to generate a cryptographic evidence
+Remote attestation relies on the ability for the system on chip (SoC) to generate a cryptographic evidence
 for a workload executing in a CoVE TVM. The workload executing in a TVM may
-request this cryptographic evidence to relay to a remote relying party which can
-then verify that the evidence is valid (per some appraisal policy), and thus attest
-to the trustworthiness of the TVM. The relying party can then accept to release
-secrets or attestation result tokens back to the trusted workload.
+request this cryptographic evidence to relay to a remote relying party which
+verifies that the evidence is valid (per some appraisal policy). If valid, the 
+evidence attests to the trustworthiness of the TVM, so that the relying party 
+can release secrets or attestation result tokens to the TVM.
+
+Local attestation is a model where the TVM presents cryptographic evidence to the TSM 
+that enables the TSM to release a secret to the TVM if it is authorized to
+run on the platform. This form of attestation meets the needs of systems that
+have limited or no access to the network.
 
 This section describes the CoVE attestation evidence content, format and
 generation interface.
@@ -65,7 +70,7 @@ The TCB elements for each of them is summarized in the following table:
 .4+.^|Platform
     <| HW RoT for boot, measurement and storage
  .4+<| All M-mode firmwares, including the TSM-driver
-    <| All CPU hardware logic, including MMU and caches
+    <| All CPU hardware logic
     <| All SoC subsystems, including memory confidentiality, integrity and replay-protection for volatile memory
     <| IOMMU and translation agents
 
@@ -88,7 +93,7 @@ measurements and a runtime one.
 TVM initial measurements are generated from the CoVE workload TCB elements
 involved in the TVM construction. Any TCB element that directly or indirectly
 supports a TVM must be measured into the TVM initial measurement registers. Once
-a TVM is finalized, i.e. after the `sbi_tee_host_finalize_tvm()` TH-ABI is
+a TVM is finalized, i.e., after the `sbi_tee_host_finalize_tvm()` TH-ABI is
 called, the TVM initial measurements must no longer be extended.
 
 Each TVM's initial measurements are stored in dedicated measurement registers and
@@ -141,7 +146,7 @@ CoVE implementation may look like the following table:
 
      | 5
      | TVM Configuration
-    <| TVM Entry Point and Initial Arguments
+    <| TVM Entry Point, Initial Arguments, and the vCPU state
      | TSM
 |===
 
@@ -162,7 +167,7 @@ The TVM measurement extension interface is exposed through the optional TG-ABI
 
 [NOTE]
 ====
-if an implementation uses UEFI firmware to initialize the CoVE TVM guest
+If an implementation uses UEFI firmware to initialize the CoVE TVM guest
 environment, then refer to UEFI specification <<R23>> chapter 38 on confidential
 computing for UEFI ABI related to runtime measurement extension and
 event log creation.
@@ -172,10 +177,10 @@ event log creation.
 
 All above described TCB elements measurements are added to an attestation
 evidence and then reported to relying parties. The attestation mechanism
-and protocol that take place between the attester (i.e. the TVM) and the
-remote attestation service are out of this document scope.
+and protocol that take place between the attester (i.e., the TVM) and the
+remote attestation service are out of the scope of this document.
 
-In this section we describe the high level attestation model for CoVE,
+In this section, we describe the high level model of remote attestation for CoVE,
 together with the attestation evidence content, format and generation process.
 
 ==== Model
@@ -222,13 +227,13 @@ TCB layer measurements:
 [.center]
 [stem]
 ++++
-CDI_{0} = KDF(UDS_{Len},\ UDS\ ||\ H_{alg}(Meas(TCB_{0}))
+CDI_{0} = KDF(UDS_{Len},\ UDS\ ||\ H_{alg}(Meas(TCB_{0})))
 ++++
 :stem: asciimath
 [.center]
 [stem]
 ++++
-CDI_{N} = KDF(CDI_{Len},\ CDI_{N-1}\ ||\ H_{alg}(Meas(TCB_{N}))
+CDI_{N} = KDF(CDI_{Len},\ CDI_{N-1}\ ||\ H_{alg}(Meas(TCB_{N})))
 ++++
 
 Asymmetric key pairs can be derived from a CDI in order to generate the
@@ -649,9 +654,9 @@ The TVM identity claim value is a `sbi_tee_host_finalize_tvm()` provided
 argument. It is an optional claim and is not included in the TVM token when
 the TVM identity argument is set to 0.
 
-It is used by the host TVM creator (e.g. the host VMM) to bind a TVM to an
+It is used by the host TVM creator (e.g., the host VMM) to bind a TVM to an
 identity or more generically a specific piece of data (e.g. an Attestation
-Service public key, a configuration blob, etc) through its hash value.
+Service public key, a configuration blob, etc.) through its hash value.
 
 TVM identity allows for untrusted hosts to provide a TVM with unmeasured but
 attestable pieces of data. A Relying Party can then verify the TVM measurements

@@ -62,6 +62,8 @@ that hosts multiple mutually distrusting software owned by different tenants.
 
 | MTT | Memory Tracking Table (MTT).
 
+| Relying party | An entity that depends on the validity of information about another entity, typically for purposes of authorization cite:[RATS].
+
 | RISC-V Supervisor Domains | RISC-V privileged architecture <<R0>> defines
 the S-mode for execution of supervisor software. S-mode software may optionally
 enable the Hypervisor extension to host virtual machines. Typically, there is a
@@ -90,6 +92,8 @@ information as part of the evidence of the TCB in use. The SVN is typically
 combined with other meta-data elements when evaluating the attestation
 information.
 
+| TAP | TVM attestation payload (TAP) is a block of memory in a VM that TSM uses to perform local attestation as part of promoting a VM to a TVM.
+
 | TSM | TEE security manager (TSM) is a software module that enforces TEE security guarantees on a platform. It acts as
 the trusted intermediary between the VMM and the TVM. TSM extends the TCB chain on the CoVE platform and is therefore subject to attestation. 
 
@@ -100,14 +104,15 @@ software, and firmware elements that are trusted by a relying party to
 protect the confidentiality and integrity of the relying parties' workload
 data and execution against a defined adversary model. In a system with
 separate processing elements within a package on a socket, the TCB
-boundary is the package. In a multi-socket system the TCB extends across
-the socket-to-socket interface, and is managed as one system TCB.
+boundary is the package. In a multi-socket system the Hardware TCB extends across
+the socket-to-socket interface, and is managed as one system TCB. The software TCB may  also extends
+across multiple sockets.
 
 | TEE | Trusted execution environment (TEE) is a set of hardware and software mechanisms that allow creating attestable and isolated execution environment.
 
-| TVM | TEE VM (TVM) also known as Confidential VM. It is a VM instantiation of an confidential workload.
+| TVM | TEE VM (TVM) also known as Confidential VM. It is a VM instantiation of a confidential workload.
 
-| Virtual Machine (VM) | Guest operating system hosted by a VMM.
+| VM | Virtual Machine (VM) is a guest operating system hosted by a VMM.
 
 | VMM | Virtual machine monitor (VMM) is used interchangeably with the term hypervisor in this document.
 

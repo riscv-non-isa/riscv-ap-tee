@@ -8,13 +8,17 @@ including the OS/VMM interactions with the TSM.
 
 === TVM build and initialization
 
-The host OS/VMM must be capable of hosting many TVMs on a CoVE-capable
-platform (limited only by the practical limits of the number of cpus and
+The host OS/VMM should be capable of hosting many TVMs on a CoVE-capable
+platform (limited only by the practical limits of the number of CPUs and
 the amount of memory available on the system). To that end, the TVM should
 be able to use all of the system memory as confidential memory, as long as
 the platform access-control mechanisms are applicable to all the available
-memory on the system. The TSM allows the OS/VMM to manage the assignment of
-confidential memory by providing a two stage TEE memory management model:
+memory on the system. In CoVE implementations that support dynamic conversion 
+between confidential and non-confidential memory, the TSM might allow the 
+OS/VMM to manage the assignment of confidential memory by providing a two stage 
+TEE memory management model, described below. However, this memory management 
+model is not required for CoVE implementations that statically partition memory into
+confidential and non-confidential.
 
 1. Creation of confidential memory regions - this process converts memory
 pages from non-confidential to confidential memory (and in that process
@@ -25,13 +29,22 @@ controls described earlier).
 confidential memory regions for various purposes like creating TVM workloads
 etc.
 
-The host OS/VMM may create a new TVM by allocating and initializing a TVM
-using the `sbi_covh_create_tvm()` function. An initial set of memory pages are
-granted to the TSM and tracked as TEE pages associated with that TVM from
-that point onwards until the TVM is destroyed via the `sbi_covh_destroy_tvm()`
-function.
+This specification defines two ways of creating a TVM, an implementation must
+provide at least one of them: (1) Multi-step TVM creation, (2) Single-step TVM creation.
+In the multi-step TVM creation, OS/VMM constructs a TVM in a sequence of calls to TSM. 
+During this process, the TVM is in an intermediate state and cannot be executed until 
+the explicit call to finalize the TVM creation. In the single-step TVM creation, the TSM
+converts an existing VM into a TVM in a single operation by copying the VM data and state 
+to confidential memory.
 
-A TVM context may be created and initialized by using the
+==== Multi-step TVM Creation
+
+The host OS/VMM may create a new TVM by allocating and initializing a TVM using the 
+`sbi_covh_create_tvm()` function. An initial set of memory pages are granted to the 
+TSM and tracked as TEE pages associated with that TVM from that point onwards until 
+the TVM is destroyed via the `sbi_covh_destroy_tvm()` function. 
+
+When a TVM context is created and initialized by using the
 `sbi_covh_create_tvm()` function - this global init function allocates a
 set of pages for the TVM global control structure and resets the control
 fields that are immutable for the lifetime of the TVM, e.g., configuration of
@@ -65,11 +78,29 @@ measurement of the TVM via `sbi_covh_finalize_tvm()`. The TSM prevents any
 TVM virtual harts from being entered until the TVM initialization is
 finalized.
 
+==== Single-step TVM Creation
+
+The OS/VMM can create a new TVM in a single operation by requesting the TSM to construct a TVM 
+from the existing non-confidential VM. 
+First, the OS/VMM creates a regular VM by allocating memory for the VM's data and vCPUs and creating
+the G-Stage page table configuration. This is a standard process for creating non-confidential VMs
+implemented by existing OS/VMMs. In response to a request from a VM, `sbi_promote_to_tvm()`, 
+the OS/VMM requests the TSM to promote the VM by executing the `sbi_covh_promote_to_tvm()` call. 
+The TSM creates a new TVM from the reflected VM state (VM data, page table configuration, vCPU state). 
+After promotion, the OS/VMM releases the previously allocated VM resources and begins interacting with the TVM through the TSM as described in the next sections.
+
+[NOTE]
+====
+The promotion should be done early during the TVM's bootstrap so that the integrity measurements 
+calculated by TSM over the TVM data in confidential memory are deterministic and therefore meaningful for
+attestation.
+====
+
 === TVM execution
 
 The VMM uses `sbi_covh_run_tvm_vcpu()` to (re)activate a virtual hart for a
 specific TVM (identified by the unique identifier). This TEECALL traps into
-the TSM-driver which affects the context switch to the TSM - The TSM then
+the TSM-driver which affects the context switch to the TSM. The TSM then
 manages the activation of the virtual hart on the calling physical hart. During
 this activation the TCB's firmware can enforce that
 stale TLB entries that govern guest physical to system physical page access
@@ -78,9 +109,11 @@ the virtual-harts due to VS-stage translation changes (guest virtual to
 guest physical) performed by the TVM OS - these are initiated by the TVM OS
 to cause IPIs to the virtual-harts managed by the TVM OS (and verified by
 the TVM OS to ensure the IPIs are received by the TVM OS to invalidate the
-TLB lazily). This reference architecture requires use of AiA IMSIC <<R9>>
-to ensure these IPIs are delivered through the IMSIC associated with the
-guest TVM. Each TVM is allocated a guest interrupt file during TVM
+TLB lazily). 
+
+For implementations using AIA <<R9>>, this reference architecture requires 
+use of AIA IMSIC to ensure these IPIs are delivered through the IMSIC associated 
+with the guest TVM. Each TVM is allocated a guest interrupt file during TVM
 initialization.
 
 During TVM execution, the hardware enforces TSM-driven policies for memory
@@ -113,8 +146,8 @@ confidential memory may be only lazily added via
 `sbi_covh_add_tvm_zero_pages()` after the TVM measurement has been finalized.
 The TVM manages its internal memory database to indicate which guest physical
 page frames are confidential for mapping into VS-stage mappings. There are at
-least two use scenarios for this ABI - first, late addition of memory to enable
-TVM boot with the minimal measured state, and second, if some memory pages were
+least two use scenarios for this ABI: (1) the late addition of memory to enable
+TVM boot with the minimal measured state, and (2) if some memory pages were
 converted to non-confidential by the TVM via `sbi_covg_share_memory_region()`,
 and at a later point they are converted back to confidential, the VMM may add
 zero pages for those mappings.
@@ -148,26 +181,29 @@ HFENCE.GVMA for the TVM VMID. This sequence is described in more detail in
 
 === TVM memory management
 
-The RISC-V architecture supports page types of 4KB, 2MB, 1GB and 512GB.
 The untrusted OS/VMM may assign memory to the TVM at any architecture-supported
-page size. This assignment is enforced via the TSM-driver and the TSM.
-Specifically, the TSM-driver configures the memory tracking table (MTT) after
-enforcing the security requirements to track the assignment of memory pages to
-a supervisor domain/TSM. The TSM manages subsequent assignment of memory to
-TVMs.
+page size, i.e., 4KB, 2MB, 1GB and 512GB, according to RISC-V architecture. 
+This assignment is supervised by the TSM-driver and the TSM and enforced using
+a specific hardware memory isolation component. Specifically, memory access-control 
+is enforced at two levels:
 
-Thus, memory access-control is enforced at two levels:
-
-* Isolation of memory assigned to TEEs - this includes memory assigned to the
-TSM as well as any TVMs - this tracking is configured by the firmware TCB
-(TSM-driver) via the Memory Tracking Table structure and is enforced by the CPU
-MMU. The MTT tracks the access permissions for confidential supervisor domains
+* Isolation of memory assigned to the confidential supervisor domain (TSM and TVMs). 
+This tracking is configured by the firmware TCB (TSM-driver) and enforced using a 
+hardware memory isolation mechanism, e.g., Memory Tracking Table (MTT), PMP.
+These mechanisms track access permissions for confidential supervisor domains
 and hosting supervisor domains for all software-accessible physical memory
 addresses.
-* Isolation of memory between TVMs - memory tracking is augmented by the TSM
-via the G-stage translation structures to maintain compatibility with OS/VMM
-memory management, and is also enforced by the CPU MMU. The correct operation of
-this access-control level is dependent on trusted enforcement of item 1 above.
+* Isolation of memory between TVMs within a confidential supervisor domain. 
+The memory tracking is augmented by the TSM via the G-stage translation structures to 
+maintain compatibility with OS/VMM memory management, and is also enforced by the CPU's 
+memory management unit (MMU). The correct operation of this access-control level is dependent 
+on trusted enforcement of item 1 above.
+
+In CoVE implementations that support MTT, the TSM-driver configures the MTT
+after enforcing the security requirements to track the assignment of memory pages to
+a supervisor domain/TSM. The TSM manages subsequent assignment of memory to TVMs. In implementations
+that do not implement MTT, memory must be statically partitioned into confidential and 
+non-confidential and the TSM is required to track assignment of pages in confidential memory to TVMs.
 
 ==== Security requirements for TVM memory mappings
 
@@ -199,7 +235,8 @@ the GPA and enforced for memory access for the TVM by the hardware.
 
 ====  Information tracked per physical page
 
-The Extended Memory Tracking Table (EMTT) information managed by the TSM
+For implementations that utilize MTT the Extended Memory Tracking Table (EMTT) 
+information managed by the TSM
 is used to track additional fields of metadata associated with physical
 addresses.
 The page size is implicit in the MTT and EMTT lookup - 4KB, 2MB, 1GB, 512GB.
@@ -229,25 +266,24 @@ per the global TLB management. If the page is assigned to a TVM, it is versioned
 the TVM-local TLB management.
 | Additional meta-data | Locking state
 |===
-% HGAT above what does it stand for, hypervisor guest address translation? should it be HGATP, or HGATP should be HGAT?
 
 ==== Page walk and Translation caching considerations
 
 Any caching of the address translation information when the memory tracking for
 confidential memory is enabled must cache whether the address translation is for
-a TEE context or not. A miss in the cached MTT information is expected to cause
-a lookup of the MTT structure using the PA and the resolved page size for TEE
-access evaluation - which results in the TEE access information that is cached.
+a TEE context or not. A miss in the cached address translation information is expected to cause
+a lookup of the address translation structure using the physical address (PA) and the resolved page 
+size for TEE access evaluation - which results in the TEE access information that is cached.
 
-The MTT lookups are performed using the physical address, and must be enforced
-for all modes of operation i.e., with paging disabled, one-level paging and
-guest-stage paging.
-
-Any MTT cached information may be flushed as part of HFENCE.GVMA. The TSM and
+In CoVE implementations with MTT, the MTT lookups are performed using the physical address, 
+and must be enforced for all modes of operation i.e., with paging disabled, one-level paging and
+guest-stage paging. Any MTT cached information may be flushed as part of HFENCE.GVMA. The TSM and
 VMM may both issue this operation. TSM issues this fence when memory access
-is transferred between TEE and non-TEE domains via sbi_covh_convert_pages.
+is transferred between TEE and non-TEE domains via `sbi_covh_convert_pages()`.
 
 ==== Page conversion
+
+This section refers to CoVE implementations supporting page conversion, i.e., implementing MTT.
 
 Post measured boot, the system memory map must be available to the TSM on load
 (accessed as part of initialization of the TSM). This memory map structure may
@@ -304,9 +340,9 @@ TLB version. A similar TLB version is managed associated with the physical
 address in the EMTT.
 
 If the VMM initiates memory conversion to confidential, or any change to an
-assigned confidential and present GPA mapping for a TVM, e.g., remove, relocate,
-promote etc., then it must execute the following sequence (enforced by TSM) to
-affect that change:
+assigned confidential and present guest physical address (GPA) mapping for a TVM, 
+e.g., remove, relocate, promote etc., then it must execute the following sequence 
+(enforced by TSM) to affect that change:
 
 * Invalidate the mapping it wants to modify (page or range of pages). This step
 prevents new cached mappings from being populated in the TLB.
@@ -337,6 +373,9 @@ mapping and validate the mapping.
 
 ==== Page Mapping Page Assignment
 
+This section refers to CoVE implementations supporting OS/VMM-initiated page assignment
+to a TVM. 
+
 The VMM uses this operation to add a hgatp structure page to be used for mapping
 a guest physical address (GPA) to a physical address (PA). The inputs to this
 operation are the TVM identifier and the physical address(es) for the new
@@ -357,6 +396,9 @@ as valid).
 * Update the hgatp page EMTT entry with the TVM owner-id and page-type.
 
 ==== Measured page assignment into a TVM memory map
+
+This section refers to CoVE implementations supporting OS/VMM-initiated page assignment
+to a TVM. 
 
 VMM uses the sbi_covh_add_tvm_zero/measured_pages interfaces to add a
 4KB/2MB/1GB page to the TVM. The page assigned to the TVM is identified by its
@@ -611,15 +653,14 @@ executing, the VMM stops TVM execution by issuing an asynchronous interrupt
 that yields the virtual hart and taking control back into the VMM (without
 any TVM state leakage as that is context saved by the TSM on the trap due to
 the interrupt). Once the TVM virtual harts are stopped, the VMM must issue a
-sbi_covh_destroy_tvm that can verify that no TVM harts are executing and
+`sbi_covh_destroy_tvm()` that can verify that no TVM harts are executing and
 unassigns all memory assigned to the TVM.
 
-The VMM may grant the confidential memory to another TVM or may
-reclaim all memory granted to the TVM via sbi_covh_reclaim_pages which will
+CoVE implementations supporting dynamic memory conversion between confidential
+and non-confidential, may allow the VMM to grant the confidential memory to another 
+TVM or reclaim all memory granted to the TVM via `sbi_covh_reclaim_pages()` which will
 verify the TSM hgatp mapping and tracking for the page and restore it as
-a VMM-available page to grant to a non-confidential VM.
-
-*Reclaim TSM operation*:
+a VMM-available page to grant to a non-confidential VM. This reclaim TSM opertaion:
 
 * Verifies that the PAs referenced are either Non-confidential (No-operation) or
 Confidential-Unassigned state.
@@ -628,6 +669,10 @@ Confidential-Unassigned state.
 * TSM updates MTT tracker entry (synchronized) for the page as Non-confidential
 and returns the PA as an Non-Conf page to the VMM.
 * VMM translations to the PA (via 1st or G stage mappings) may be created now.
+
+In CoVE implementations that do not support dynamic memory conversion between confidential
+and non-confidential, the TSM must scrub page contents and should make these pages available
+for future assignments to new TVMs.
 
 === RAS interaction
 

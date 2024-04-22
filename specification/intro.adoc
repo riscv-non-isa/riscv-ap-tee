@@ -7,7 +7,7 @@ a scalable Trusted Execution Environment (TEE) for hardware virtual-machine-base
 workloads on RISC-V-based platforms. This CoVE interface specification enables
 application workloads that require confidentiality to reduce the Trusted
 Computing Base (TCB) to a minimal TCB, specifically, keeping the host OS/VMM,
-devices and other software outside the TCB.  Admitting devices into the TCB of CoVE
+devices and other software outside the TCB. Admitting devices into the TCB of CoVE
 TEE VMs is outside the scope of this specification and is described in the CoVE-IO
 specification.
 The proposed specification supports an
