@@ -1,7 +1,7 @@
 [[appendix_b]]
 == Appendix B: Interrupt Handling
 
-The following table describes the interrupt handling delegation for an 
+The following table describes the interrupt handling delegation for an
 interruptible and non-preemptable TSM.
 
 |===
@@ -13,18 +13,18 @@ interruptible and non-preemptable TSM.
 | 1          | 3              | Machine software interrupt  |"
 | 1          | 4              | Reserved    |"
 | 1          | 5              | Supervisor timer interrupt  | VU(TVM)/VS
-(TVM); VU (TVM)/VS(TVM); U(TSM)/HS(TSM); HS(TSM)/M(TSM-driver)   
+(TVM); VU (TVM)/VS(TVM); U(TSM)/HS(TSM); HS(TSM)/M(TSM-driver)
 | 1          | 6              | Reserved                | */M(TSM-driver)
 | 1          | 7              | Machine timer interrupt |"
 | 1          | 8              | Reserved                |"
 | 1          | 9              | Supervisor external interrupt | VU(TVM)/VS
-(TVM); VU(TVM)/VS(TVM); U(TSM)/HS(TSM); HS(TSM)/M(TSM-driver)   
+(TVM); VU(TVM)/VS(TVM); U(TSM)/HS(TSM); HS(TSM)/M(TSM-driver)
 | 1          | 10             | Reserved    | */M(TSM-driver)
 | 1          | 11             | Machine external interrupt   |"
 | 1          | 12–15          | Reserved                     |"
 | 1          | ≥16            | Designated for platform use  |"
 | 0          | 0              | Instruction address misaligned | VU(TVM)/
-VS(TVM); VU(TVM)/VS(TVM); U(TSM)/HS(TSM); HS(TSM)/M(TSM-driver)  
+VS(TVM); VU(TVM)/VS(TVM); U(TSM)/HS(TSM); HS(TSM)/M(TSM-driver)
 | 0          | 1              | Instruction access fault     |"
 | 0          | 2              | Illegal instruction          |"
 | 0          | 3              | Breakpoint                   |"
@@ -37,14 +37,14 @@ VS(TVM); VU(TVM)/VS(TVM); U(TSM)/HS(TSM); HS(TSM)/M(TSM-driver)
 | 0          | 9              | Environment call from S-mode | VS(TVM)/HS
 (TSM); HS(TSM)/M(TSM-driver)
 | 0          | 10             | Reserved                    |*/M(TSM-driver)
-| 0          | 11             | Environment call from M-mode|*/M(TSM-driver)                                                                 
-| 0          | 12                | Instruction page fault             | 
-VU (TVM)  / VS (TVM); VS (TVM) / HS (TSM); U (TSM) / HS (TSM); HS (TSM) / M 
-(TSM-driver) 
+| 0          | 11             | Environment call from M-mode|*/M(TSM-driver)
+| 0          | 12             | Instruction page fault      |
+VU (TVM)  / VS (TVM); VS (TVM) / HS (TSM); U (TSM) / HS (TSM); HS (TSM) / M
+(TSM-driver)
 | 0          | 13             | Load page fault              |"
 | 0          | 14             | Reserved                 |*/M(TSM-driver)
 | 0          | 15             | Store/AMO page fault     |VU(TVM)/VS(TVM);
- VS(TVM)/HS(TSM); U(TSM)/HS(TSM); HS(TSM)/M(TSM-driver)  
+ VS(TVM)/HS(TSM); U(TSM)/HS(TSM); HS(TSM)/M(TSM-driver)
 | 0          | 16–23          | Reserved           |*/M(TSM-driver)
 | 0          | 24–31          | Designated for custom use   |Per custom use
 | 0          | 32–47          | Reserved            |*/M(TSM-driver)

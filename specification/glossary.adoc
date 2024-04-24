@@ -3,7 +3,8 @@
 
 |===
 
-| AIA | Advanced interrupt architecture (AIA) is an architecture for handling interrupts.
+| AIA | Advanced interrupt architecture (AIA) is an architecture for handling
+interrupts.
 
 | ABI | Application binary interface (ABI).
 
@@ -17,24 +18,24 @@ Multiple APs may be used within a logical system.
 security posture of the confidential workload based on verifying a set of
 HW-rooted cryptographically-protected evidence.
 
-| CDI | Compound device identifier (CDI) is the value that represents the hardware,
-software and firmware combination measured by the TCB elements transitively.
-A CDI is the output of a DICE <<R2>> and is passed to the entity which is
-measured by the previous TCB layer. The CDI is a secret that may be
+| CDI | Compound device identifier (CDI) is the value that represents the
+hardware, software and firmware combination measured by the TCB elements
+transitively. A CDI is the output of a DICE <<R2>> and is passed to the entity
+which is measured by the previous TCB layer. The CDI is a secret that may be
 certified to use for attestation protocols.
 
-| Confidential Computing | A computing paradigm that protects data in use by performing
-computation in a hardware-based, attested TEE.
+| Confidential Computing | A computing paradigm that protects data in use by
+performing computation in a hardware-based, attested TEE.
 
-| CoVE | Confidential VM extension (CoVE) is the set of non-ISA RISC-V ABI extensions
-defined in this specification that enables confidential computing on RISC-V
-platforms. In some deployment models, the CoVE ABI leverages the RISC-V ISA
-extensions specified in the RISC-V Supervisor Domains specification <<R20>>.
-CoVE is a Trusted Execution Environment (TEE) ABI for Application Processors (APs). A
-supervisor domain that provides HW-isolation for workload data assets when in
-use (user/supervisor code/data) and provides HW-attestable confidentiality and
-integrity protection against specific attack vectors per a specified
-adversary and threat model.
+| CoVE | Confidential VM extension (CoVE) is the set of non-ISA RISC-V ABI
+extensions defined in this specification that enables confidential computing on
+RISC-V platforms. In some deployment models, the CoVE ABI leverages the RISC-V
+ISA extensions specified in the RISC-V Supervisor Domains specification <<R20>>.
+CoVE is a Trusted Execution Environment (TEE) ABI for Application Processors
+(APs). A supervisor domain that provides HW-isolation for workload data assets
+when in use (user/supervisor code/data) and provides HW-attestable
+confidentiality and integrity protection against specific attack vectors per a
+specified adversary and threat model.
 
 | Confidential application or library | A user-mode application or
 library instantiation in a TVM. The user-mode application may be supported
@@ -52,7 +53,9 @@ and OS; U-mode user-space VMM tools; ordinary VMs hosted by the VMM that
 emulate devices. The hosting platform is typically a multi-tenant platform
 that hosts multiple mutually distrusting software owned by different tenants.
 
-| Hypervisor | is software running in HS-mode that manages virtual machines (VMs) by virtualizing hart, guest physical memory and input/output (IO) resources. 
+| Hypervisor | is software running in HS-mode that manages virtual machines
+(VMs) by virtualizing hart, guest physical memory and input/output (IO)
+resources.
 
 | IMSIC | Incoming message signaled interrupt controller (IMSIC).
 
@@ -62,7 +65,8 @@ that hosts multiple mutually distrusting software owned by different tenants.
 
 | MTT | Memory Tracking Table (MTT).
 
-| Relying party | An entity that depends on the validity of information about another entity, typically for purposes of authorization cite:[RATS].
+| Relying party | An entity that depends on the validity of information about
+another entity, typically for purposes of authorization <<R1>>.
 
 | RISC-V Supervisor Domains | RISC-V privileged architecture <<R0>> defines
 the S-mode for execution of supervisor software. S-mode software may optionally
@@ -74,47 +78,57 @@ supervisor domain. Supervisor domains enable the reduction of the supervisor
 Trusted Computing Base (TCB), with differential access to memory and other
 platform resources, e.g., as used in this specification.
 
-| RoT | Root of trust (RoT) is the isolated hardware/software subsystem with an immutable ROM firmware and
-isolated compute and memory elements that form the Trusted Compute Base (TCB)
-of a TEE system. The RoT manages cryptographic keys and other security
-critical functions such as system lifecycle and debug authorization.
-The RoT provides trusted services to other software on the platform such
-as verified boot, key provisioning, and management, security lifecycle
-management, sealed storage, device management, crypto services,
+| RoT | Root of trust (RoT) is the isolated hardware/software subsystem with an
+immutable ROM firmware and isolated compute and memory elements that form the
+Trusted Compute Base (TCB) of a TEE system. The RoT manages cryptographic keys
+and other security critical functions such as system lifecycle and debug
+authorization. The RoT provides trusted services to other software on the
+platform such as verified boot, key provisioning, and management, security
+lifecycle management, sealed storage, device management, crypto services,
 attestation etc. The RoT may be an integrated or discrete element <<R7>>,
 and may take on the role of a Device Identification Composition Engine
 (DICE) as defined in <<R2>>.
 
-| SVN | Security version number (SVN) is the meta-data about the Trusted Compute Base (TCB) components
-that conveys the security posture of the TCB. The SVN is a monotonically
-increasing number that represents TCB's version. It gets increased with TCB updates, causing these updates to be reflected in the attestation. The SVN is hence provided as part of the attestation
+| SVN | Security version number (SVN) is the meta-data about the Trusted
+Compute Base (TCB) components that conveys the security posture of the TCB.
+The SVN is a monotonically increasing number that represents TCB's version.
+It gets increased with TCB updates, causing these updates to be reflected in
+the attestation. The SVN is hence provided as part of the attestation
 information as part of the evidence of the TCB in use. The SVN is typically
 combined with other meta-data elements when evaluating the attestation
 information.
 
-| TAP | TVM attestation payload (TAP) is a block of memory in a VM that TSM uses to perform local attestation as part of promoting a VM to a TVM.
+| TAP | TVM attestation payload (TAP) is a block of memory in a VM that TSM uses
+to perform local attestation as part of promoting a VM to a TVM.
 
-| TSM | TEE security manager (TSM) is a software module that enforces TEE security guarantees on a platform. It acts as
-the trusted intermediary between the VMM and the TVM. TSM extends the TCB chain on the CoVE platform and is therefore subject to attestation. 
+| TSM | TEE security manager (TSM) is a software module that enforces TEE
+security guarantees on a platform. It acts as the trusted intermediary between
+the VMM and the TVM. TSM extends the TCB chain on the CoVE platform and is
+therefore subject to attestation.
 
-| Tenant software | All software elements owned and deployed by a tenant in a multi-tenant hosting environment. These elements include VS-mode guest kernel and VU-mode guest user-space software.
+| Tenant software | All software elements owned and deployed by a tenant in a
+multi-tenant hosting environment. These elements include VS-mode guest kernel
+and VU-mode guest user-space software.
 
 | TCB; Also, System/Platform TCB | Trusted computing base (TCB) is the hardware,
 software, and firmware elements that are trusted by a relying party to
 protect the confidentiality and integrity of the relying parties' workload
 data and execution against a defined adversary model. In a system with
 separate processing elements within a package on a socket, the TCB
-boundary is the package. In a multi-socket system the Hardware TCB extends across
-the socket-to-socket interface, and is managed as one system TCB. The software TCB may  also extends
-across multiple sockets.
+boundary is the package. In a multi-socket system the Hardware TCB extends
+across the socket-to-socket interface, and is managed as one system TCB. The
+software TCB may  also extends across multiple sockets.
 
-| TEE | Trusted execution environment (TEE) is a set of hardware and software mechanisms that allow creating attestable and isolated execution environment.
+| TEE | Trusted execution environment (TEE) is a set of hardware and software
+mechanisms that allow creating attestable and isolated execution environment.
 
-| TVM | TEE VM (TVM) also known as Confidential VM. It is a VM instantiation of a confidential workload.
+| TVM | TEE VM (TVM) also known as Confidential VM. It is a VM instantiation of
+a confidential workload.
 
 | VM | Virtual Machine (VM) is a guest operating system hosted by a VMM.
 
-| VMM | Virtual machine monitor (VMM) is used interchangeably with the term hypervisor in this document.
+| VMM | Virtual machine monitor (VMM) is used interchangeably with the term
+hypervisor in this document.
 
 |===
 
