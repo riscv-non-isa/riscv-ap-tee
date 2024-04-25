@@ -4,19 +4,20 @@
 == TVM Attestation and Measurements
 
 The CoVE TVM attestation framework allows CoVE workload owners to assert
-the trustworthiness of the hardware and software environment in which their workload is
-running. This framework allows for *remote* and *local attestation*.
+the trustworthiness of the hardware and software environment in which their
+workload is running. This framework allows for *remote* and *local attestation*.
 
-Remote attestation relies on the ability for the system on chip (SoC) to generate a cryptographic evidence
-for a workload executing in a CoVE TVM. The workload executing in a TVM may
-request this cryptographic evidence to relay to a remote relying party which
-verifies that the evidence is valid (per some appraisal policy). If valid, the 
-evidence attests to the trustworthiness of the TVM, so that the relying party 
-can release secrets or attestation result tokens to the TVM.
+Remote attestation relies on the ability for the system on chip (SoC) to
+generate a cryptographic evidence for a workload executing in a CoVE TVM. The
+workload executing in a TVM may request this cryptographic evidence to relay to
+a remote relying party which verifies that the evidence is valid (per some
+appraisal policy). If valid, the  evidence attests to the trustworthiness of the
+TVM, so that the relying party  can release secrets or attestation result tokens
+to the TVM.
 
-Local attestation is a model where the TVM presents cryptographic evidence to the TSM 
-that enables the TSM to release a secret to the TVM if it is authorized to
-run on the platform. This form of attestation meets the needs of systems that
+Local attestation is a model where the TVM presents cryptographic evidence to
+the TSM  that enables the TSM to release a secret to the TVM if it is authorized
+to run on the platform. This form of attestation meets the needs of systems that
 have limited or no access to the network.
 
 This section describes the CoVE attestation evidence content, format and
@@ -71,7 +72,8 @@ The TCB elements for each of them is summarized in the following table:
     <| HW RoT for boot, measurement and storage
  .4+<| All M-mode firmwares, including the TSM-driver
     <| All CPU hardware logic
-    <| All SoC subsystems, including memory confidentiality, integrity and replay-protection for volatile memory
+    <| All SoC subsystems, including memory confidentiality, integrity and
+       replay-protection for volatile memory
     <| IOMMU and translation agents
 
      | TSM
@@ -96,8 +98,8 @@ supports a TVM must be measured into the TVM initial measurement registers. Once
 a TVM is finalized, i.e., after the `sbi_tee_host_finalize_tvm()` TH-ABI is
 called, the TVM initial measurements must no longer be extended.
 
-Each TVM's initial measurements are stored in dedicated measurement registers and
-a CoVE implementation must provide at least 1 and at most 8 of them. The
+Each TVM's initial measurements are stored in dedicated measurement registers
+and a CoVE implementation must provide at least 1 and at most 8 of them. The
 initial measurement registers cover platform, TSM & TVM specific TCB element
 measurements.
 
@@ -159,8 +161,8 @@ while it is booting or running.
 
 The TSM optionally provides an interface for TVM guests to extend their
 measurement into runtime measurement registers. When supporting that feature,
-the TSM must store runtime measurements separately from the TVM initial ones. The
-TSM can use up to 18 runtime measurement registers for that purpose.
+the TSM must store runtime measurements separately from the TVM initial ones.
+The TSM can use up to 18 runtime measurement registers for that purpose.
 
 The TVM measurement extension interface is exposed through the optional TG-ABI
 `sbi_covg_extend_measurement()` FID.
@@ -180,8 +182,8 @@ evidence and then reported to relying parties. The attestation mechanism
 and protocol that take place between the attester (i.e., the TVM) and the
 remote attestation service are out of the scope of this document.
 
-In this section, we describe the high level model of remote attestation for CoVE,
-together with the attestation evidence content, format and generation process.
+In this section, we describe the high level model of remote attestation for CoVE
+, together with the attestation evidence content, format and generation process.
 
 ==== Model
 
@@ -294,14 +296,14 @@ As the following step in the DICE chain, the TSM generates and provision any TVM
 it creates with its CDI. TVM CDIs are derived from the TSM CDI and the TVM
 specific measurements. However, unlike the RoT and the TSM-driver, the TSM does
 not pass attestation certificates to its TVMs. For evidence freshness
-establishment reasons, TVMs asynchronously request their attestation certificates
-from the TSM, in the form of a TSM-signed Attestation Evidence.
+establishment reasons, TVMs asynchronously request their attestation
+certificates from the TSM, in the form of a TSM-signed Attestation Evidence.
 
 TVMs are the CoVE DICE chain leaves and they can obtain an Attestation Evidence
-from the TSM by calling the CoVE guest-ABI `sbi_covg_get_evidence()` FID. The TVM
-provides a challenge value to the TSM through this call, and that value must be
-included in the generated Evidence. This value allows relying parties to establish
-the Attestation Evidence freshness.
+from the TSM by calling the CoVE guest-ABI `sbi_covg_get_evidence()` FID. The
+TVM provides a challenge value to the TSM through this call, and that value must
+be included in the generated Evidence. This value allows relying parties to
+establish the Attestation Evidence freshness.
 
 The CoVE Evidence is composed of separated but cryptographically bound
 attestation tokens for each of the above-describe TCB layers (Platform, TSM and
@@ -323,10 +325,10 @@ measurement to support the CoVE layered RTMs attestation of CoVE workloads.
 
 ==== Evidence Format
 
-The CoVE Attestation Evidence uses the IETF Entity Attestation Token
-(<<EAT>>), formatted as an untagged, unprotected Concise Binary Object
-Representation (<<CBOR>>) Web Token (<<UCCS>>). A CoVE EAT profile is proposed
-to narrow the EAT specification for the CoVE use case to enable interoperability.
+The CoVE Attestation Evidence uses the IETF Entity Attestation Token (<<EAT>>),
+formatted as an untagged, unprotected Concise Binary Object Representation
+(<<CBOR>>) Web Token (<<UCCS>>). A CoVE EAT profile is proposed to narrow the
+EAT specification for the CoVE use case to enable interoperability.
 
 The UCCS is composed of one EAT submodule Claims-Set map where the map values
 are attestation tokens for the TVM, TSM and Platform Claims.
@@ -513,15 +515,15 @@ loaded in memory.
 * *Component SVN*: This is the component Secure Version Number. The semantics of
 that value is defined by the component creator or vendor. The SVN can be
 generated from multiple SVNs.
-* *Component manifest*: This is the hash value of the component manifest that was
-used when loading and verifying the associated component. This field is
+* *Component manifest*: This is the hash value of the component manifest that
+was used when loading and verifying the associated component. This field is
 _optional_. The format of the manifest for the component is out of scope of this
 specification.
 * *Component signer*: This is the hash value of a signing authority for the
 component.
-* *Hash algorithm identifier*: This describes which algorithm was used to generate the
-component measurement. It is recommended to use one of the IANA defined
-<<HashAlgorithmNames>>.
+* *Hash algorithm identifier*: This describes which algorithm was used to
+generate the component measurement. It is recommended to use one of the IANA
+defined <<HashAlgorithmNames>>.
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
 [title= "Platform Software Components Claim"]
@@ -584,8 +586,8 @@ tsm-public-key = (
 The TSM software components claim lists all software components that compose the
 CoVE TSM TCB.
 
-The TSM software components that influence the TSM TCB are the TSM-Driver and the
-TSM.
+The TSM software components that influence the TSM TCB are the TSM-Driver and
+the TSM.
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
 [title= "TSM Software Components Claim"]

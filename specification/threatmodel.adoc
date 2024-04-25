@@ -14,9 +14,10 @@ assigned system memory, CPU registers, IOMMU(s) and IO devices.
 
 _Startup Software Adversary_ - This includes system software executing in
 early/boot phases of the system (in M-mode), including BIOS, memory
-configuration code, device option read-only memory (ROM) / firmware that can access system
-memory, CPU registers, IOMMU(s), IO devices and platform configuration
-registers (e.g., address range decoders, system-on-chip (SoC) fabric configuration, etc.).
+configuration code, device option read-only memory (ROM) / firmware that can
+access system memory, CPU registers, IOMMU(s), IO devices and platform
+configuration registers (e.g., address range decoders, system-on-chip (SoC)
+fabric configuration, etc.).
 
 _Non-invasive Hardware Adversary_ - This includes adversaries that can use
 non-invasive (requiring no physical change to the target hardware) attacks
@@ -54,8 +55,8 @@ row-hammer attacks on memory.
 T4: Malicious injection of content into TSM/TVM execution context using
 physical memory aliasing attacks via system firmware adversary.
 
-T5: Information leakage of workload data via CPU registers, control status registers (CSRs) via
-in-scope adversaries.
+T5: Information leakage of workload data via CPU registers, control status
+registers (CSRs) via in-scope adversaries.
 
 T6: Incorrect execution of workload via runtime modification of CPU
 registers, CSRs, mode switches via in-scope adversaries.
@@ -141,8 +142,8 @@ non-normative Reference*
 Required | MMU, xPMP, MTT | Confidential memory should be dynamically allocated/
 unallocated as required | RISC-V Priv. ISA, Supervisor Domains (Sdid, Smmtt)
 
-| TEE CPU State Protection | State Isolation | Required | Priv. levels (M, S, HS, U) 
-and execution context (ASID, VMID, SDID) | Prevent non-TCB components from
+| TEE CPU State Protection | State Isolation | Required | Priv. levels (M, S, HS
+, U) and execution context (ASID, VMID, SDID) | Prevent non-TCB components from
 arbitrarily accessing/modifying TEE CPU state | Priv ISA w/ virtual memory
 system, Supervisor Domains (Sdid, Smmtt)
 
@@ -168,14 +169,14 @@ Supervisor Domains
 | Memory Confidentiality | Number of encryption keys | Implementation-specific |
 cryptography | Number of TEE keys supported | Security Model
 
-| Memory Integrity | Memory integrity against software attacks | Required | MMU, xPMP,
-MTT | Prevent software attacks such as remapping aliasing replay corruption etc. |
-CoVE ABI
+| Memory Integrity | Memory integrity against software attacks | Required | MMU,
+xPMP, MTT | Prevent software attacks such as remapping aliasing replay
+corruption etc. | CoVE ABI
 
 | Memory Integrity | Memory integrity against hardware attacks | Implementation
-specific | cryptography and/or MMU, xPMP, MTT extension | Prevent hardware attacks
-DRAM-bus attacks and physical attacks that replace TEE memory with tampered /
-old data | Security Model
+specific | cryptography and/or MMU, xPMP, MTT extension | Prevent hardware
+attacks DRAM-bus attacks and physical attacks that replace TEE memory with
+tampered / old data | Security Model
 
 | Memory Integrity | Memory isolation (Write exec) | Required | Cryptography
 and/or MMU, xPMP, MTT | Prevent TEE from executing from normal memory; Enforce
@@ -241,10 +242,10 @@ Security Model
 Implementation-specific | * Bounds check bypass TEA and variants - should be
 addressed by TVM software using apropos synchronization. Software TCB should use
 synchronization to isolate TCB code from non-TCB code.
-* Branch target injection TEA and variants - should be addressed by software TCB via
-flushing across privilege boundaries to remove untrusted state injected by
+* Branch target injection TEA and variants - should be addressed by software TCB
+via flushing across privilege boundaries to remove untrusted state injected by
 non-TCB software
-* Speculative store bypass TEA and variants - should be addressed by TCB hardware
+* Speculative store bypass TEA and variants- should be addressed by TCB hardware
 via synchronization/barriers to prevent speculative execution of memory reads
 which may allow unauthorized disclosure of information.
 | Implementations should mitigate attacks such as these spectre variants (In
@@ -252,9 +253,9 @@ practice, it is difficult to defend against such attacks in advance) |
 Supervisor Domain Id, additional recommendations in Security Model
 
 | Side Channel | Control channels, single-step/zero-step attacks | Required |
-leverage hardware/software TCB mechanisms to enforce restrictions on single-stepping
-or zero-stepping via use of state flushing/barriers, entropy defenses and
-detection mechanisms. | Prevent interrupt/exception injection
+leverage hardware/software TCB mechanisms to enforce restrictions on
+single-stepping or zero-stepping via use of state flushing/barriers, entropy
+defenses and detection mechanisms. | Prevent interrupt/exception injection
 (combined with cache side channel to leak sensitive data) | Security Model
 
 | Side Channel | Architectural cache side channel | Implementation-specific  |
@@ -303,8 +304,8 @@ chain | CoVE ABI, Security Model
 | Attestation | TCB transparency (and auditability) | Implementation-specific |
 Mutable firmware | TCB elements reviewable | CoVE ABI, Security Model
 
-| Attestation | Sealing | Implementation-specific | Hardware RoT sealing keys per TVM
-| Binding of secrets to TEEs | CoVE ABI, Security Model
+| Attestation | Sealing | Implementation-specific | Hardware RoT sealing keys
+per TVM | Binding of secrets to TEEs | CoVE ABI, Security Model
 
 | Operational Features | TVM Migration | Implementation-specific | Secure
 migration of TEEs | Malicious host tampers with TVM assets during migration |

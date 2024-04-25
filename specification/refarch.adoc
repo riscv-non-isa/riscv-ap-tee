@@ -9,19 +9,25 @@ the properties of the TSM, its instantiation, isolation and operational model
 for the TVM life cycle. The description in this section refers to the reference
 architecture in Figure 1.
 
-=== CoVE Deplyment Models
-There are three deployment models described below (1, 2, and 3). CoVE ABI is applicable for 
-all of them. This specification focuses mainly on the first deployment model (1) where a
+=== CoVE Deployment Models
+There are three deployment models described below (1, 2, and 3). CoVE ABI is
+applicable for
+all of them. This specification focuses mainly on the first deployment model
+(1) where a
 primary host supervisor domain is used to host confidential workloads in a
 secondary confidential domain. In all models, memory assigned to a Confidential
-supervisor domain is called *Confidential* memory and memory accessible to the hosting 
+supervisor domain is called *Confidential* memory and memory accessible to the
+hosting
 supervisor domain is called *Non-Confidential*.
 
 . The TSM operates in S/HS mode as a per supervisor domain manager to the
-hosting supervisor domain which operates in S/HS mode. <<dep1>> shows this model that utilizes
-the Memory Tracking Table (MTT) and the G-stage page tables (PT) for TVM isolation (the 1st
+hosting supervisor domain which operates in S/HS mode. <<dep1>> shows this
+model that utilizes
+the Memory Tracking Table (MTT) and the G-stage page tables (PT) for TVM
+isolation (the 1st
 stage PT is normally used by the Guest OS). The MTT is used to assign physical
-memory to the Confidential supervisor domain. The MTT allows dynamic programming of the 
+memory to the Confidential supervisor domain. The MTT allows dynamic
+programming of the
 per-domain access permissions.
 
 . The TSM is the only root HS-mode component on the platform, hence, G-stage
@@ -30,18 +36,23 @@ ordinary VMs. In this model the host VMM must execute in the de-privileged VS
 mode and the TSM must provide nested virtualization of the H-extension controls.
 This model may be suitable for client/embedded systems and is shown in <<dep2>>.
 
-. The TSM runs along the TSM-driver in M-mode, thus allowing only for a single confidential 
-supervisor domain. This model enforces isolation between TVMs using MMU (G-stage PT) and 
-between hosting supervisor domain (OS/VMM, VMs) and confidential supervisor domain using, e.g., PMPs.
-This model might be suitable for client/embedded systems running in a constraint hardware and software
-environment (e.g., it does not require Smmtt). <<dep3>> discusses this model in detail. 
+. The TSM runs along the TSM-driver in M-mode, thus allowing only for a single
+confidential
+supervisor domain. This model enforces isolation between TVMs using MMU
+(G-stage PT) and
+between hosting supervisor domain (OS/VMM, VMs) and confidential supervisor
+domain using, e.g., PMPs.
+This model might be suitable for client/embedded systems running in a
+constraint hardware and software
+environment (e.g., it does not require Smmtt). <<dep3>> discusses this model in
+detail.
 
 === CoVE Memory Isolation
 Memory isolation for TVMs is orchestrated by the TSM-driver and the TSM in two
 phases: the conversion of memory to confidential memory and the assignment of
 confidential memory (alongwith the enforcement of properties on use) to TVMs.
 To enforce isolation across Host and Confidential supervisor domains, CoVE
-requires isolation of physical memory (that supports paging when enabled). 
+requires isolation of physical memory (that supports paging when enabled).
 
 CoVE defines two types of memory:
 
@@ -50,30 +61,44 @@ including state such as 1st-stage, G-stage page tables.
 * Non-confidential memory - used only for shared data, e.g., communication
 between the TVM/TSM and the non-TCB host software and/or non-TCB IO devices.
 
-The split of memory into confidential and non-confidential may be static or dynamic. 
-Static partitioning occurs during platform initialization while the dynamic partitioning 
-occurs during runtime. The dynamic partitioning allows for better resource utilization, 
-but requires additional hardware and software requirements. 
+The split of memory into confidential and non-confidential may be static or
+dynamic.
+Static partitioning occurs during platform initialization while the dynamic
+partitioning
+occurs during runtime. The dynamic partitioning allows for better resource
+utilization,
+but requires additional hardware and software requirements.
 
-To support the dynamic memory partitioning, the TSM enables the OS/VMM to 
-convert / donate memory from the hosting supervisor domain to the confidential supervisor domain using dedicated COVH ABI. 
+To support the dynamic memory partitioning, the TSM enables the OS/VMM to
+convert / donate memory from the hosting supervisor domain to the confidential
+supervisor domain using dedicated COVH ABI.
 Similarly, a separate ABI intrinsic is used to reclaim memory back from the
 confidential supervisor domain to the hosting supervisor domain. Once physical
 memory is converted to confidential, it is accessible only to the confidential
 supervisor domain. By default, TVM memory is assigned by the TSM (which
 operates in the confidential supervisor domain context) from confidential
-physical memory regions. Note that a TVM may request assignment of non-confidential
-(shared) memory regions to enable communication channels to hosting supervisor domain (e.g., VirtIO).
-The TSM manages the type and accessibility of all memory assigned to the TVM, to mitigate attacks 
-from non-TCB software. The TSM enforces isolation between TVMs by using the G-stage page table.
+physical memory regions. Note that a TVM may request assignment of
+non-confidential
+(shared) memory regions to enable communication channels to hosting supervisor
+domain (e.g., VirtIO).
+The TSM manages the type and accessibility of all memory assigned to the TVM,
+to mitigate attacks
+from non-TCB software. The TSM enforces isolation between TVMs by using the
+G-stage page table.
 
-* Hart operating with the confidential supervisor domain context has permissions to access Confidential and Non-confidential memory,
-* Hart not operating in a Confidential supervisor domain has access permissions only for Non-confidential memory.
+* Hart operating with the confidential supervisor domain context has
+permissions to access Confidential and Non-confidential memory,
+* Hart not operating in a Confidential supervisor domain has access permissions
+only for Non-confidential memory.
 
-In CoVE implementations supporting the Smmtt extension, the root domain security manager (RDSM) 
-configures the MTT such that a hart executing in the hosting domain does not have access to any 
-confidential memory regions. The RDSM configures the MTT for the confidential domain to allow access 
-to confidential memory exclusively to that domain, but may also allow access to non-confidential
+In CoVE implementations supporting the Smmtt extension, the root domain
+security manager (RDSM)
+configures the MTT such that a hart executing in the hosting domain does not
+have access to any
+confidential memory regions. The RDSM configures the MTT for the confidential
+domain to allow access
+to confidential memory exclusively to that domain, but may also allow access to
+non-confidential
 (shared) memory regions to one or more secondary domains.
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
@@ -98,10 +123,11 @@ properties of memory tracking are discussed below. The TSM (within a supervisor
 domain) manages page-based allocation using the G-stage page table from the set
 of confidential memory regions that are enforced by the MTT.
 
-Four aspects of memory isolation are impacted due to this dynamically configurable
-property of the MTT and are discussed next: 
-(1) address translation/page walk, 
-(2) management of isolation for confidential physical memory, 
+Four aspects of memory isolation are impacted due to this dynamically
+configurable
+property of the MTT and are discussed next:
+(1) address translation/page walk,
+(2) management of isolation for confidential physical memory,
 (3) handling implicit & explicit memory accesses, and
 (4) cached translations/TLB management.
 
@@ -119,15 +145,18 @@ image::https://github.com/riscv/riscv-smmtt/blob/main/images/fig2.png?raw=true[]
 
 ==== Management of Isolation for Confidential Physical Memory
 
-The software TCB (specifically TSM) manages the assignment of physical memory to the confidential
-supervisor domain, while the hardware TCB (specifically the hart MMU including virtual memory system,
+The software TCB (specifically TSM) manages the assignment of physical memory
+to the confidential
+supervisor domain, while the hardware TCB (specifically the hart MMU including
+virtual memory system,
 MTT Extensions) enforces the access-control for confidential memory against
 other supervisor domains. The region sizes at which the memory tracking enforces
 isolation may be multiples of the architectural page sizes supported by the hart
 MMU. The IOMMU is expected to support a similar memory tracking lookup
 to enable a device/function trusted by the TVM to directly access
 TVM confidential memory regions. For the CoVE reference architecture, this TCB
-consists of the hardware (e.g., MMU, IOMMU, Memory Controller) and the software/firmware elements -
+consists of the hardware (e.g., MMU, IOMMU, Memory Controller) and the
+software/firmware elements -
 TSM-driver and the TSM. The TSM-driver is responsible for enforcing isolation of
 confidential memory regions (e.g., via PMP or MTT) and the TSM
 is responsible for enforcing isolation of confidential memory pages among TVMs
@@ -138,7 +167,8 @@ hosting supervisor domain (e.g., to allow for paravirtualized IO access).
 [NOTE]
 ====
 The TSM may manage additional attributes on TVM-assigned pages such as:
-TVM-owner, Page-sub-type, Translation Lookaside Buffer (TLB) versioning information, Locking semaphore and
+TVM-owner, Page-sub-type, Translation Lookaside Buffer (TLB) versioning
+information, Locking semaphore and
 additional metadata, etc. This extended memory tracking information managed by
 the TSM software is referred to as the Extended Memory Tracking Table (EMTT).
 ====
@@ -177,7 +207,7 @@ confidential to non-confidential, then the TVM must scrub the confidential
 memory being returned to the host via `sbi_covg_share_memory_region()`.
 
 With a fixed partitioning of memory into confidential and non-confidential,
-memory conversion or reclamation cannot occur. The TSM remains responsible for 
+memory conversion or reclamation cannot occur. The TSM remains responsible for
 scrubbing memory when being assigned to a TVM.
 ====
 
@@ -195,14 +225,16 @@ components. Each TCB layer should have associated security version numbers
 (SVN) to allow for TCB recovery in the event of security vulnerabilities
 discovered in a prior version of the TCB layer.
 
-During platform initialization, hardware and firmware elements form the RTM that measure the
+During platform initialization, hardware and firmware elements form the RTM
+that measure the
 TSM-driver. The TSM-driver acts as the RTM for the TSM loaded on the
 platform. The TSM-driver initializes the TSM-memory-region for the TSM -
 this TSM-memory-region must be in confidential memory. The TSM binary may be
 provided by the OS/VMM which may independently authenticate the binary
 before loading the binary into the TSM-memory-region via the TSM-driver.
 Alternatively, the platform firmware may pre-load the RoT-authenticated TSM
-binary via the TSM-driver or, as in case of some embedded systems, both TSM-driver and 
+binary via the TSM-driver or, as in case of some embedded systems, both
+TSM-driver and
 TSM might be loaded as part of the secure boot process (see <<appendix_d>>).
 
 In both cases, the loaded TSM binary must be measured and may be
@@ -255,11 +287,12 @@ medeleg).
 The TSM saves the TVM state and invokes the TSM-driver via an ECALL (TEERET
 with reason) to initiate the return of execution control to the OS/VMM if
 required. The TSM-driver restores the context for the OS/VMM via the
-per-hart control sub-structure THCS.hssa (See <<appendix_a>>). Figure 3 shows this canonical
+per-hart control sub-structure THCS.hssa (See <<appendix_a>>). Figure 3 shows
+this canonical
 flow.
 
 Beyond the basic operation described above, the following different
-operational models of the TSM may be supported by an implementation. 
+operational models of the TSM may be supported by an implementation.
 Interruptible TSM implementations must run TSM-driver and TSM in different
 processor privileged modes.
 
@@ -283,7 +316,7 @@ interrupted TSM security routine is initiated by the OS/VMM on the same
 hart. The TSM hart context restore is enforced by the TSM to allow for the
 resumed TSM security routine operation to complete. Intermediate
 state of the operation must be saved and restored by the TSM for such
-flows. **__This specification primarily describes the operation of the TSM 
+flows. **__This specification primarily describes the operation of the TSM
 in this mode of operation.__**
 
 * *Interruptible and re-entrant TSM* - In this model, similar to the
@@ -301,7 +334,8 @@ concurrency controls on internal data structures and per-TVM global data
 structures (such as the G-stage page table structures).
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
-[title= "TSM operation: Interruptible and non-reentrant TSM model according to the deployment model 1."]
+[title= "TSM operation: Interruptible and non-reentrant TSM model according to
+the deployment model 1."]
 image::img_3.png[]
 
 A TSM entry triggered by an ECALL (with CoVE extension type) by the OS/VMM
@@ -429,7 +463,8 @@ TVMs are prevented from execution after that point.
 
 TSM (and all TVMs) memory is granted by the host OS/VMM but is isolated
 (via access-control and/or confidentiality-protection) by the hardware and TCB
-elements. The TSM, TVM, and hardware isolation methods used must be evident in the
+elements. The TSM, TVM, and hardware isolation methods used must be evident in
+the
 attestation evidence provided for the TVM since it identifies the hardware
 and the TSM-driver.
 
@@ -438,9 +473,9 @@ implementation-specific:
 
 *a)* *Isolation from host software access* - For deployment model 3,
 the CPU must enforce hardware-based access-control of TSM memory via a hardware
-memory isolation mechanism (e.g., PMP) configurable only by TCB. 
-For deployment model 2, this isolation is enforced via the G-stage page tables, 
-preventing the guest VMM from accessing TSM memory. 
+memory isolation mechanism (e.g., PMP) configurable only by TCB.
+For deployment model 2, this isolation is enforced via the G-stage page tables,
+preventing the guest VMM from accessing TSM memory.
 For the deployment model 1, the CPU must also similarly enforce
 access-control of TSM memory to prevent access from host supervisor
 domain components (VMM and host OS that operate in V=0, HS-mode) software.
@@ -452,8 +487,9 @@ TEE and TVM address spaces are identified by supervisor domain identifiers
 address translation caches, e.g., Hart TLB lookup may be extended with the
 SDID in addition to the ASID, VMID for workloads in the Confidential supervisor
 domain. TVM memory isolation must support sparse memory management
-models and architectural page-sizes of 4KB, 64KB (with Svnapot), 2MB, 1GB (and optionally
-512GB). 
+models and architectural page-sizes of 4KB, 64KB (with Svnapot), 2MB, 1GB (and
+optionally
+512GB).
 The hardware may implement the MTT as specified in the Smmtt
 privileged ISA extension, or other approaches may be used such as a flat
 table. The memory tracking table may be enforced at the memory controller,
@@ -481,9 +517,10 @@ management>>.
 
 === TVM Execution
 
-As described above, TVMs can access both classes of memory: (1) confidential memory
+As described above, TVMs can access both classes of memory: (1) confidential
+memory
 which has confidentiality and access-control properties for memory exclusive
-to the TVM, and (2) non-confidential memory which is memory accessible to the 
+to the TVM, and (2) non-confidential memory which is memory accessible to the
 OS/VMM and is used for untrusted operations, such as, virtio, gRPC communication
 with the host. If the confidential memory is access-controlled only, the TSM
 and TSM-driver are the authority over the access-control enforcement. If the
@@ -492,11 +529,16 @@ encryption keys used for confidential memory must be different from
 non-confidential memory.
 
 All TVM memory is mapped in the second-stage page tables controlled by the
-TSM explicitly. CoVE implementations that support dynamic conversions between confidential 
-and non-confidential memory might delegate the allocation of memory for the G-stage paging
-structures to the OS/VMM, while relying on TSM to enforce the security properties of the G-stage mapping. 
-By default any memory mapped to a TVM is confidential. A TVM may then explicitly request that 
-confidential memory be converted to non-confidential memory regions using services provided by the TSM. More
+TSM explicitly. CoVE implementations that support dynamic conversions between
+confidential
+and non-confidential memory might delegate the allocation of memory for the
+G-stage paging
+structures to the OS/VMM, while relying on TSM to enforce the security
+properties of the G-stage mapping.
+By default any memory mapped to a TVM is confidential. A TVM may then
+explicitly request that
+confidential memory be converted to non-confidential memory regions using
+services provided by the TSM. More
 information about TVM Execution and the lifecycle of a TVM is described in
 the <<TVM Lifecycle>> section of this document.
 
