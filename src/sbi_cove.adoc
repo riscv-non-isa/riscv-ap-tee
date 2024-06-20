@@ -2028,11 +2028,17 @@ completed. Attempts to run it with `sbi_covh_run_tvm_vcpu()` will fail. Any
 guest page faults taken by other TVM vCPUs in the invalidated pages continue to
 be reported to the host.
 
-In CoVE implementations that do not support dynamic page conversions between
+In CoVE implementations that do not support dynamic page conversion between
 confidential and non-confidential memory, the TSM reflects this call to the
 OS/VMM, which then allocates contiguous non-confidential pages and returns the
 host physical address of the first page to the TSM. The TSM maps the
 non-confidential pages to the TVM's address space.
+
+In systems with fragmented memory and lack of dynamic page conversion, 
+the OS/VMM may fail allocating a single large physical memory region that
+spans over contiguous non-confidential pages. The TVM should then retry and
+request share of multiple smaller memory regions, for example, at the 4KiB page
+size granularity.
 
 Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned.
 
