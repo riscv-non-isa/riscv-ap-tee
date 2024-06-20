@@ -527,6 +527,12 @@ when resuming.
 
 ==== TVM external interrupts
 
+Platforms that do not support hardware-accelerated interrupt-controller
+virtualization must rely on the OS/VMM for management of external interrupts.
+The OS/VMM presents the external interrupt to the TVM via the HVIP register
+when resuming the vCPU execution. The TSM must filter presented interrupts to
+enforce that it injects only interrupts allow-listed by the TVM.
+
 Hardware-accelerated interrupt-controller virtualization is possible for TVMs on
 platform supporting the Advanced Interrupt Architecture [AIA] and an
 implementation-defined method of isolating IMSIC guest interrupt files between
@@ -689,17 +695,21 @@ triggered.
 
 *sbi_covg_allow_external_interrupt*
 
-Registers an interrupt ID that the OS/VMM is allowed to trigger. Passing an
-interrupt ID of -1 allows the injection of all external interrupts. TVM vCPUs
-are started with all external interrupts completely denied by default. Generates
-a TVM exit to notify the OS/VMM of the interrupt vector.
+TVM can register an interrupt ID that the OS/VMM is allowed to trigger. Passing an
+interrupt ID of the maximum value of unsigned long (`2^64-1`) allows the injection
+of all external interrupts. TVM vCPUs are started with all external interrupts
+denied by default. This call results in a TVM exit to notify the OS/VMM of the
+interrupt vector.
 
 *sbi_covi_inject_tvm_cpu*
 
-Injects a previously allow-listed interrupt into a TVM. The TSM updates the
-interrupt state of the targeted virtual hart. The TSM may also enforce
-rate-limiting on the injection of interrupts in order to prevent single-step
-attacks by the OS/VMM.
+The OS/VMM can use this ABI to inject an interrupt into a TVM's vCPU on systems
+supporting AIA. On systems that do not support AIA, it should present the interrupts
+via HVIP when resuming the vCPU execution via `sbi_covh_run_tvm_vcpu()`.
+In both cases, the TSM updates the interrupt state of the targeted virtual hart after
+filtering triggered interrupts using the TVM's allow-list. The TSM may also enforce
+rate-limiting on the injection of interrupts in order to prevent single-step attacks
+by the OS/VMM.
 
 === TVM shutdown
 

@@ -404,8 +404,9 @@ NACL shared memory region.
 
 ===== Management of secure interrupts
 The host can use the TEE Interrupt Extension (EXT_COVI) to manage secure TVM
-interrupts on
-platforms with AIA support.
+interrupts on platforms with AIA support, or present these interrupts via HVIP
+when resuming the vCPU execution via `sbi_covh_run_tvm_vcpu()` on platforms
+without AIA support.
 
 ===== TVM teardown
 The host can teardown a TVM by calling `sbi_covh_destroy_tvm()`. This
