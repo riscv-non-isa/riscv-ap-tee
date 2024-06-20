@@ -2355,7 +2355,8 @@ confidential memory.
 === Function: COVE Guest Retrieve Secret (FID #9)
 [source, C]
 -----
-struct sbiret covg_retrieve_secret();
+struct sbiret covg_retrieve_secret(unsigned long buf_addr,
+                                   unsigned long buf_size);
 -----
 Requests TSM for a secret available after successful local attestation. TSM
 reads this secret during local attestation from the `TVM attestation payload`
@@ -2363,6 +2364,11 @@ reads this secret during local attestation from the `TVM attestation payload`
 creation via `sbi_covh_promote_to_tvm()`. Only the TVMs that were correctly
 authenticated and authorized during local attestation can receive the secret
 embedded in TAP.
+
+`buf_addr` is the 4KiB-aligned address in the TVM address space to which the 
+TSM will write the secret.
+`buf_size` is the length of the buffer. The buffer cannot be larger than the 
+4KiB page size.
 
 This ABI will become part of the `Sealing Interface` planned for the CoVE in
 version 2.0.
@@ -2376,6 +2382,8 @@ The possible error codes are shown below.
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `buf_addr_out` is not a valid guest physical address or is not correctly aligned.
+| SBI_ERR_INVALID_PARAM   | The buffer's size is too small to store the secret or larger than the 4KiB page.
 | SBI_ERR_AUTH            | Local attestation failed.
 |===
 
@@ -2387,7 +2395,7 @@ struct sbiret sbi_covg_read_measurememt(unsigned long msmt_buf_addr_out,
                                              unsigned long msmt_buf_size,
                                              unsigned long msmt_index);
 -------
-This intrisic returns a the TVM measurement register value for the `msmt_index`
+This intrisic returns a TVM measurement register value for the `msmt_index`
 measurement register. TVMs can read both initial and runtime measurement
 register values back.
 
@@ -2704,6 +2712,10 @@ intrinsic is used by a TVM to get an attestation evidence to
 report to a remote relying party. It returns an attestation certificate signed
 by the TSM attestation key, and includes the TVM attestation evidence. The TSM
 attestion key is also included in the reported TSM token.
+
+| <<covg_retrieve_secret, covg_retrieve_secret>>      | TVM reads a secret 
+available after successful local attestation. TSM writes the secret to the
+buffer specified by the TVM.
 
 | <<sbi_covg_read_measurement, sbi_covg_read_measurement>>      | This
 intrisic returns a the TVM measurement register value for the `msmt_index`
