@@ -740,13 +740,21 @@ enum tvm_state {
 [source, C]
 -----
 struct sbiret sbi_covh_get_tsm_info(unsigned long tsm_info_address,
-                                        unsigned long tsm_info_len);
+                                    unsigned long tsm_info_len);
 -----
-Writes up to `tsm_info_len` bytes of information at the physical memory address
-specified by `tsm_info_address`. `tsm_info_len` should be the size of the
-`tsm_info` struct below. The information returned by the call can be used to
-determine the current state of the TSM, and configure parameters for other
-TVM-related calls.
+Reads the current TSM state, its configuration, and supported features. The
+information returned by the call should be used to configure parameters for
+other TVM-related calls.
+
+`tsm_info_address` must be the 4B-aligned physical memory address to which the
+TSM will write the content of the `tsm_info` struct.
+`tsm_info_len` should be the size of the `tsm_info` struct below.
+The entire buffer must reside in a physical memory region that the OS/VMM can
+access.
+
+`tsm_info.tsm_capabilities` defines features supported by the TSM and hardware.
+The OS/VMM can verify that the TSM and hardware support capability `i`, by
+checking that the bit `i` is set, i.e., `tsm_info.tsm_capabilities & 1<<i > 0`.
 
 *Returns* the number of bytes written to `tsm_info_address` on success.
 
@@ -761,29 +769,65 @@ enum tsm_state {
     TSM_READY = 2
 };
 
+#define COVE_TSM_CAP_PROMOTE_TO_TVM       0x1
+#define COVE_TSM_CAP_LOCAL_ATTESTATION    0x2
+#define COVE_TSM_CAP_AIA                  0x3
+#define COVE_TSM_CAP_DYN_PAGE_CONVERSION  0x4
+
 struct tsm_info {
     /*
-     * The current state of the TSM (see tsm_state enum above).
-     * If the state is not TSM_READY, the remaining fields are invalid and will
-     * be initialized to 0.
+     * The current state of the TSM (see `tsm_state` enum above).
+     * If the state is not `TSM_READY`, the remaining fields are invalid and
+     * will be initialized to `0`.
      */
     uint32_t tsm_state;
-    /* Version number of the running TSM. */
+    /* 
+     * Identifier of the TSM implementation. 
+     * It is intended to distinguish among different TSM implementations,
+     * potentially managed by different organizations, that might target
+     * different deployment models and, thus, implement subset of CoVE spec.
+     */
+    uint32_t tsm_impl_id;
+    /* 
+     * Version number of the running TSM. 
+     */
     uint32_t tsm_version;
+    /* 
+     * CoVE features supported by the running TSM.
+     * Enabled bit `i` indicates that the TSM and underly supports capability `i` and there
+     * is hardware support.
+     */
+    uint64_t tsm_capabilities;
     /*
      * The number of 4KiB pages which must be donated to the TSM for storing TVM
-     * state in sbi_covh_create_tvm_vcpu().
+     * state in sbi_covh_create_tvm_vcpu(). `0` if the TSM does not support the
+     * dynamic page conversion capability.
      */
-    unsigned long tvm_state_pages;
-    /* The maximum number of vCPUs a TVM can support. */
-    unsigned long tvm_max_vcpus;
+    uint64_t tvm_state_pages;
+    /* 
+     * The maximum number of vCPUs a TVM can support. 
+     */
+    uint64_t tvm_max_vcpus;
     /*
-     * The number of 4KB pages which must be donated to the TSM when
-     * creating a new vCPU.
+     * The number of 4KiB pages which must be donated to the TSM when creating
+     * a new vCPU. `0` if the TSM does not support the dynamic page conversion
+     * capability.
      */
-    unsigned long tvm_vcpu_state_pages;
+    uint64_t tvm_vcpu_state_pages;
 };
 ------
+
+
+[#table_sbi_covh_get_tsm_info_capabilities]
+.COVE TSM Capabilities
+[cols="3,3", width=90%, align="center", options="header"]
+|===
+| Bit | Name                               | Definition
+| 1   | COVE_TSM_CAP_PROMOTE_TO_TVM        | TSM supports single-step TVM creation.
+| 2   | COVE_TSM_CAP_LOCAL_ATTESTATION     | TSM supports local attestation.
+| 3   | COVE_TSM_CAP_AIA                   | TSM supports RISC-V AIA
+| 4   | COVE_TSM_CAP_DYN_PAGE_CONVERSION   | TSM supports dynamic page conversion.
+|===
 
 The possible error codes returned in `sbiret.error` are shown below.
 
