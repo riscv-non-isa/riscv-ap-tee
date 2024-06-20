@@ -1992,9 +1992,9 @@ Removes the specified range of TVM physical address space starting at
 `tvm_gpa_addr` from the emulated MMIO regions. Upon return, all accesses by the
 TVM within the range will result in a page fault.
 
-Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned, and the region must
-not overlap with a previously defined region. This call will result in an exit
-to the host on success.
+Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned. The TSM must remove
+every MMIO region that overlaps with the requested range. This call will result
+in an exit to the host on success.
 
 [#table_sbi_covg_remove_mmio_region_errors]
 .COVE Guest Remove MMIO Region
