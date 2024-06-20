@@ -1054,7 +1054,9 @@ The possible error codes returned in `sbiret.error` are shown below.
 [source, C]
 -----
 struct sbiret sbi_covh_promote_to_tvm(unsigned long fdt_addr,
-                                      unsigned long tap_addr);
+                                      unsigned long tap_addr,
+                                      unsigned long entry_sepc,
+                                      unsigned long tvm_identity_addr);
 -----
 This intrisic is used by the host to promote a VM to a TVM. It is primarily
 intended for CoVE deployment models that require single-step TVM creation
@@ -1068,6 +1070,10 @@ The `tap_addr` is the 8-bytes aligned guest physical address of the
 `TVM attestation payload` used for local attestation.
 For VMs that do not require local attestation (only the remote attestation),
 `tap_addr` must be set to `0`.
+The `entry_sepc` is the address at which the vCPU execution will resume.
+`tvm_identity_addr` is an optional, when set, it points to a 64-bytes buffer 
+containing a host-defined TVM identity, see `sbi_covh_finalize_tvm()` for more
+details.
 
 The VM should be promoted as early in the boot process as possible to minimize
 changes in memory contents so that the resulting integrity measurement hashes
@@ -2454,6 +2460,11 @@ etc.
 the VMM to finalize the measurement of a TVM (initial). The TSM enforces that
 the TVM virtual harts cannot be entered unless the TVM measurement is committed
 via this operation.
+
+| <<sbi_covh_promote_to_tvm, sbi_covh_promote_to_tvm>>  | Creates a TVM in 
+a single-step taking the state of an existing VM and recreating it in 
+confidential memory. It is an alternative approach to creating a TVM in
+a multi-step process initiated with `sbi_covh_create_tvm()`.
 
 | <<sbi_covh_destroy_tvm, sbi_covh_destroy_tvm>> | TVM shutdown verifies VMM
 has stopped all virtual hart execution for the TVM. The TVM virtual hart
