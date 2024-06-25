@@ -159,7 +159,7 @@ encrypted TEE memory | Supervisor Domains
 Cryptography and/or MMU, xPMP, MTT extension | TEE memory confidentiality
 against logical attacks via hart; additionally address physical attacks via
 cryptography. If cryptography used, TEE should have a unique encryption key;
-each TEE VM may may also have one or more unique keys. Also see related
+each TEE VM may also have one or more unique keys. Also see related
 requirements around ciphertext disclosure and memory integrity  |
 Supervisor Domains
 

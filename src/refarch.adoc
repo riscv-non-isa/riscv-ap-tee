@@ -334,8 +334,7 @@ concurrency controls on internal data structures and per-TVM global data
 structures (such as the G-stage page table structures).
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
-[title= "TSM operation: Interruptible and non-reentrant TSM model according to
-the deployment model 1."]
+[title= "TSM operation: Interruptible and non-reentrant TSM model according to the deployment model 1."]
 image::img_3.png[]
 
 A TSM entry triggered by an ECALL (with CoVE extension type) by the OS/VMM
@@ -605,3 +604,4 @@ OS/VMM, the TSM must restore the saved hardware performance monitoring event
 triggers and counter enables. If the TSM uses the SBI PMU extension instead of
 Supervisor counter delegation, the TSM-driver needs to perform the save/restore
 on behalf of the TSM.
+

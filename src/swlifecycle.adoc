@@ -50,8 +50,8 @@ When a TVM context is created and initialized by using the
 `sbi_covh_create_tvm()` function - this global init function allocates a
 set of pages for the TVM global control structure and resets the control
 fields that are immutable for the lifetime of the TVM, e.g., configuration of
-which RISC-V CPU extensions the TVM is allowed to use, debug and pmon
-capabilities enabled etc.
+which RISC-V CPU extensions the TVM is allowed to use, debug and performance
+monitoring capabilities enabled etc.
 
 The VMM may assign memory to the TVM via a sequence of
 `sbi_covh_add_tvm_page_table_pages()` `sbi_covh_add_tvm_measured_pages()` and
