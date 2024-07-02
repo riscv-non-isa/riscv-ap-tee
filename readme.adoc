@@ -9,8 +9,7 @@ See the https://github.com/riscv/docs-spec-template/blob/main/LICENSE[LICENSE] f
 
 = Contributors
 
-Contributors to this specification are contained in the 
-https://github.com/riscv-non-isa/riscv-ap-tee/blob/main/specification/contributors.adoc[contributors.adoc] file.
+Contributors to this specification are contained in the link:src/contributors.adoc[contributors] file.
 
 = Dependencies
 
