@@ -968,7 +968,7 @@ The list of possible TVM states appears below.
 | State              | Description
 | TVM_INITIALIZING   | The TVM has been created, but isn't yet ready to run.
 | TVM_RUNNABLE       | The TVM is in a runnable state, and can be executed by
-                     | calling `sbi_covh_run_tvm_vcpu()`.
+                       calling `sbi_covh_run_tvm_vcpu()`.
 |===
 
 The possible error codes returned in `sbiret.error` are shown below.
