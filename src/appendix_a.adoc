@@ -74,7 +74,7 @@ handled by the TSM (default all)
 | htimedeltah | Initialized by TSM per TVM configuration
 | hgatp       | TVM enforces page remap protection via this G-stage
 translation. Hart register is programmed by TSM to activate at TVM entry 
-via SRET |
+via SRET
 |===
 
 [NOTE]
