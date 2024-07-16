@@ -84,14 +84,13 @@ and platform configuration. The pointer to TAP is passed in a call to promote a
 VM to a TVM. If it is zero,
 then remote attestation is used, otherwise local attestation is used. Local
 attestation is strongest when it is hardware enforced.
+The TSM must verify that the attestation (i.e., integrity measurements, configuration of the hardware
+platform) of the TVM match the values specified by the TVM creator in the TAP.
 
-Attestation for embedded systems utilizes one or both of the following
-properties:
+Local attestation utilizes one or more of the following properties:
 
-. The embedded platform must be able to verify that the TVM is authorized to
-run on the platform.
-. The TVM must be able to verify that the configuration of the hardware
-platform is acceptable/correct.
+. The TSM must be able to verify that a TVM creator authorized the TVM to run on the platform.
+. The TSM enforces that only TVMs created by a trusted partner runs on the hardware.
 
 Separate mechanisms may be used to achieve these goals.
 
