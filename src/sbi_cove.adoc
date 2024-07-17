@@ -775,7 +775,8 @@ enum tsm_state {
 #define COVE_TSM_CAP_ATTESTATION_LOCAL   0x1
 #define COVE_TSM_CAP_ATTESTATION_REMOTE  0x2
 #define COVE_TSM_CAP_AIA                 0x3
-#define COVE_TSM_CAP_MEMORY_ALLOCATION   0x4  
+#define COVE_TSM_CAP_MRIF                0x4
+#define COVE_TSM_CAP_MEMORY_ALLOCATION   0x5  
 
 /* Reserved IDs for TSM implementations */
 #define COVE_TSM_IMPL_SALUS            0x1
@@ -828,7 +829,7 @@ struct tsm_info {
 
 [#table_sbi_covh_get_tsm_info_capabilities]
 .COVE TSM Capabilities
-[cols="3,3", width=90%, align="center", options="header"]
+[cols="4", width=90%, align="center", options="header"]
 |===
 | Bit   | Name                               | Value              | Definition
 | 0     | COVE_TSM_CAP_PROMOTE_TVM           | `0`                | TSM supports multi-step TVM creation.
@@ -839,9 +840,20 @@ struct tsm_info {
 | 2     | COVE_TSM_CAP_ATTESTATION_REMOTE    | `1`                | TSM supports remote attestation.
 | 3     | COVE_TSM_CAP_AIA                   | `0`                | TSM supports legacy interrupt handling.
 | 3     | COVE_TSM_CAP_AIA                   | `1`                | TSM supports RISC-V AIA.
-| 4     | COVE_TSM_CAP_MEMORY_ALLOCATION     | `0`                | TSM supports static memory allocation.
-| 4     | COVE_TSM_CAP_MEMORY_ALLOCATION     | `1`                | TSM supports dynamic memory allocation.
-| 5..63 | RESERVED     |                 | 
+| 4     | COVE_TSM_CAP_MRIF                  | `0`                | TSM does not support MRIF.
+| 4     | COVE_TSM_CAP_MRIF                  | `1`                | TSM supports MRIF.
+| 5     | COVE_TSM_CAP_MEMORY_ALLOCATION     | `0`                | TSM supports static memory allocation.
+| 5     | COVE_TSM_CAP_MEMORY_ALLOCATION     | `1`                | TSM supports dynamic memory allocation.
+| 6..63 | RESERVED     |                 | 
+|===
+
+[#table_sbi_covh_get_tsm_implementation_ids]
+.COVE Reserved TSM Implementation IDs
+[cols="3", width=90%, align="center", options="header"]
+|===
+| ID   | Name                                          | Definition
+| 0     | COVE_TSM_IMPL_SALUS                 | TSM supports multi-step TVM creation.
+| 0     | COVE_TSM_IMPL_ACE                   | TSM supports single-step TVM creation.
 |===
 
 The possible error codes returned in `sbiret.error` are shown below.
