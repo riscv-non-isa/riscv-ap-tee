@@ -776,11 +776,7 @@ enum tsm_state {
 #define COVE_TSM_CAP_ATTESTATION_REMOTE  0x2
 #define COVE_TSM_CAP_AIA                 0x3
 #define COVE_TSM_CAP_MRIF                0x4
-#define COVE_TSM_CAP_MEMORY_ALLOCATION   0x5  
-
-/* Reserved IDs for TSM implementations */
-#define COVE_TSM_IMPL_SALUS            0x1
-#define COVE_TSM_IMPL_ACE              0x2
+#define COVE_TSM_CAP_MEMORY_ALLOCATION   0x5
 
 struct tsm_info {
     /*
@@ -851,9 +847,10 @@ struct tsm_info {
 .COVE Reserved TSM Implementation IDs
 [cols="3", width=90%, align="center", options="header"]
 |===
-| ID   | Name                                          | Definition
-| 0     | COVE_TSM_IMPL_SALUS                 | TSM supports multi-step TVM creation.
-| 0     | COVE_TSM_IMPL_ACE                   | TSM supports single-step TVM creation.
+| ID    | Name                 | Definition
+| 1     | COVE_TSM_IMPL_SALUS  | Salus implementation of CoVE spec
+| 2     | COVE_TSM_IMPL_ACE    | Assured confidential execution (ACE) implementation of CoVE spec
+| >2    | RESERVED             | Available for future CoVE implementations
 |===
 
 The possible error codes returned in `sbiret.error` are shown below.
