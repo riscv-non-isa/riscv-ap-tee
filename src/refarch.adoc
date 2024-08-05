@@ -352,7 +352,7 @@ confidential supervisor domain for the hart via M-mode `mttp` CSR (See
 Supervisor Domains specification <<R20>> for CSR definition)
 * Locate the per-hart THCS (located within TSM-driver memory data region)
 * Save operating VMM csr context into the THCS.hssa (Hart Supervisor State
-Area) fields : sstatus, stvec, scounteren, sscratch, satp (and other x
+Area) fields: sstatus, stvec, scounteren, sscratch, satp (and other x
 state other than a0, a1 - see <<appendix_a>>). Note that
 any v/f register state must be saved by the caller.
 * Save THCS.hssa.pc as mepc+4 to ensure that a subsequent resumption

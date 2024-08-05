@@ -347,19 +347,19 @@ memory pages will fault (including implicit accesses).
 ....
 @startuml
 
-VMM -> TSM : sbi_covh_convert_pages[_range](TVM, GPA)
+VMM -> TSM: sbi_covh_convert_pages[_range](TVM, GPA)
 activate VMM
 activate TSM
-TSM -> VMM :
+TSM -> VMM:
 deactivate VMM
 deactivate TSM
 
 activate TVM
 
-VMM -> TSM : sbi_covh_global_fence(TVM)
+VMM -> TSM: sbi_covh_global_fence(TVM)
 activate VMM
 activate TSM
-TSM -> VMM :
+TSM -> VMM:
 deactivate VMM
 deactivate TSM
 
@@ -373,7 +373,7 @@ TSM -> VMM: ecall/mret (scause = interrupt)
 activate VMM
 deactivate TSM
 
-VMM -> TSM : sbi_covh_local_fence(TVM, virtual_hart, hart)
+VMM -> TSM: sbi_covh_local_fence(TVM, virtual_hart, hart)
 deactivate VMM
 activate TSM
 note right

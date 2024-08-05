@@ -21,7 +21,7 @@ Supervisor Domain Identifier for the callee. `a6` bits [16..25] are reserved for
 future use. `a6` bits [0..15] are used by the host to specify the CoVE functions
 as allocated in <<table_cove_fid_namespaces>>.
 
-[caption="CoVE FID : "]
+[caption="CoVE FID: "]
 [title="Format of register a6 for CoVE SBI Extension"]
 [id=cove-fid]
 [wavedrom, ,svg]
@@ -576,7 +576,7 @@ end group
 
 deactivate TVM
 
-Host -> TSM : Destroy TVM
+Host -> TSM: Destroy TVM
 TSM -> TSM: verifies all vcpus exited. Updates TVM state as "TVM_DESTROYED"
 TSM -> TSM: clear ownership of confidential memory assigned to TVM
 TSM --> Host: Return from vcpu_run to Host
@@ -806,7 +806,7 @@ struct tsm_info {
     /*
      * The number of 4KB pages which must be donated to the TSM for storing TVM
      * state in sbi_covh_create_tvm_vcpu(). `0` if the TSM does not support the
-     * dynamic page conversion capability.
+     * dynamic memory allocation capability.
      */
     unsigned long tvm_state_pages;
     /* 
@@ -815,7 +815,7 @@ struct tsm_info {
     unsigned long tvm_max_vcpus;
     /*
      * The number of 4KB pages which must be donated to the TSM when creating
-     * a new vCPU. `0` if the TSM does not support the dynamic page conversion
+     * a new vCPU. `0` if the TSM does not support the dynamic memory allocation
      * capability.
      */
     unsigned long tvm_vcpu_state_pages;
