@@ -696,7 +696,7 @@ triggered.
 *sbi_covg_allow_external_interrupt*
 
 TVM can register an interrupt ID that the OS/VMM is allowed to trigger. Passing an
-interrupt ID of the maximum value of unsigned long (`2^64-1`) allows the injection
+interrupt ID of the maximum unsigned long value (2^64^-1 on 64-bit architecture) allows the injection
 of all external interrupts. TVM vCPUs are started with all external interrupts
 denied by default. This call results in a TVM exit to notify the OS/VMM of the
 interrupt vector.

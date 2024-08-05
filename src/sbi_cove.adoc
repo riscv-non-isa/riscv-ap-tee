@@ -2174,7 +2174,7 @@ doesn't
 struct sbiret sbi_covg_allow_external_interrupt(unsigned long interrupt_id);
 -------
 Allows injection of the specified external interrupt ID into the calling TVM
-vCPU. Passing an `interrupt_id` of the maximum unsigned long value (2^64-1 on
+vCPU. Passing an `interrupt_id` of the maximum unsigned long value (2^64^-1 on
 64-bit architecture) allows the injection of all external interrupts. TVM
 vCPUs are started with all external interrupts completely denied by default.
 
@@ -2199,7 +2199,7 @@ resume of execution.
 struct sbiret sbi_covg_deny_external_interrupt(unsigned long interrupt_id);
 -------
 Denies injection of the specified external interrupt ID into the calling TVM
-vCPU. Passing an `interrupt_id` of the maximum unsigned long value (2^64-1 on
+vCPU. Passing an `interrupt_id` of the maximum unsigned long value (2^64^-1 on
 64-bit architecture) denies injection of all external interrupts.
 
 The possible error codes returned in sbiret.error are:
@@ -2759,13 +2759,13 @@ and TVM pages.
 
 | <<sbi_covg_allow_external_interrupt, sbi_covg_allow_external_interrupt>> |
 Allows injection of the specified external interrupt ID into the calling TVM
-vCPU. Passing an `interrupt_id` of the maximum unsigned long value (2^64-1 on
+vCPU. Passing an `interrupt_id` of the maximum unsigned long value (2^64^-1 on
 64-bit architecture) allows injection of all external interrupts. TVM vCPUs
 are started with injection of external interrupts completely disabled by default.
 
 | <<sbi_covg_deny_external_interrupt, sbi_covg_deny_external_interrupt>> |
 Denies injection of the specified external interrupt ID into the calling TVM
-vCPU. Passing an `interrupt_id` of the maximum unsigned long value (2^64-1 on
+vCPU. Passing an `interrupt_id` of the maximum unsigned long value (2^64^-1 on
 64-bit architecture) denies injection of all external interrupts.
 
 | <<sbi_covg_get_attcaps, sbi_covg_get_attcaps>>   | This
