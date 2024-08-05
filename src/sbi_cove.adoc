@@ -786,10 +786,10 @@ struct tsm_info {
      */
     uint32_t tsm_state;
     /* 
-     * Identifier of the TSM implementation, see <<table_sbi_covh_get_tsm_implementation_ids>>. 
-     * It is intended to distinguish among different TSM implementations,
-     * potentially managed by different organizations, that might target
-     * different deployment models and, thus, implement subset of CoVE spec.
+     * Identifier of the TSM implementation, see `Reserved TSM Implementation IDs`
+     * table below. This identifier is intended to distinguish among different TSM
+     * implementations, potentially managed by different organizations, that might
+     * target different deployment models and, thus, implement subset of CoVE spec.
      */
     uint32_t tsm_impl_id;
     /* 
@@ -797,8 +797,8 @@ struct tsm_info {
      */
     uint32_t tsm_version;
     /* 
-     * A bitmask of CoVE features supported by the running TSM, see <<table_sbi_covh_get_tsm_info_capabilities>>.
-     * Every bit in this field corresponds to a capability defined by
+     * A bitmask of CoVE features supported by the running TSM, see `TSM Capabilities`
+     * table below. Every bit in this field corresponds to a capability defined by
      * `COVE_TSM_CAP_*` constants. Presence of bit `i` indicates that both the TSM
      * and hardware support the corresponding capability.
      */
