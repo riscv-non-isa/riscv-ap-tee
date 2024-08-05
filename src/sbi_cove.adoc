@@ -21,7 +21,7 @@ Supervisor Domain Identifier for the callee. `a6` bits [16..25] are reserved for
 future use. `a6` bits [0..15] are used by the host to specify the CoVE functions
 as allocated in <<table_cove_fid_namespaces>>.
 
-[caption="CoVE FID : "]
+[caption="CoVE FID: "]
 [title="Format of register a6 for CoVE SBI Extension"]
 [id=cove-fid]
 [wavedrom, ,svg]
@@ -404,8 +404,9 @@ NACL shared memory region.
 
 ===== Management of secure interrupts
 The host can use the TEE Interrupt Extension (EXT_COVI) to manage secure TVM
-interrupts on
-platforms with AIA support.
+interrupts on platforms with AIA support, or present these interrupts via HVIP
+when resuming the vCPU execution via `sbi_covh_run_tvm_vcpu()` on platforms
+without AIA support.
 
 ===== TVM teardown
 The host can teardown a TVM by calling `sbi_covh_destroy_tvm()`. This
@@ -575,7 +576,7 @@ end group
 
 deactivate TVM
 
-Host -> TSM : Destroy TVM
+Host -> TSM: Destroy TVM
 TSM -> TSM: verifies all vcpus exited. Updates TVM state as "TVM_DESTROYED"
 TSM -> TSM: clear ownership of confidential memory assigned to TVM
 TSM --> Host: Return from vcpu_run to Host
@@ -740,13 +741,21 @@ enum tvm_state {
 [source, C]
 -----
 struct sbiret sbi_covh_get_tsm_info(unsigned long tsm_info_address,
-                                        unsigned long tsm_info_len);
+                                    unsigned long tsm_info_len);
 -----
-Writes up to `tsm_info_len` bytes of information at the physical memory address
-specified by `tsm_info_address`. `tsm_info_len` should be the size of the
-`tsm_info` struct below. The information returned by the call can be used to
-determine the current state of the TSM, and configure parameters for other
-TVM-related calls.
+Reads the current TSM state, its configuration, and supported features. The
+information returned by the call is intended to be used by the VMM to configure
+parameters for other TVM-related calls.
+
+`tsm_info_address` must be the 4B-aligned physical memory address to which the
+TSM will write the content of the `tsm_info` struct.
+`tsm_info_len` should be the size of the `tsm_info` struct below.
+The entire buffer must reside in a physical memory region that the OS/VMM and
+TSM can access.
+
+`tsm_info.tsm_capabilities` defines features supported by both the TSM and hardware.
+The OS/VMM can verify that the TSM and hardware support capability `i` by
+checking that the bit `i` is set.
 
 *Returns* the number of bytes written to `tsm_info_address` on success.
 
@@ -761,29 +770,88 @@ enum tsm_state {
     TSM_READY = 2
 };
 
+/* Below specifies bit position in the `tsm_capabilities` field */
+#define COVE_TSM_CAP_PROMOTE_TVM         0x0
+#define COVE_TSM_CAP_ATTESTATION_LOCAL   0x1
+#define COVE_TSM_CAP_ATTESTATION_REMOTE  0x2
+#define COVE_TSM_CAP_AIA                 0x3
+#define COVE_TSM_CAP_MRIF                0x4
+#define COVE_TSM_CAP_MEMORY_ALLOCATION   0x5
+
 struct tsm_info {
     /*
-     * The current state of the TSM (see tsm_state enum above).
-     * If the state is not TSM_READY, the remaining fields are invalid and will
-     * be initialized to 0.
+     * The current state of the TSM (see `tsm_state` enum above).
+     * If the state is not `TSM_READY`, the remaining fields are invalid and
+     * will be initialized to `0`.
      */
     uint32_t tsm_state;
-    /* Version number of the running TSM. */
+    /* 
+     * Identifier of the TSM implementation, see `Reserved TSM Implementation IDs`
+     * table below. This identifier is intended to distinguish among different TSM
+     * implementations, potentially managed by different organizations, that might
+     * target different deployment models and, thus, implement subset of CoVE spec.
+     */
+    uint32_t tsm_impl_id;
+    /* 
+     * Version number of the running TSM. 
+     */
     uint32_t tsm_version;
+    /* 
+     * A bitmask of CoVE features supported by the running TSM, see `TSM Capabilities`
+     * table below. Every bit in this field corresponds to a capability defined by
+     * `COVE_TSM_CAP_*` constants. Presence of bit `i` indicates that both the TSM
+     * and hardware support the corresponding capability.
+     */
+    unsigned long tsm_capabilities;
     /*
-     * The number of 4KiB pages which must be donated to the TSM for storing TVM
-     * state in sbi_covh_create_tvm_vcpu().
+     * The number of 4KB pages which must be donated to the TSM for storing TVM
+     * state in sbi_covh_create_tvm_vcpu(). `0` if the TSM does not support the
+     * dynamic memory allocation capability.
      */
     unsigned long tvm_state_pages;
-    /* The maximum number of vCPUs a TVM can support. */
+    /* 
+     * The maximum number of vCPUs a TVM can support. 
+     */
     unsigned long tvm_max_vcpus;
     /*
-     * The number of 4KB pages which must be donated to the TSM when
-     * creating a new vCPU.
+     * The number of 4KB pages which must be donated to the TSM when creating
+     * a new vCPU. `0` if the TSM does not support the dynamic memory allocation
+     * capability.
      */
     unsigned long tvm_vcpu_state_pages;
 };
 ------
+
+
+[#table_sbi_covh_get_tsm_info_capabilities]
+.COVE TSM Capabilities
+[cols="4", width=90%, align="center", options="header"]
+|===
+| Bit   | Name                               | Value              | Definition
+| 0     | COVE_TSM_CAP_PROMOTE_TVM           | `0`                | TSM supports multi-step TVM creation.
+| 0     | COVE_TSM_CAP_PROMOTE_TVM           | `1`                | TSM supports single-step TVM creation.
+| 1     | COVE_TSM_CAP_ATTESTATION_LOCAL     | `0`                | TSM does not support local attestation.
+| 1     | COVE_TSM_CAP_ATTESTATION_LOCAL     | `1`                | TSM supports local attestation.
+| 2     | COVE_TSM_CAP_ATTESTATION_REMOTE    | `0`                | TSM does not support remote attestation.
+| 2     | COVE_TSM_CAP_ATTESTATION_REMOTE    | `1`                | TSM supports remote attestation.
+| 3     | COVE_TSM_CAP_AIA                   | `0`                | TSM supports legacy interrupt handling.
+| 3     | COVE_TSM_CAP_AIA                   | `1`                | TSM supports RISC-V AIA.
+| 4     | COVE_TSM_CAP_MRIF                  | `0`                | TSM does not support MRIF.
+| 4     | COVE_TSM_CAP_MRIF                  | `1`                | TSM supports MRIF.
+| 5     | COVE_TSM_CAP_MEMORY_ALLOCATION     | `0`                | TSM supports static memory allocation.
+| 5     | COVE_TSM_CAP_MEMORY_ALLOCATION     | `1`                | TSM supports dynamic memory allocation.
+| 6..63 | RESERVED     |                 | 
+|===
+
+[#table_sbi_covh_get_tsm_implementation_ids]
+.COVE Reserved TSM Implementation IDs
+[cols="3", width=90%, align="center", options="header"]
+|===
+| ID    | Name                 | Definition
+| 1     | COVE_TSM_IMPL_SALUS  | Salus implementation of CoVE spec
+| 2     | COVE_TSM_IMPL_ACE    | Assured confidential execution (ACE) implementation of CoVE spec
+| >2    | RESERVED             | Available for future CoVE implementations
+|===
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -1054,7 +1122,9 @@ The possible error codes returned in `sbiret.error` are shown below.
 [source, C]
 -----
 struct sbiret sbi_covh_promote_to_tvm(unsigned long fdt_addr,
-                                      unsigned long tap_addr);
+                                      unsigned long tap_addr,
+                                      unsigned long entry_sepc,
+                                      unsigned long tvm_identity_addr);
 -----
 This intrisic is used by the host to promote a VM to a TVM. It is primarily
 intended for CoVE deployment models that require single-step TVM creation
@@ -1068,6 +1138,10 @@ The `tap_addr` is the 8-bytes aligned guest physical address of the
 `TVM attestation payload` used for local attestation.
 For VMs that do not require local attestation (only the remote attestation),
 `tap_addr` must be set to `0`.
+The `entry_sepc` is the address at which the vCPU execution will resume.
+`tvm_identity_addr` is an optional, when set, it points to a 64-bytes buffer 
+containing a host-defined TVM identity, see `sbi_covh_finalize_tvm()` for more
+details.
 
 The VM should be promoted as early in the boot process as possible to minimize
 changes in memory contents so that the resulting integrity measurement hashes
@@ -1946,7 +2020,7 @@ within.
 A typical use case for this extension is to relay information to the host.
 COVE-Guest calls cause a trap to the TSM. TSM should do any processing required
 and then must forward the ECALL to the host with `scause` set to ECALL, `a7` set
-to EID, `a6` set to FID (See <<cove-fid>>), `a0`-`a5` set to ECALL args.
+to EID, `a6` set to FID (see <<cove-fid>>), `a0`-`a5` set to ECALL args.
 
 [#sbi_covg_add_mmio_region]
 === Function: COVE Guest Add MMIO Region (FID #0)
@@ -1986,9 +2060,9 @@ Removes the specified range of TVM physical address space starting at
 `tvm_gpa_addr` from the emulated MMIO regions. Upon return, all accesses by the
 TVM within the range will result in a page fault.
 
-Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned, and the region must
-not overlap with a previously defined region. This call will result in an exit
-to the host on success.
+Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned. The TSM must remove
+every MMIO region that overlaps with the requested range. This call will result
+in an exit to the host on success.
 
 [#table_sbi_covg_remove_mmio_region_errors]
 .COVE Guest Remove MMIO Region
@@ -2022,11 +2096,17 @@ completed. Attempts to run it with `sbi_covh_run_tvm_vcpu()` will fail. Any
 guest page faults taken by other TVM vCPUs in the invalidated pages continue to
 be reported to the host.
 
-In CoVE implementations that do not support dynamic page conversions between
+In CoVE implementations that do not support dynamic page conversion between
 confidential and non-confidential memory, the TSM reflects this call to the
 OS/VMM, which then allocates contiguous non-confidential pages and returns the
 host physical address of the first page to the TSM. The TSM maps the
 non-confidential pages to the TVM's address space.
+
+In systems with fragmented memory and lack of dynamic page conversion, 
+the OS/VMM may fail allocating a single large physical memory region that
+spans over contiguous non-confidential pages. The TVM should then retry and
+request share of multiple smaller memory regions, for example, at the 4KB page
+size granularity.
 
 Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned.
 
@@ -2094,10 +2174,9 @@ doesn't
 struct sbiret sbi_covg_allow_external_interrupt(unsigned long interrupt_id);
 -------
 Allows injection of the specified external interrupt ID into the calling TVM
-vCPU. Passing
-an `interrupt_id` of -1 allows the injection of all external interrupts. TVM
-vCPUs are started with
-all external interrupts completely denied by default.
+vCPU. Passing an `interrupt_id` of the maximum unsigned long value (2^64^-1 on
+64-bit architecture) allows the injection of all external interrupts. TVM
+vCPUs are started with all external interrupts completely denied by default.
 
 The possible error codes returned in sbiret.error are:
 
@@ -2120,8 +2199,8 @@ resume of execution.
 struct sbiret sbi_covg_deny_external_interrupt(unsigned long interrupt_id);
 -------
 Denies injection of the specified external interrupt ID into the calling TVM
-vCPU. Passing
-an `interrupt_id` of -1 denies injection of all external interrupts.
+vCPU. Passing an `interrupt_id` of the maximum unsigned long value (2^64^-1 on
+64-bit architecture) denies injection of all external interrupts.
 
 The possible error codes returned in sbiret.error are:
 
@@ -2349,7 +2428,8 @@ confidential memory.
 === Function: COVE Guest Retrieve Secret (FID #9)
 [source, C]
 -----
-struct sbiret covg_retrieve_secret();
+struct sbiret covg_retrieve_secret(unsigned long buf_addr,
+                                   unsigned long buf_size);
 -----
 Requests TSM for a secret available after successful local attestation. TSM
 reads this secret during local attestation from the `TVM attestation payload`
@@ -2357,6 +2437,11 @@ reads this secret during local attestation from the `TVM attestation payload`
 creation via `sbi_covh_promote_to_tvm()`. Only the TVMs that were correctly
 authenticated and authorized during local attestation can receive the secret
 embedded in TAP.
+
+`buf_addr` is the 4KB-aligned address in the TVM address space to which the 
+TSM will write the secret.
+`buf_size` is the length of the buffer. The buffer cannot be larger than the 
+4KB page size.
 
 This ABI will become part of the `Sealing Interface` planned for the CoVE in
 version 2.0.
@@ -2370,6 +2455,8 @@ The possible error codes are shown below.
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
+| SBI_ERR_INVALID_ADDRESS | `buf_addr_out` is not a valid guest physical address or is not correctly aligned.
+| SBI_ERR_INVALID_PARAM   | The buffer's size is too small to store the secret or larger than the 4KB page.
 | SBI_ERR_AUTH            | Local attestation failed.
 |===
 
@@ -2381,7 +2468,7 @@ struct sbiret sbi_covg_read_measurememt(unsigned long msmt_buf_addr_out,
                                              unsigned long msmt_buf_size,
                                              unsigned long msmt_index);
 -------
-This intrisic returns a the TVM measurement register value for the `msmt_index`
+This intrisic returns a TVM measurement register value for the `msmt_index`
 measurement register. TVMs can read both initial and runtime measurement
 register values back.
 
@@ -2454,6 +2541,11 @@ etc.
 the VMM to finalize the measurement of a TVM (initial). The TSM enforces that
 the TVM virtual harts cannot be entered unless the TVM measurement is committed
 via this operation.
+
+| <<sbi_covh_promote_to_tvm, sbi_covh_promote_to_tvm>>  | Creates a TVM in 
+a single-step taking the state of an existing VM and recreating it in 
+confidential memory. It is an alternative approach to creating a TVM in
+a multi-step process initiated with `sbi_covh_create_tvm()`.
 
 | <<sbi_covh_destroy_tvm, sbi_covh_destroy_tvm>> | TVM shutdown verifies VMM
 has stopped all virtual hart execution for the TVM. The TVM virtual hart
@@ -2667,15 +2759,14 @@ and TVM pages.
 
 | <<sbi_covg_allow_external_interrupt, sbi_covg_allow_external_interrupt>> |
 Allows injection of the specified external interrupt ID into the calling TVM
-vCPU. Passing
-an `interrupt_id` of -1 allows injection of all external interrupts. TVM vCPUs
-are started with
-injection of external interrupts completely disabled by default.
+vCPU. Passing an `interrupt_id` of the maximum unsigned long value (2^64^-1 on
+64-bit architecture) allows injection of all external interrupts. TVM vCPUs
+are started with injection of external interrupts completely disabled by default.
 
 | <<sbi_covg_deny_external_interrupt, sbi_covg_deny_external_interrupt>> |
 Denies injection of the specified external interrupt ID into the calling TVM
-vCPU. Passing
-an `interrupt_id` of -1 denies injection of all external interrupts.
+vCPU. Passing an `interrupt_id` of the maximum unsigned long value (2^64^-1 on
+64-bit architecture) denies injection of all external interrupts.
 
 | <<sbi_covg_get_attcaps, sbi_covg_get_attcaps>>   | This
 intrinsic is used by a TVM to get attestation capabilities supported by the TSM.
@@ -2693,6 +2784,10 @@ intrinsic is used by a TVM to get an attestation evidence to
 report to a remote relying party. It returns an attestation certificate signed
 by the TSM attestation key, and includes the TVM attestation evidence. The TSM
 attestion key is also included in the reported TSM token.
+
+| <<covg_retrieve_secret, covg_retrieve_secret>>      | TVM reads a secret 
+available after successful local attestation. TSM writes the secret to the
+buffer specified by the TVM.
 
 | <<sbi_covg_read_measurement, sbi_covg_read_measurement>>      | This
 intrisic returns a the TVM measurement register value for the `msmt_index`

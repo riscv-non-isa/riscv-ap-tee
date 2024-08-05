@@ -347,19 +347,19 @@ memory pages will fault (including implicit accesses).
 ....
 @startuml
 
-VMM -> TSM : sbi_covh_convert_pages[_range](TVM, GPA)
+VMM -> TSM: sbi_covh_convert_pages[_range](TVM, GPA)
 activate VMM
 activate TSM
-TSM -> VMM :
+TSM -> VMM:
 deactivate VMM
 deactivate TSM
 
 activate TVM
 
-VMM -> TSM : sbi_covh_global_fence(TVM)
+VMM -> TSM: sbi_covh_global_fence(TVM)
 activate VMM
 activate TSM
-TSM -> VMM :
+TSM -> VMM:
 deactivate VMM
 deactivate TSM
 
@@ -373,7 +373,7 @@ TSM -> VMM: ecall/mret (scause = interrupt)
 activate VMM
 deactivate TSM
 
-VMM -> TSM : sbi_covh_local_fence(TVM, virtual_hart, hart)
+VMM -> TSM: sbi_covh_local_fence(TVM, virtual_hart, hart)
 deactivate VMM
 activate TSM
 note right
@@ -526,6 +526,12 @@ to the OS/VMM, but must always restore the vstimecmp CSR from saved state
 when resuming.
 
 ==== TVM external interrupts
+
+Platforms that do not support hardware-accelerated interrupt-controller
+virtualization must rely on the OS/VMM for management of external interrupts.
+The OS/VMM presents the external interrupt to the TVM via the HVIP register
+when resuming the vCPU execution. The TSM must filter presented interrupts to
+enforce that it injects only interrupts allow-listed by the TVM.
 
 Hardware-accelerated interrupt-controller virtualization is possible for TVMs on
 platform supporting the Advanced Interrupt Architecture [AIA] and an
@@ -689,17 +695,21 @@ triggered.
 
 *sbi_covg_allow_external_interrupt*
 
-Registers an interrupt ID that the OS/VMM is allowed to trigger. Passing an
-interrupt ID of -1 allows the injection of all external interrupts. TVM vCPUs
-are started with all external interrupts completely denied by default. Generates
-a TVM exit to notify the OS/VMM of the interrupt vector.
+TVM can register an interrupt ID that the OS/VMM is allowed to trigger. Passing an
+interrupt ID of the maximum unsigned long value (2^64^-1 on 64-bit architecture) allows the injection
+of all external interrupts. TVM vCPUs are started with all external interrupts
+denied by default. This call results in a TVM exit to notify the OS/VMM of the
+interrupt vector.
 
 *sbi_covi_inject_tvm_cpu*
 
-Injects a previously allow-listed interrupt into a TVM. The TSM updates the
-interrupt state of the targeted virtual hart. The TSM may also enforce
-rate-limiting on the injection of interrupts in order to prevent single-step
-attacks by the OS/VMM.
+The OS/VMM can use this ABI to inject an interrupt into a TVM's vCPU on systems
+supporting AIA. On systems that do not support AIA, it should present the interrupts
+via HVIP when resuming the vCPU execution via `sbi_covh_run_tvm_vcpu()`.
+In both cases, the TSM updates the interrupt state of the targeted virtual hart after
+filtering triggered interrupts using the TVM's allow-list. The TSM may also enforce
+rate-limiting on the injection of interrupts in order to prevent single-step attacks
+by the OS/VMM.
 
 === TVM shutdown
 
