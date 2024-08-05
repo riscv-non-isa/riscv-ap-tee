@@ -786,7 +786,7 @@ struct tsm_info {
      */
     uint32_t tsm_state;
     /* 
-     * Identifier of the TSM implementation. 
+     * Identifier of the TSM implementation, see <<table_sbi_covh_get_tsm_implementation_ids>>. 
      * It is intended to distinguish among different TSM implementations,
      * potentially managed by different organizations, that might target
      * different deployment models and, thus, implement subset of CoVE spec.
@@ -797,28 +797,28 @@ struct tsm_info {
      */
     uint32_t tsm_version;
     /* 
-     * CoVE features supported by the running TSM.
+     * A bitmask of CoVE features supported by the running TSM, see <<table_sbi_covh_get_tsm_info_capabilities>>.
      * Every bit in this field corresponds to a capability defined by
      * `COVE_TSM_CAP_*` constants. Presence of bit `i` indicates that both the TSM
      * and hardware support the corresponding capability.
      */
-    uint64_t tsm_capabilities;
+    unsigned long tsm_capabilities;
     /*
      * The number of 4KB pages which must be donated to the TSM for storing TVM
      * state in sbi_covh_create_tvm_vcpu(). `0` if the TSM does not support the
      * dynamic page conversion capability.
      */
-    uint64_t tvm_state_pages;
+    unsigned long tvm_state_pages;
     /* 
      * The maximum number of vCPUs a TVM can support. 
      */
-    uint64_t tvm_max_vcpus;
+    unsigned long tvm_max_vcpus;
     /*
      * The number of 4KB pages which must be donated to the TSM when creating
      * a new vCPU. `0` if the TSM does not support the dynamic page conversion
      * capability.
      */
-    uint64_t tvm_vcpu_state_pages;
+    unsigned long tvm_vcpu_state_pages;
 };
 ------
 
@@ -2020,7 +2020,7 @@ within.
 A typical use case for this extension is to relay information to the host.
 COVE-Guest calls cause a trap to the TSM. TSM should do any processing required
 and then must forward the ECALL to the host with `scause` set to ECALL, `a7` set
-to EID, `a6` set to FID (See <<cove-fid>>), `a0`-`a5` set to ECALL args.
+to EID, `a6` set to FID (see <<cove-fid>>), `a0`-`a5` set to ECALL args.
 
 [#sbi_covg_add_mmio_region]
 === Function: COVE Guest Add MMIO Region (FID #0)
