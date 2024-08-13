@@ -2,8 +2,8 @@
 :docgroup: RISC-V Task Group
 :description: :description: Confidential VM Extension (CoVE) for Confidential Computing on RISC-V platforms
 :company: RISC-V.org
-:revdate: 4/2024
-:revnumber: 0.6
+:revdate: 8/2024
+:revnumber: 0.7
 :revremark: This document is under development. Expect potential changes. Visit http://riscv.org/spec-state for further details.
 :revinfo:
 :url-riscv: http://riscv.org
