@@ -727,7 +727,7 @@ and non-confidential, may allow the VMM to grant the confidential memory to
 another TVM or reclaim all memory granted to the TVM via
 `sbi_covh_reclaim_pages()` which will verify the TSM hgatp mapping and tracking
 for the page and restore it as a VMM-available page to grant to a
-non-confidential VM. This reclaim TSM opertaion:
+non-confidential VM. This reclaim TSM operation:
 
 * Verifies that the PAs referenced are either Non-confidential (No-operation) or
 Confidential-Unassigned state.

@@ -118,7 +118,7 @@ values are required in order for the key to be released.
 When the request to promote VM to a TVM is called and local attestation is
 successful, the TSM unseals the key with help of the hardware root-of-trust. At
 the point when the TVM needs to decrypt its disk (e.g., for mounting the
-filesystem), the TVM utilizes an ABI call (`covg_retrieve_secret()`) to
+filesystem), the TVM utilizes an ABI call (`sbi_covg_retrieve_secret()`) to
 retrieve the decryption key from the TSM.
 
 === Further recommendations

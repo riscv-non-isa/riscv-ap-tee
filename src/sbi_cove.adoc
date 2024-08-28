@@ -785,18 +785,18 @@ struct tsm_info {
      * will be initialized to `0`.
      */
     uint32_t tsm_state;
-    /* 
+    /*
      * Identifier of the TSM implementation, see `Reserved TSM Implementation IDs`
      * table below. This identifier is intended to distinguish among different TSM
      * implementations, potentially managed by different organizations, that might
      * target different deployment models and, thus, implement subset of CoVE spec.
      */
     uint32_t tsm_impl_id;
-    /* 
-     * Version number of the running TSM. 
+    /*
+     * Version number of the running TSM.
      */
     uint32_t tsm_version;
-    /* 
+    /*
      * A bitmask of CoVE features supported by the running TSM, see `TSM Capabilities`
      * table below. Every bit in this field corresponds to a capability defined by
      * `COVE_TSM_CAP_*` constants. Presence of bit `i` indicates that both the TSM
@@ -809,8 +809,8 @@ struct tsm_info {
      * dynamic memory allocation capability.
      */
     unsigned long tvm_state_pages;
-    /* 
-     * The maximum number of vCPUs a TVM can support. 
+    /*
+     * The maximum number of vCPUs a TVM can support.
      */
     unsigned long tvm_max_vcpus;
     /*
@@ -840,7 +840,7 @@ struct tsm_info {
 | 4     | COVE_TSM_CAP_MRIF                  | `1`                | TSM supports MRIF.
 | 5     | COVE_TSM_CAP_MEMORY_ALLOCATION     | `0`                | TSM supports static memory allocation.
 | 5     | COVE_TSM_CAP_MEMORY_ALLOCATION     | `1`                | TSM supports dynamic memory allocation.
-| 6..63 | RESERVED     |                 | 
+| 6..63 | RESERVED     |                 |
 |===
 
 [#table_sbi_covh_get_tsm_implementation_ids]
@@ -1139,7 +1139,7 @@ The `tap_addr` is the 8-bytes aligned guest physical address of the
 For VMs that do not require local attestation (only the remote attestation),
 `tap_addr` must be set to `0`.
 The `entry_sepc` is the address at which the vCPU execution will resume.
-`tvm_identity_addr` is an optional, when set, it points to a 64-bytes buffer 
+`tvm_identity_addr` is an optional, when set, it points to a 64-bytes buffer
 containing a host-defined TVM identity, see `sbi_covh_finalize_tvm()` for more
 details.
 
@@ -2102,7 +2102,7 @@ OS/VMM, which then allocates contiguous non-confidential pages and returns the
 host physical address of the first page to the TSM. The TSM maps the
 non-confidential pages to the TVM's address space.
 
-In systems with fragmented memory and lack of dynamic page conversion, 
+In systems with fragmented memory and lack of dynamic page conversion,
 the OS/VMM may fail allocating a single large physical memory region that
 spans over contiguous non-confidential pages. The TVM should then retry and
 request share of multiple smaller memory regions, for example, at the 4KB page
@@ -2276,10 +2276,10 @@ struct AttestationCapabilities {
     uint32_t certificate_formats;
 
     /* Number of initial measurement registers */
-    uint_8 initial_measurements;
+    uint8_t initial_measurements;
 
     /* Number of runtime measurement registers */
-    uint_8 runtime_measurements;
+    uint8_t runtime_measurements;
 
     /* Array of all measurement register descriptors */
     MeasurementRegisterDescriptor[MAX_MEASUREMENT_REGISTERS] msmt_regs;
@@ -2326,7 +2326,7 @@ struct MeasurementRegisterDescriptor {
                             This implies an exit to the host, and a subsequent
                             resume of execution.
 | SBI_ERR_INVALID_ADDRESS | `tvm_caps_addr` was invalid.
-| SBI_ERR_INVALID_PARAM   | `caps_len` was invalid, or the entire range doesn't
+| SBI_ERR_INVALID_PARAM   | `caps_size` was invalid, or the entire range doesn't
                             span a `CONFIDENTIAL_MEMORY_REGION`
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
@@ -2424,11 +2424,11 @@ confidential memory.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#covg_retrieve_secret]
+[#sbi_covg_retrieve_secret]
 === Function: COVE Guest Retrieve Secret (FID #9)
 [source, C]
 -----
-struct sbiret covg_retrieve_secret(unsigned long buf_addr,
+struct sbiret sbi_covg_retrieve_secret(unsigned long buf_addr,
                                    unsigned long buf_size);
 -----
 Requests TSM for a secret available after successful local attestation. TSM
@@ -2438,9 +2438,9 @@ creation via `sbi_covh_promote_to_tvm()`. Only the TVMs that were correctly
 authenticated and authorized during local attestation can receive the secret
 embedded in TAP.
 
-`buf_addr` is the 4KB-aligned address in the TVM address space to which the 
+`buf_addr` is the 4KB-aligned address in the TVM address space to which the
 TSM will write the secret.
-`buf_size` is the length of the buffer. The buffer cannot be larger than the 
+`buf_size` is the length of the buffer. The buffer cannot be larger than the
 4KB page size.
 
 This ABI will become part of the `Sealing Interface` planned for the CoVE in
@@ -2449,7 +2449,7 @@ version 2.0.
 If the call fails, the TSM returns SBI error code in `sbiret.error` to the VM.
 The possible error codes are shown below.
 
-[#table_covg_retrieve_secret_errors]
+[#table_sbi_covg_retrieve_secret_errors]
 .COVE Guest Retrieve Secret Errors
 [cols="2,3", width=90%, align="center", options="header"]
 |===
@@ -2542,8 +2542,8 @@ the VMM to finalize the measurement of a TVM (initial). The TSM enforces that
 the TVM virtual harts cannot be entered unless the TVM measurement is committed
 via this operation.
 
-| <<sbi_covh_promote_to_tvm, sbi_covh_promote_to_tvm>>  | Creates a TVM in 
-a single-step taking the state of an existing VM and recreating it in 
+| <<sbi_covh_promote_to_tvm, sbi_covh_promote_to_tvm>>  | Creates a TVM in
+a single-step taking the state of an existing VM and recreating it in
 confidential memory. It is an alternative approach to creating a TVM in
 a multi-step process initiated with `sbi_covh_create_tvm()`.
 
@@ -2785,7 +2785,7 @@ report to a remote relying party. It returns an attestation certificate signed
 by the TSM attestation key, and includes the TVM attestation evidence. The TSM
 attestion key is also included in the reported TSM token.
 
-| <<covg_retrieve_secret, covg_retrieve_secret>>      | TVM reads a secret 
+| <<sbi_covg_retrieve_secret, sbi_covg_retrieve_secret>>      | TVM reads a secret
 available after successful local attestation. TSM writes the secret to the
 buffer specified by the TVM.
 
