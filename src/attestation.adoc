@@ -164,7 +164,7 @@ measurement into runtime measurement registers. When supporting that feature,
 the TSM must store runtime measurements separately from the TVM initial ones.
 The TSM can use up to 18 runtime measurement registers for that purpose.
 
-The TVM measurement extension interface is exposed through the optional TG-ABI
+The TVM measurement extension interface is exposed through the optional COVG-ABI
 `sbi_covg_extend_measurement()` FID.
 
 [NOTE]
@@ -348,7 +348,7 @@ include the DICE derived public key for the Platform.
 
 The CoVE layered Evidence structure is represented by the above described
 composition of cryptographically chained EAT tokens. Verifier can then attest
-of a CoVE workload trustworthiness by independenly inspecting each token,
+of a CoVE workload trustworthiness by independently inspecting each token,
 while being able to verify that the TCB represented by one token was used to
 generate the next one.
 
@@ -751,7 +751,7 @@ tvm-runtime-measurements = (
 ==== Evidence Generation
 
 TVM guest Attesters can request from the TSM to generate an Evidence that attest
-to their own layered TCB layers, by calling into the TG-ABI
+to their own layered TCB layers, by calling into the COVG-ABI
 `sbi_covg_get_evidence()` FID.
 
 The `sbi_covg_get_evidence()` returns an attestation certificate that includes
