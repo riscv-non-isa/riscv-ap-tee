@@ -12,10 +12,10 @@ extension. This specification introduces four new extensions:
 
 === CoVE FID namespaces
 
-Implementations may support more than one confidential supervisor domains. In
+Implementations may support more than one confidential supervisor domain. In
 order to support that scenario, as shown in <<cove-fid>>, the most significant 6
 bits of the SBI Function Id for the CoVE Extension may be set by the host to
-specifies the target Supervisor Domain Idenfier/TSM for the CoVH or COVI
+specify the target Supervisor Domain Identifier/TSM for the CoVH or COVI
 function invoked. For guest-invoked COVG functions, the RDSM must specify the
 Supervisor Domain Identifier for the callee. `a6` bits [16..25] are reserved for
 future use. `a6` bits [0..15] are used by the host to specify the CoVE functions
