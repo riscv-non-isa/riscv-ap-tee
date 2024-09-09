@@ -292,7 +292,7 @@ composed of both the hardware RoT generated Platform Token and the TSM-driver
 created TSM Token (See <<TSM Token>>). It is signed by the Platform CDI-derived
 attestation key.
 
-As the following step in the DICE chain, the TSM generates and provision any TVM
+As the following step in the DICE chain, the TSM generates and provisions any TVM
 it creates with its CDI. TVM CDIs are derived from the TSM CDI and the TVM
 specific measurements. However, unlike the RoT and the TSM-driver, the TSM does
 not pass attestation certificates to its TVMs. For evidence freshness
@@ -330,8 +330,8 @@ formatted as an untagged, unprotected Concise Binary Object Representation
 (<<CBOR>>) Web Token (<<UCCS>>). A CoVE EAT profile is proposed to narrow the
 EAT specification for the CoVE use case to enable interoperability.
 
-The UCCS is composed of one EAT submodule Claims-Set map where the map values
-are attestation tokens for the TVM, TSM and Platform Claims.
+The UCCS (Unprotected CWT Claims Set) is composed of one EAT submodule Claims-Set 
+map where the map values are attestation tokens for the TVM, TSM and Platform Claims.
 
 The TVM EAT is a CWT tagged CBOR formatted token, wrapped with a
 COSE_Sign1 <<COSE>> envelope. It is signed by the TSM attestation key and must
@@ -347,8 +347,8 @@ COSE_Sign1 <<COSE>> envelope. It is signed by the RoT attestation key and must
 include the DICE derived public key for the Platform.
 
 The CoVE layered Evidence structure is represented by the above described
-composition of cryptographically chained EAT tokens. Verifier can then attest
-of a CoVE workload trustworthiness by independently inspecting each token,
+composition of cryptographically chained EAT tokens. The Verifier can then attest
+a CoVE workload trustworthiness by independently inspecting each token,
 while being able to verify that the TCB represented by one token was used to
 generate the next one.
 
