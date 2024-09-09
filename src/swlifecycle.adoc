@@ -574,17 +574,17 @@ isolating guest interrupt file CSR state from the OS/VMM.
 Two fundamental operations must be supported by the TSM in order to enable the
 use of the IMSIC or MRIFs for TVM virtual harts:
 
-*Binding* a TVM virtual hart to an IMSIC guest interrupt file on a physical CPU,
+* *Binding* a TVM virtual hart to an IMSIC guest interrupt file on a physical CPU,
 migrating any interrupt state from the virtual hart's MRIF.
 
-*Unbinding* a TVM virtual hart from an IMSIC guest interrupt file and
+* *Unbinding* a TVM virtual hart from an IMSIC guest interrupt file and
 migrating interrupt state to an MRIF.
 
 If MRIFs are not supported by the hardware then TSM must additionally support
 one more operation to allow TVM virtual hart migration from one physical hart to
 another:
 
-*Rebinding* a TVM virtual hart to an IMSIC guest interrupt file on a physical
+* *Rebinding* a TVM virtual hart to an IMSIC guest interrupt file on a physical
 CPU, migrating any interrupt state from the virtual hart's previous IMSIC guest
 interrupt file.
 
