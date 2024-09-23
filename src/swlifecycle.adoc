@@ -58,7 +58,7 @@ The VMM may assign memory to the TVM via a sequence of
 `sbi_covh_add_tvm_zero_pages()` - the former grants memory pages that are to
 contain second-stage paging structures entries that translate a TVM guest
 physical address to the system physical address, while the latter two are used
-to hold TVM data and is referenced by the hgatp leaf page table entries. For
+to hold TVM data and are referenced by the hgatp leaf page table entries. For
 pages added to the TVM, the VMM must invoke `sbi_covh_add_tvm_measured_pages()`
 which extends the initial measurement hash of the TVM. The hash will be used by
 the TSM to generate the attestation report (evidence) when requested by a
@@ -132,7 +132,7 @@ requires that the TVM supervisor code should not locate VS-stage page
 tables in non-confidential memory. The TSM enforces that G-stage page
 tables are in confidential memory.
 * TVM access to confidential or non-confidential memory is subject to
-VS-stage address translation (this is existing). G-stage address
+VS-stage address translation (if this is existing). G-stage address
 translation is enforced via the TSM-managed hgatp with the listed
 recommendations in <<TSM and TVM Isolation>>.
 
@@ -243,7 +243,7 @@ the GPA and enforced for memory access for the TVM by the hardware.
 
 ====  Information tracked per physical page
 
-For implementations that utilize MTT the Extended Memory Tracking Table (EMTT)
+For implementations that utilize MTT, the Extended Memory Tracking Table (EMTT)
 information managed by the TSM
 is used to track additional fields of metadata associated with physical
 addresses.
@@ -251,20 +251,26 @@ The page size is implicit in the MTT and EMTT lookup - 4KB, 2MB, 1GB, 512GB.
 Actual page sizes supported are implementation-specified.
 
 |===
-| *Memory Type* | *Confidential or Non-confidential (enforced via MTT)*
-| Page-Type   | Reserved - page that may not be assigned to any TEE entity
+h| Memory Type h| Confidential or Non-confidential (enforced via MTT)
+| Page-Type   
+a| Reserved - page that may not be assigned to any TEE entity.
+
 If the Memory Type is Confidential, the following page types may be used:
+
 * Unassigned - page not assigned to any TEE (TSM or TVM)
-* TVM - page assigned to a TVM (mapped via G-stage page table).
+* TVM - page assigned to a TVM (mapped via G-stage page table)
 * TSM - page used by the TSM (for MTT and other control structures)
 | Page Owner  | If the Memory Type is Confidential and Page-Type is TVM,
 this value holds the identifier (e.g., PPN) for the TVM control page (4KB TEE-
 TSM-TVM page); else it is 0.
-| Page sub-type | Following types apply if Memory Type is Confidential and
+| Page sub-type a| Following types apply if Memory Type is Confidential and
 Page-Type is TVM:
+
 * HGATP - pages used for HGATP structures
 * Data - pages used for TVM content
-Following types apply If Memory Type is Confidential and Page-Type is TSM:
+
+Following types apply if Memory Type is Confidential and Page-Type is TSM:
+
 * MTT - pages used for MTT structures
 * TVMC - pages used for TVM control structure(s) for global control
 * VHCS - pages used for TVM VHCS (virtual hart control structures)
@@ -423,7 +429,7 @@ during the vcpu run.
 mappings exist at this point -----
 * Invoke the specific mapping change operation, such as remove, relocate,
 promote, migrate etc.
-* Checks that the affected mapping(s) are invalidated in the MTT and/or g-stage
+* Checks that the affected mapping(s) are invalidated in the MTT and/or G-stage
 mapping and validate the mapping.
 * Subsequent page walks may create cached mappings from this point onwards.
 
@@ -441,7 +447,7 @@ page(s) to be used for the hgatp structure entries
 
 * Verify that the TVM has been created successfully.
 * Verify that the PPN(s) for the new page(s) to be used for TVM hgatp is/are
-Unassigned-Confidential per the MTT.
+Unassigned-Confidential per the EMTT.
 * For the GPA to be mapped, perform a TVM-hgatp walk to locate the non-leaf
 entry that should refer to the new page being added (to hold the next level of
 the mapping for the GPA). If the mapping already exists, the operation is
@@ -501,7 +507,7 @@ While OS/VMMs traditionally have unfettered access to the virtualized timer and
 interrupt state of legacy VMs, TVMs must be protected from malicious injection
 or filtering of interrupts or modification of timers which could lead to
 incorrect execution of or information leakage from the TVM. As such, a
-combination of hardware isolation features and COVH support are necessary to
+combination of hardware isolation features and COVH support is necessary to
 guard access to this state while still ultimately giving the OS/VMM control over
 resource management.
 
@@ -568,17 +574,17 @@ isolating guest interrupt file CSR state from the OS/VMM.
 Two fundamental operations must be supported by the TSM in order to enable the
 use of the IMSIC or MRIFs for TVM virtual harts:
 
-*Binding* a TVM virtual hart to an IMSIC guest interrupt file on a physical CPU,
+* *Binding* a TVM virtual hart to an IMSIC guest interrupt file on a physical CPU,
 migrating any interrupt state from the virtual hart's MRIF.
 
-*Unbinding* a TVM virtual hart from an IMSIC guest interrupt file and
+* *Unbinding* a TVM virtual hart from an IMSIC guest interrupt file and
 migrating interrupt state to an MRIF.
 
 If MRIFs are not supported by the hardware then TSM must additionally support
 one more operation to allow TVM virtual hart migration from one physical hart to
 another:
 
-*Rebinding* a TVM virtual hart to an IMSIC guest interrupt file on a physical
+* *Rebinding* a TVM virtual hart to an IMSIC guest interrupt file on a physical
 CPU, migrating any interrupt state from the virtual hart's previous IMSIC guest
 interrupt file.
 
@@ -727,7 +733,7 @@ and non-confidential, may allow the VMM to grant the confidential memory to
 another TVM or reclaim all memory granted to the TVM via
 `sbi_covh_reclaim_pages()` which will verify the TSM hgatp mapping and tracking
 for the page and restore it as a VMM-available page to grant to a
-non-confidential VM. This reclaim TSM operation:
+non-confidential VM. TSM memory reclaim operation:
 
 * Verifies that the PAs referenced are either Non-confidential (No-operation) or
 Confidential-Unassigned state.

@@ -161,7 +161,7 @@ TSM-driver and the TSM. The TSM-driver is responsible for enforcing isolation of
 confidential memory regions (e.g., via PMP or MTT) and the TSM
 is responsible for enforcing isolation of confidential memory pages among TVMs
 (e.g., via G-stage page tables). Pages assigned to the TVM may be exclusively
-accessible to the condidential supervisor domain or may be shared with the
+accessible to the confidential supervisor domain or may be shared with the
 hosting supervisor domain (e.g., to allow for paravirtualized IO access).
 
 [NOTE]
@@ -482,7 +482,7 @@ In this deployment model, other supervisor domains have access to 1st
 and G-stage paging hardware the root security manager (TSM-driver) must use MTT
 to isolate supervisor domain memory. In this deployment model,
 TEE and TVM address spaces are identified by supervisor domain identifiers
-(Smsdid) to maintain the isolation during access and in internal
+(SDIDs) to maintain the isolation during access and in internal
 address translation caches, e.g., Hart TLB lookup may be extended with the
 SDID in addition to the ASID, VMID for workloads in the Confidential supervisor
 domain. TVM memory isolation must support sparse memory management

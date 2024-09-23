@@ -28,11 +28,12 @@ On processors supporting multiple supervisor domains (the Smmtt extension), the
 resources managed by the hosting supervisor domain (OS/VMM) include memory, CPU,
 I/O resources and platform capabilities required to host the TVM workload. The
 terms hosting supervisor domain and OS/VMM are used interchangeably in this
-specification. The underlying memory isolation mechanisms for supervisor domains
+specification. The underlying memory isolation mechanism for supervisor domains
 (Smmtt) is agnostic of the number of supervisor domains. On processors that do
 not support multiple supervisor domains where Smmtt is not mandated, a single
 confidential  supervisor domain and a single hosting supervisor domain can be
-supported (for example <<dep3>>, other deployment models are also possible).
+supported using other hardware memory isolation techniques like PMP 
+(for example <<dep3>>, other deployment models are also possible).
 
 [id=dep1]
 [caption="Figure {counter:image}", reftext="Figure {image}"]
@@ -47,7 +48,7 @@ trusted intermediary between TEE and non-TEE workloads on the same platform.
 The TSM should have a minimal hardware-attested footprint. The TCB (which
 includes
 the TSM and hardware) enforces strict confidentiality and integrity security
-properties for workloads in this supervisor domain. The Root Security Manager,
+properties for workloads in this supervisor domain. The Root Domain Security Manager,
 also called the " *TSM-driver* ", isolates the Confidential Supervisor Domain
 from all other Supervisor domains and other platform components
 (non-confidential and
@@ -93,8 +94,8 @@ execute and destroy a TVM - _this specification aims to describe the TEEI and
 TSM interfaces_. By using the Hypervisor extension of the RISC-V privileged
 specification <<R0>>, this specification minimizes ISA changes to introduce
 a scalable architecture for hosting TEE workloads. More than one confidential
-supervisor domains may be hosted by the TSM-driver. Similarly, more than one
-TVMs may be hosted by the host OS/VMM via confidential supervisor domains.
+supervisor domain may be hosted by the TSM-driver. Similarly, more than one
+TVM may be hosted by the host OS/VMM via confidential supervisor domains.
 Each TVM may consist of the guest firmware, a guest OS and applications. The
 software components included in the TVM are implementation specific.
 
@@ -165,7 +166,7 @@ management.
 <<dep1>> shows TVMs (a.k.a. confidential VMs) managed by a VMM and <<dep1a>>
 shows Confidential applications managed by an untrusted host (OS/VMM). As
 evident from the architecture, the difference between these two scenarios is the
-software TCB (owned by the tenant within the TVM) for the tenant workload in the
+software TCB (owned by the tenant within the TVM): for the tenant workload in the
 application TEE case, a minimal guest runtime may be used; whereas in the VM TEE
 case, an enlightened guest OS is expected in the TVM TCB. Other software models
 that map to the VU/VS modes of operation are also possible as TEE workloads.
