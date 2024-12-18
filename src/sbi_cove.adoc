@@ -804,7 +804,7 @@ struct tsm_info {
      */
     unsigned long tsm_capabilities;
     /*
-     * The number of 4KB pages which must be donated to the TSM for storing TVM
+     * The number of 4 KiB pages which must be donated to the TSM for storing TVM
      * state in sbi_covh_create_tvm_vcpu(). `0` if the TSM does not support the
      * dynamic memory allocation capability.
      */
@@ -814,7 +814,7 @@ struct tsm_info {
      */
     unsigned long tvm_max_vcpus;
     /*
-     * The number of 4KB pages which must be donated to the TSM when creating
+     * The number of 4 KiB pages which must be donated to the TSM when creating
      * a new vCPU. `0` if the TSM does not support the dynamic memory allocation
      * capability.
      */
@@ -893,7 +893,7 @@ Begins the process of converting `num_pages` of non-confidential memory starting
 at `base_page_address` to confidential-memory. On success, pages can be assigned
 to TVMs only following subsequent calls to `sbi_covh_global_fence()` and
 `sbi_covh_local_fence()` that complete the conversion process. The implied
-page size is 4KB.
+page size is 4 KiB.
 
 The `base_page_address` must be page-aligned.
 
@@ -921,7 +921,7 @@ struct sbiret sbi_covh_reclaim_pages(unsigned long base_page_address,
 -------
 Reclaims `num_pages` of confidential memory starting at `base_page_address`.
 The pages must not be currently assigned to an active TVM. The implied page
-size is 4KB.
+size is 4 KiB.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -1004,8 +1004,8 @@ information about the parameters that should be used to populate
 ----
 struct tvm_create_params {
     /*
-     * The base physical address of the 16KB confidential memory region
-     * that should be used for the TVM's page directory. Must be 16KB-aligned.
+     * The base physical address of the 16 KiB confidential memory region
+     * that should be used for the TVM's page directory. Must be 16 KiB-aligned.
      */
     unsigned long tvm_page_directory_addr;
     /*
@@ -1224,7 +1224,7 @@ Marks the range of TVM physical address space starting at `tvm_gpa_addr` as
 reserved for the mapping of confidential memory. The memory region length is
 specified by `region_len`.
 
-Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned, and the region must
+Both `tvm_gpa_addr` and `region_len` must be 4 KiB-aligned, and the region must
 not overlap with a previously defined region. This call must not be made after
 calling `sbi_covh_finalize_tvm()`.
 
@@ -1252,7 +1252,7 @@ struct sbiret sbi_covh_add_tvm_page_table_pages(unsigned long tvm_guest_id,
                                                 unsigned long num_pages);
 -----
 Adds `num_pages` confidential memory starting at `base_page_address` to the
-TVM's page-table page-pool. The implied page size is 4KB.
+TVM's page-table page-pool. The implied page size is 4 KiB.
 
 Page table pages may be added at any time, and a typical use case is in
 response to a TVM page fault.
@@ -1295,7 +1295,7 @@ This call must not be made after calling `sbi_covh_finalize_tvm()`.
 
 This operation is used to extend the initial measurement for a TVM for added
 page contents. The operation performs a SHA384 hash extend to the measurement
-register managed by the TSM on a 4KB page. The page must be added to a valid GPA
+register managed by the TSM on a 4 KiB page. The page must be added to a valid GPA
 mapping. The GPA of the page mapped is part of the measurement operation.
 
 The measurement process is a state machine that must be faithfully reproduced
@@ -2033,7 +2033,7 @@ Marks the specified range of TVM physical address space starting at
 `tvm_gpa_addr` as used for emulated MMIO. Upon return, all accesses by the TVM
 within the range are trapped and may be emulated by the host.
 
-Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned, and the region must
+Both `tvm_gpa_addr` and `region_len` must be 4 KiB-aligned, and the region must
 not overlap with a previously defined region. This call will result in an exit
 to the host on success.
 
@@ -2060,7 +2060,7 @@ Removes the specified range of TVM physical address space starting at
 `tvm_gpa_addr` from the emulated MMIO regions. Upon return, all accesses by the
 TVM within the range will result in a page fault.
 
-Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned. The TSM must remove
+Both `tvm_gpa_addr` and `region_len` must be 4 KiB-aligned. The TSM must remove
 every MMIO region that overlaps with the requested range. This call will result
 in an exit to the host on success.
 
@@ -2105,10 +2105,10 @@ non-confidential pages to the TVM's address space.
 In systems with fragmented memory and lack of dynamic page conversion,
 the OS/VMM may fail allocating a single large physical memory region that
 spans over contiguous non-confidential pages. The TVM should then retry and
-request share of multiple smaller memory regions, for example, at the 4KB page
+request share of multiple smaller memory regions, for example, at the 4 KiB page
 size granularity.
 
-Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned.
+Both `tvm_gpa_addr` and `region_len` must be 4 KiB-aligned.
 
 The possible error codes returned in sbiret.error are:
 
@@ -2150,7 +2150,7 @@ with `sbi_covh_run_tvm_vcpu()` will fail. Any guest page faults taken by other
 TVM vCPUs in the
 invalidated pages continue to be reported to the host.
 
-Both `tvm_gpa_addr` and `region_len` must be 4KB-aligned.
+Both `tvm_gpa_addr` and `region_len` must be 4 KiB-aligned.
 
 [#table_sbi_covg_unshare_memory_region_errors]
 .COVE Guest Unshare Memory Region
@@ -2438,10 +2438,10 @@ creation via `sbi_covh_promote_to_tvm()`. Only the TVMs that were correctly
 authenticated and authorized during local attestation can receive the secret
 embedded in TAP.
 
-`buf_addr` is the 4KB-aligned address in the TVM address space to which the
+`buf_addr` is the 4 KiB-aligned address in the TVM address space to which the
 TSM will write the secret.
 `buf_size` is the length of the buffer. The buffer cannot be larger than the
-4KB page size.
+4 KiB page size.
 
 This ABI will become part of the `Sealing Interface` planned for the CoVE in
 version 2.0.
@@ -2456,7 +2456,7 @@ The possible error codes are shown below.
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
 | SBI_ERR_INVALID_ADDRESS | `buf_addr_out` is not a valid guest physical address or is not correctly aligned.
-| SBI_ERR_INVALID_PARAM   | The buffer's size is too small to store the secret or larger than the 4KB page.
+| SBI_ERR_INVALID_PARAM   | The buffer's size is too small to store the secret or larger than the 4 KiB page.
 | SBI_ERR_AUTH            | Local attestation failed.
 |===
 
@@ -2510,7 +2510,7 @@ allocate per TVM, Size of memory to allocate per TVM Virtual Hart and so on.
 | <<sbi_covh_convert_pages, sbi_covh_convert_pages>> | Begins the process
 of converting memory
 to be used as confidential memory. The region consists of one or more contiguous
-4KB memory naturally aligned regions.
+4 KiB memory naturally aligned regions.
 
 | <<sbi_covh_reclaim_pages, sbi_covh_reclaim_pages>> | VMM may unassign
 memory for TVMs by destroying them. All confidential-unassigned memory may be
@@ -2606,7 +2606,7 @@ allows the VMM to assign TEE pages for a virtual hart context structure (VHCS)
 for a
 specific TVM. This routine also initializes the hart-specific fields of
 this structure. Note that a virtual hart context structure may consist of
-more than one 4KB page. The number of pages are enumerated via the tsm_info
+more than one 4 KiB page. The number of pages are enumerated via the tsm_info
 call.
 
 | <<sbi_covh_run_tvm_vcpu, sbi_covh_run_tvm_vcpu>> | Enter or resume a TVM
