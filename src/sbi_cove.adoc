@@ -802,7 +802,7 @@ struct tsm_info {
      * `COVE_TSM_CAP_*` constants. Presence of bit `i` indicates that both the TSM
      * and hardware support the corresponding capability.
      */
-    unsigned long tsm_capabilities;
+    uint32_t tsm_capabilities;
     /*
      * The number of 4KB pages which must be donated to the TSM for storing TVM
      * state in sbi_covh_create_tvm_vcpu(). `0` if the TSM does not support the
@@ -812,7 +812,7 @@ struct tsm_info {
     /*
      * The maximum number of vCPUs a TVM can support.
      */
-    unsigned long tvm_max_vcpus;
+    uint32_t tvm_max_vcpus;
     /*
      * The number of 4KB pages which must be donated to the TSM when creating
      * a new vCPU. `0` if the TSM does not support the dynamic memory allocation
