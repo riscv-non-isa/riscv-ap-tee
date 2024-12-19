@@ -486,9 +486,8 @@ TEE and TVM address spaces are identified by supervisor domain identifiers
 address translation caches, e.g., Hart TLB lookup may be extended with the
 SDID in addition to the ASID, VMID for workloads in the Confidential supervisor
 domain. TVM memory isolation must support sparse memory management
-models and architectural page-sizes of 4KB, 64KB (with Svnapot), 2MB, 1GB (and
-optionally
-512GB).
+models and architectural page-sizes of 4 KiB, 64 KiB (with Svnapot), 2 MiB, 1 GiB (and
+optionally 512 GiB).
 The hardware may implement the MTT as specified in the Smmtt
 privileged ISA extension, or other approaches may be used such as a flat
 table. The memory tracking table may be enforced at the memory controller,
