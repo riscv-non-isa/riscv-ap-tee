@@ -510,8 +510,8 @@ address translation table (hgatp). The TSM must track memory assignment of
 TVMs (by the untrusted OS/VMM) to ensure memory assignment is
 non-overlapping, along with additional security requirements. The security
 requirements/invariants for enforcement of the memory
-access-control for memory assigned to the TVMs is described in <<TVM Memory
-management>>.
+access-control for memory assigned to the TVMs is described in 
+<<TVM memory management>>.
 
 === TVM Execution
 
