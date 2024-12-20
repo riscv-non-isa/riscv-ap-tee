@@ -203,7 +203,7 @@ its confidential memory. If the TVM is not gracefully shutdown, or the host is
 reclaiming memory assigned to a TVM, the TSM must perform scrubbing of
 confidential memory before returning control of the memory to the host (via the
 MTT) or assigning to another TVM. If the TVM is converting memory from
-confidential to non-confidential, then the TVM must scrub the confidential
+confidential to non-confidential, then the TVM should scrub the confidential
 memory being returned to the host via `sbi_covg_share_memory_region()`.
 
 With a fixed partitioning of memory into confidential and non-confidential,
