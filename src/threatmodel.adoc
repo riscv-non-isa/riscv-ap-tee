@@ -1,4 +1,10 @@
 [[threatmodel]]
+
+The RISC-V Security Model <<RVISEC>> describes the common security principles
+for RISC-V platforms, and the normative requirements for security building
+blocks employed in a platform. This specification describes the detailed
+threat model for the RISC-V CoVE Confidential Computing use case.
+
 === Adversary Model
 
 _Unprivileged Software Adversary_ - This includes software executing in
@@ -111,8 +117,9 @@ T21: A TVM causes a denial of service on the platform.
 
 [NOTE]
 ====
-This threat model is not an exhaustive list and will be updated (via the RISC-V
-Security Model specification <<R21>>) on a regular basis as attacks evolve.
+This threat model is not an exhaustive list and will be updated (via revisions
+of the RISC-V Security Model specification <<RVISEC>>) on a regular basis as
+attacks (are expected to) evolve.
 ====
 
 === Scope
@@ -196,12 +203,12 @@ with another TEE | Supervisor Domains
 
 | I/O Protection | DMA protection from non-TCB-admitted devices | Required | DMA
 access-control, e.g., IOPMP, IOMTT, IOMMU | Prevent non-TCB peripheral devices
-from accessing TEE memory | See CoVE-IO <<R22>>, IOMMU, Supervisor Domains
+from accessing TEE memory | See CoVE-IO <<RVICOVEIO>>, IOMMU, Supervisor Domains
 (IOMTT)
 
 | I/O Protection | Trusted I/O from devices admitted into the TCB of a TVM |
-Implementation-specific | Device attestation, Link protection, IOMMU |
-Admission control to bind devices to TEEs | See CoVE-IO <<R22>>, IOMMU,
+Implementation-specific | Device attestation <<SPDM>>, Link protection, IOMMU |
+Admission control to bind devices to TEEs | See CoVE-IO <<RVICOVEIO>>, IOMMU,
 Supervisor Domains (IOMTT)
 
 | Interrupts | Trusted (no spoofing/tampering/dropped) Interrupts | Required |

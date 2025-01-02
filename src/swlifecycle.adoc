@@ -116,7 +116,7 @@ to cause IPIs to the virtual-harts managed by the TVM OS (and verified by
 the TVM OS to ensure the IPIs are received by the TVM OS to invalidate the
 TLB lazily).
 
-For implementations using AIA <<R9>>, this reference architecture requires
+For implementations using AIA <<RVIAIA>>, this reference architecture requires
 use of AIA IMSIC to ensure these IPIs are delivered through the IMSIC associated
 with the guest TVM. Each TVM is allocated a guest interrupt file during TVM
 initialization.
@@ -252,7 +252,7 @@ Actual page sizes supported are implementation-specified.
 
 |===
 h| Memory Type h| Confidential or Non-confidential (enforced via MTT)
-| Page-Type   
+| Page-Type
 a| Reserved - page that may not be assigned to any TEE entity.
 
 If the Memory Type is Confidential, the following page types may be used:
