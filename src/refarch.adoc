@@ -7,7 +7,7 @@ We describe the capabilities of the platform to support memory isolation
 requirements for confidentiality of workloads in TVMs. We then describe
 the properties of the TSM, its instantiation, isolation and operational model
 for the TVM life cycle. The description in this section refers to the reference
-architecture in Figure 1.
+architecture in <<dep1>>.
 
 === CoVE Deployment Models
 There are three deployment models described below (1, 2, and 3). CoVE ABI is
@@ -23,10 +23,10 @@ supervisor domain is called *Non-Confidential*.
 . The TSM operates in S/HS mode as a per supervisor domain manager to the
 hosting supervisor domain which operates in S/HS mode. <<dep1>> shows this
 model that utilizes
-the Memory Tracking Table (MTT) and the G-stage page tables (PT) for TVM
+the Memory Protection Table (MPT) and the G-stage page tables (PT) for TVM
 isolation (the 1st
-stage PT is normally used by the Guest OS). The MTT is used to assign physical
-memory to the Confidential supervisor domain. The MTT allows dynamic
+stage PT is normally used by the Guest OS). The MPT is used to assign physical
+memory to the Confidential supervisor domain. The MPT allows dynamic
 programming of the
 per-domain access permissions.
 
@@ -44,7 +44,7 @@ between hosting supervisor domain (OS/VMM, VMs) and confidential supervisor
 domain using, e.g., PMPs.
 This model might be suitable for client/embedded systems running in a
 constraint hardware and software
-environment (e.g., it does not require Smmtt). <<dep3>> discusses this model in
+environment (e.g., it does not require Smmpt). <<appendix_d>> discusses this model in
 detail.
 
 === CoVE Memory Isolation
@@ -91,16 +91,17 @@ permissions to access Confidential and Non-confidential memory,
 * Hart not operating in a Confidential supervisor domain has access permissions
 only for Non-confidential memory.
 
-In CoVE implementations supporting the Smmtt extension, the root domain
+In CoVE implementations supporting the Smmpt extension, the root domain
 security manager (RDSM)
-configures the MTT such that a hart executing in the hosting domain does not
+configures the MPT such that a hart executing in the hosting domain does not
 have access to any
-confidential memory regions. The RDSM configures the MTT for the confidential
+confidential memory regions. The RDSM configures the MPT for the confidential
 domain to allow access
 to confidential memory exclusively to that domain, but may also allow access to
 non-confidential
 (shared) memory regions to one or more secondary domains.
 
+[id=dep_conversion]
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
 [title= "Confidential memory conversion"]
 image::img_7.png[]
@@ -108,7 +109,7 @@ image::img_7.png[]
 [NOTE]
 ====
 To also provide physical memory protection, memory accessible to the
-confidential supervisor domain via MTT may also be associated with a unique
+confidential supervisor domain via MPT may also be associated with a unique
 memory encryption key. Additionally each TVM may also be associated with a
 unique memory encryption key. These additional protection aspects are platform
 and implementation dependent.
@@ -118,29 +119,29 @@ In deployment models that allow for dynamic memory partitioning,
 confidential and non-confidential memory are both always assigned by the VMM,
 i.e., the hosting supervisor domain. The TSM-driver is expected to manage the
 isolation for confidential memory assigned to any of the secondary supervisor
-domains by programming the Memory Tracking Table (MTT). The desired security
-properties of memory tracking are discussed below. The TSM (within a supervisor
+domains by programming the Memory Protection Table (MPT). The desired security
+properties of memory protection are discussed below. The TSM (within a supervisor
 domain) manages page-based allocation using the G-stage page table from the set
-of confidential memory regions that are enforced by the MTT.
+of confidential memory regions that are enforced by the MPT.
 
 Four aspects of memory isolation are impacted due to this dynamically
 configurable
-property of the MTT and are discussed next:
+property of the MPT and are discussed next:
 (1) address translation/page walk,
 (2) management of isolation for confidential physical memory,
 (3) handling implicit & explicit memory accesses, and
 (4) cached translations/TLB management.
 
 ==== Address Translation/Page Walk
-Figure 2 describes a reference model for memory tracking lookup where
+Figure 2 describes a reference model for memory protection table lookup where
 the physical address derived from the two-stage address translation and
-protection mechanism is looked up via the MTT configured for the active
+protection mechanism is looked up via the MPT configured for the active
 supervisor domain to get the access permissions for the physical address. This
 lookup should be performed for each implicit and explicit memory access and per
 the paging sizes/modes supported by the hart.
 
-[caption="Figure {counter:image}: ", reftext="smmtt"]
-[title= "Memory Tracking for Supervisor Domains"]
+[caption="Figure {counter:image}: ", reftext="smmpt"]
+[title= "MPT lookup for Supervisor Domain Access"]
 image::https://github.com/riscv/riscv-smmtt/blob/main/images/fig2.png?raw=true[]
 
 ==== Management of Isolation for Confidential Physical Memory
@@ -149,16 +150,16 @@ The software TCB (specifically TSM) manages the assignment of physical memory
 to the confidential
 supervisor domain, while the hardware TCB (specifically the hart MMU including
 virtual memory system,
-MTT Extensions) enforces the access-control for confidential memory against
-other supervisor domains. The region sizes at which the memory tracking enforces
+MPT Extensions) enforces the access-control for confidential memory against
+other supervisor domains. The region sizes at which the memory protection enforces
 isolation may be multiples of the architectural page sizes supported by the hart
-MMU. The IOMMU is expected to support a similar memory tracking lookup
+MMU. The IOMMU is expected to support a similar memory protection lookup
 to enable a device/function trusted by the TVM to directly access
 TVM confidential memory regions. For the CoVE reference architecture, this TCB
 consists of the hardware (e.g., MMU, IOMMU, Memory Controller) and the
 software/firmware elements -
 TSM-driver and the TSM. The TSM-driver is responsible for enforcing isolation of
-confidential memory regions (e.g., via PMP or MTT) and the TSM
+confidential memory regions (e.g., via PMP or MPT) and the TSM
 is responsible for enforcing isolation of confidential memory pages among TVMs
 (e.g., via G-stage page tables). Pages assigned to the TVM may be exclusively
 accessible to the confidential supervisor domain or may be shared with the
@@ -169,8 +170,8 @@ hosting supervisor domain (e.g., to allow for paravirtualized IO access).
 The TSM may manage additional attributes on TVM-assigned pages such as:
 TVM-owner, Page-sub-type, Translation Lookaside Buffer (TLB) versioning
 information, Locking semaphore and
-additional metadata, etc. This extended memory tracking information managed by
-the TSM software is referred to as the Extended Memory Tracking Table (EMTT).
+additional metadata, etc. This extended memory protection information managed by
+the TSM software is referred to as the Extended Memory Protection Table (EMPT).
 ====
 
 ==== Handling Implicit & Explicit Memory Accesses
@@ -182,7 +183,7 @@ from untrusted/shared memory - enforced by the hart
 * TEE Paging structure walk - security property: TVM and TSM must not locate
 page tables in untrusted shared memory.
 * TEE data fetch - security property: The TVM via the TSM may be allowed to
-relax data accesses to non-confidential memory (e.g., via MTT) to allow for IO
+relax data accesses to non-confidential memory (e.g., via MPT) to allow for IO
 accesses.
 
 ==== Cached translations/TLB management
@@ -194,7 +195,7 @@ of confidential memory to shared), the TCB must enforce that stale
 translations may not be held to memory yielded by a TVM (and used
 by the host for another TVM or VM or the host).
 These properties are implemented by the TSM in conjunction with
-the hardware (e.g., MTT cache invalidations) via the proposed COVH interface.
+the hardware (e.g., MPT cache invalidations) via the proposed COVH interface.
 
 [NOTE]
 ====
@@ -202,8 +203,8 @@ Regarding stale data in memory: If the TVM is gracefully shutdown, it may scrub
 its confidential memory. If the TVM is not gracefully shutdown, or the host is
 reclaiming memory assigned to a TVM, the TSM must perform scrubbing of
 confidential memory before returning control of the memory to the host (via the
-MTT) or assigning to another TVM. If the TVM is converting memory from
-confidential to non-confidential, then the TVM must scrub the confidential
+MPT) or assigning to another TVM. If the TVM is converting memory from
+confidential to non-confidential, then the TVM should scrub the confidential
 memory being returned to the host via `sbi_covg_share_memory_region()`.
 
 With a fixed partitioning of memory into confidential and non-confidential,
@@ -287,9 +288,8 @@ medeleg).
 The TSM saves the TVM state and invokes the TSM-driver via an ECALL (TEERET
 with reason) to initiate the return of execution control to the OS/VMM if
 required. The TSM-driver restores the context for the OS/VMM via the
-per-hart control sub-structure THCS.hssa (See <<appendix_a>>). Figure 3 shows
-this canonical
-flow.
+per-hart control sub-structure THCS.hssa (See <<appendix_a>>). 
+<<dep_conversion>> shows this canonical flow.
 
 Beyond the basic operation described above, the following different
 operational models of the TSM may be supported by an implementation.
@@ -348,7 +348,7 @@ the registers that are restored on resumed security operations.
 TSM-driver*
 
 * If trap is a synchronous trap due to TEECALL/ TEERESUME then activate
-confidential supervisor domain for the hart via M-mode `mttp` CSR (See
+confidential supervisor domain for the hart via M-mode `mmpt` CSR (See
 Supervisor Domains specification <<R20>> for CSR definition)
 * Locate the per-hart THCS (located within TSM-driver memory data region)
 * Save operating VMM csr context into the THCS.hssa (Hart Supervisor State
@@ -388,7 +388,7 @@ any v/f register state must be restored by the caller.
 return status from TEERET (TSM sets a0, a1 registers always - other
 registers may be selected by the TVM)
 * Enable hosting supervisor domain on hart (via Superisor Domains <<R20>>
-M-mode CSR `mttp` to disable non-TCB accesses to confidential memory.)
+M-mode CSR `mmpt` to disable non-TCB accesses to confidential memory.)
 * MRET to resume execution in OS/VMM at mepc set to THCS.hssa.pc
 (THCS.hssa.pc adjusted to refer to opcode after the ECALL that triggered
 the TEECALL / TEERESUME)
@@ -479,7 +479,7 @@ For the deployment model 1, the CPU must also similarly enforce
 access-control of TSM memory to prevent access from host supervisor
 domain components (VMM and host OS that operate in V=0, HS-mode) software.
 In this deployment model, other supervisor domains have access to 1st
-and G-stage paging hardware the root security manager (TSM-driver) must use MTT
+and G-stage paging hardware the root security manager (TSM-driver) must use MPT
 to isolate supervisor domain memory. In this deployment model,
 TEE and TVM address spaces are identified by supervisor domain identifiers
 (SDIDs) to maintain the isolation during access and in internal
@@ -488,9 +488,9 @@ SDID in addition to the ASID, VMID for workloads in the Confidential supervisor
 domain. TVM memory isolation must support sparse memory management
 models and architectural page-sizes of 4 KiB, 64 KiB (with Svnapot), 2 MiB, 1 GiB (and
 optionally 512 GiB).
-The hardware may implement the MTT as specified in the Smmtt
+The hardware may implement the MPT as specified in the Smmpt
 privileged ISA extension, or other approaches may be used such as a flat
-table. The memory tracking table may be enforced at the memory controller,
+table. The memory protection table may be enforced at the memory controller,
 or in a page table walker.
 
 *b)* *Isolation against physical/out-of-band access* - The platform TCB may
@@ -510,8 +510,8 @@ address translation table (hgatp). The TSM must track memory assignment of
 TVMs (by the untrusted OS/VMM) to ensure memory assignment is
 non-overlapping, along with additional security requirements. The security
 requirements/invariants for enforcement of the memory
-access-control for memory assigned to the TVMs is described in <<TVM Memory
-management>>.
+access-control for memory assigned to the TVMs is described in 
+<<TVM memory management>>.
 
 === TVM Execution
 
