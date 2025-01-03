@@ -152,7 +152,7 @@ permitted as per the active permissions enforced by the memory management unit
 Smmtt for CoVE). This per-hart execution context is used by the processor to
 enforce access-control properties on memory accessed by TEE workloads managed by
 the TSM. The details of the supervisor domain access protection is specified in
-this specification <<RVISD>>.
+the Smmpt specification <<RVISD>>.
 
 TSM functionality should be explicitly limited to support only the security
 primitives to ensure that the OS/VMM and non-confidential VMs do not violate
