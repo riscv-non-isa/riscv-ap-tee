@@ -788,7 +788,7 @@ scheme with SHA-512, e.g. Ed25519.
 
 [NOTE]
 ====
-The COSE_Sign structure might include signatures generated with the
+The COSE_Sign structure might include signatures generated with both the
 Edwards-curve Digital Signature Algorithm (EdDSA) <<RFC8032>> and the Elliptic
 Curve Digital Signature Algorithm (ECDSA) <<DSS>>. This allows recipients to
 verify the signature associated with one algorithm or the other. More detailed

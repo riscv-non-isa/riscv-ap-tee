@@ -10,8 +10,8 @@ https://datatracker.ietf.org/doc/rfc9334/
 * [[[DICE,3]]] TCG DICE Attestation Architecture, Version 1.00 Revision 0.23
 https://trustedcomputinggroup.org/resource/dice-attestation-architecture/
 
-* [[[SPDM,4]]] DMTF DSP0274 Security Protocol and Data Model (SPDM) Specification, Version 1.2.1
-https://www.dmtf.org/dsp/DSP0274
+* [[[SPDM,4]]] DMTF DSP0274 Security Protocol and Data Model (SPDM) Specification, Version 1.2.3
+https://www.dmtf.org/sites/default/files/standards/documents/DSP0274_1.2.3.pdf
 
 * [[[SBI,5]]] RISC-V Supervisor Binary Interface
 https://github.com/riscv-non-isa/riscv-sbi-doc[riscv-non-isa/riscv-sbi-doc]
@@ -67,8 +67,8 @@ https://github.com/riscv-non-isa/riscv-security-model/releases/download/v1.0/ris
 * [[[RVICOVEIO,22]]] RISC-V CoVE-IO
 https://github.com/riscv-non-isa/riscv-ap-tee-io/releases/download/v0.1.0/riscv-cove-io.pdf
 
-* [[[UEFI, 23]]] Unified Extensible Firmware Interface (UEFI) Specification v2.1
-https://uefi.org/specs/UEFI/2.10/index.html
+* [[[UEFI, 23]]] Unified Extensible Firmware Interface (UEFI) Specification v2.11
+https://uefi.org/specs/UEFI/2.11/index.html
 
 * [[[RFC8032,24]]] IETF RFC 8032 Edwards-Curve Digital Signature Algorithm (EdDSA)
 https://datatracker.ietf.org/doc/rfc8032/
