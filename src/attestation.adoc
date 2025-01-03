@@ -170,7 +170,7 @@ The TVM measurement extension interface is exposed through the optional COVG-ABI
 [NOTE]
 ====
 If an implementation uses UEFI firmware to initialize the CoVE TVM guest
-environment, then refer to UEFI specification <<R23>> chapter 38 on confidential
+environment, then refer to UEFI specification <<UEFI>> Ch.38 on confidential
 computing for UEFI ABI related to runtime measurement extension and
 event log creation.
 ====
@@ -187,7 +187,7 @@ In this section, we describe the high level model of remote attestation for CoVE
 
 ==== Model
 
-The CoVE attestation model follows the IETF RATS <<R1>> Remote Attestation
+The CoVE attestation model follows the IETF RATS <<RATS>> Remote Attestation
 architecture. CoVE implementations perform the RATS Attester role, and each CoVE
 TCB component participates to the generation of a layered Attestation Evidence
 composed of TCB specific Claims. Moreover, the generated CoVE Evidence freshness
@@ -197,7 +197,7 @@ Set. This is enforced by the `sbi_covg_get_evidence` intrinsic signature.
 In Remote Attestation, the Attester produces information about itself
 (Evidence) to enable a remote peer (the Relying Party) to decide whether to
 consider that Attester a trustworthy peer or not.
-The Verifier authenticates the Evidence with Endorser provided trust anchors
+The Verifier authenticates the Evidence with Endorser-provided trust anchors
 (Endorsements), compares it against Reference Values and appraises it via
 appraisal policies. It eventually creates Attestation Results to support
 Relying Parties in their decision process.
@@ -327,10 +327,10 @@ measurement to support the CoVE layered RTMs attestation of CoVE workloads.
 
 The CoVE Attestation Evidence uses the IETF Entity Attestation Token (<<EAT>>),
 formatted as an untagged, unprotected Concise Binary Object Representation
-(<<CBOR>>) Web Token (<<UCCS>>). A CoVE EAT profile is proposed to narrow the
+(<<CBOR>>) Web Token (<<CWT>>, <<UCCS>>). A CoVE EAT profile is proposed to narrow the
 EAT specification for the CoVE use case to enable interoperability.
 
-The UCCS (Unprotected CWT Claims Set) is composed of one EAT submodule Claims-Set 
+The UCCS (Unprotected CWT Claims Set) is composed of one EAT submodule Claims-Set
 map where the map values are attestation tokens for the TVM, TSM and Platform Claims.
 
 The TVM EAT is a CWT tagged CBOR formatted token, wrapped with a
@@ -785,6 +785,16 @@ CBOR formatted CoVE Attestation certificates are COSE_Sign1 protected CWTs,
 signed with the TSM attestation key. The algorithm used to sign the certificate
 is described by the COSE_Sign1 envelope. It is recommended to use an EdDSA
 scheme with SHA-512, e.g. Ed25519.
+
+[NOTE]
+====
+The COSE_Sign structure might include signatures generated with both the
+Edwards-curve Digital Signature Algorithm (EdDSA) <<RFC8032>> and the Elliptic
+Curve Digital Signature Algorithm (ECDSA) <<DSS>>. This allows recipients to
+verify the signature associated with one algorithm or the other. More detailed
+information on multiple signature evaluations can be found in IETF RFC 5752
+<<RFC5752>>.
+====
 
 The CBOR certificate COSE_Sign1 payload is a CWT which claim set is composed of
 the CoVE evidence token and 2 additional claims:

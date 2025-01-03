@@ -32,7 +32,7 @@ specification. The underlying memory isolation mechanism for supervisor domains
 (Smmtt) is agnostic of the number of supervisor domains. On processors that do
 not support multiple supervisor domains where Smmtt is not mandated, a single
 confidential  supervisor domain and a single hosting supervisor domain can be
-supported using other hardware memory isolation techniques like PMP 
+supported using other hardware memory isolation techniques like PMP
 (for example <<dep3>>, other deployment models are also possible).
 
 [id=dep1]
@@ -92,7 +92,7 @@ hart. The TSM itself operates in HS-mode (priv=01; V=0) of the hart and enables
 the OS/VMM (also in HS-mode) to create TVMs, assign resources to TVMs, manage,
 execute and destroy a TVM - _this specification aims to describe the TEEI and
 TSM interfaces_. By using the Hypervisor extension of the RISC-V privileged
-specification <<R0>>, this specification minimizes ISA changes to introduce
+specification <<PRIVISA>>, this specification minimizes ISA changes to introduce
 a scalable architecture for hosting TEE workloads. More than one confidential
 supervisor domain may be hosted by the TSM-driver. Similarly, more than one
 TVM may be hosted by the host OS/VMM via confidential supervisor domains.
@@ -152,7 +152,7 @@ permitted as per the active permissions enforced by the memory management unit
 Smmtt for CoVE). This per-hart execution context is used by the processor to
 enforce access-control properties on memory accessed by TEE workloads managed by
 the TSM. The details of the supervisor domain access protection is specified in
-the Smmtt specification <<R20>>.
+the Smmpt specification <<RVISD>>.
 
 TSM functionality should be explicitly limited to support only the security
 primitives to ensure that the OS/VMM and non-confidential VMs do not violate

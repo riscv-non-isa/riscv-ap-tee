@@ -116,7 +116,7 @@ to cause IPIs to the virtual-harts managed by the TVM OS (and verified by
 the TVM OS to ensure the IPIs are received by the TVM OS to invalidate the
 TLB lazily).
 
-For implementations using AIA <<R9>>, this reference architecture requires
+For implementations using AIA <<RVIAIA>>, this reference architecture requires
 use of AIA IMSIC to ensure these IPIs are delivered through the IMSIC associated
 with the guest TVM. Each TVM is allocated a guest interrupt file during TVM
 initialization.

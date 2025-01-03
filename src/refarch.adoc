@@ -215,7 +215,7 @@ scrubbing memory when being assigned to a TVM.
 === TSM initialization
 
 The CoVE architecture requires a hardware root-of-trust (RoT) for supporting
-TCB measurement, reporting and storage <<R8>>. The root-of-trust for
+TCB measurement, reporting and storage <<TCGG>>. The root-of-trust for
 measurement (RTM) is defined as the TCB component that performs a
 measurement of an entity and cryptographically signs it as attestation
 evidence subsequently reported to a relying party. The
@@ -349,7 +349,7 @@ TSM-driver*
 
 * If trap is a synchronous trap due to TEECALL/ TEERESUME then activate
 confidential supervisor domain for the hart via M-mode `mmpt` CSR (See
-Supervisor Domains specification <<R20>> for CSR definition)
+Supervisor Domains specification <<RVISD>> for CSR definition)
 * Locate the per-hart THCS (located within TSM-driver memory data region)
 * Save operating VMM csr context into the THCS.hssa (Hart Supervisor State
 Area) fields: sstatus, stvec, scounteren, sscratch, satp (and other x
@@ -387,7 +387,7 @@ any v/f register state must be restored by the caller.
 * TSM-driver passes TSM/TVM-specified register contents to the OS/VMM to
 return status from TEERET (TSM sets a0, a1 registers always - other
 registers may be selected by the TVM)
-* Enable hosting supervisor domain on hart (via Superisor Domains <<R20>>
+* Enable hosting supervisor domain on hart (via Superisor Domains <<RVISD>>
 M-mode CSR `mmpt` to disable non-TCB accesses to confidential memory.)
 * MRET to resume execution in OS/VMM at mepc set to THCS.hssa.pc
 (THCS.hssa.pc adjusted to refer to opcode after the ECALL that triggered
@@ -551,7 +551,7 @@ In order to support probe-mode debugging of the TSM, the RoT must support
 an authorized debug of the platform. The authentication mechanism used for
 debug authorization is implementation-specific, but must support the
 security properties described in Section 3.12 of the RISC-V Debug
-Support specification version 1.0.0-STABLE <<R6>>. The RoT may support
+Support specification version 1.0.0-STABLE <<RVIDBG>>. The RoT may support
 multiple levels of debug authorization depending on access granted. For
 probe-based debugging of the hardware, the RoT performing debug
 authentication must ensure that separate attestation keys are used for TCB

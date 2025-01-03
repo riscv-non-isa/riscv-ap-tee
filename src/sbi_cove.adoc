@@ -198,7 +198,7 @@ Host needs access to some of the TVM CSRs and GPRs to handle TVM exits. For
 example, the host needs `htval` to determine the fault address, `a0`-`a7` GPRs
 to handle forwarded ECALLs and so on. For this purpose, the host and
 TSM use the Nested Acceleration (NACL) extension based shared memory interface
-<<R10>>, from now on called NACL shared memory to avoid confusion with shared
+<<RVINACL>>, from now on called NACL shared memory to avoid confusion with shared
 memory pages between TVM and the host.
 
 The NACL shared memory interface is between TSM and the host and TSM is
