@@ -1,3 +1,5 @@
+:imagesdir: ./images
+
 [[appendix_c]]
 == Appendix C: Nested virtualization based deployment model
 
