@@ -1,3 +1,5 @@
+:imagesdir: ./images
+
 [[appendix_d]]
 == Appendix D: M-mode TSM based deployment model
 
