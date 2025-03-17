@@ -761,7 +761,7 @@ checking that the bit `i` is set.
 
 [source, C]
 ------
-enum tsm_state {
+enum tsm_state : uint32_t {
     /* TSM has not been loaded on this platform. */
     TSM_NOT_LOADED = 0,
     /* TSM has been loaded, but has not yet been initialized. */
@@ -780,11 +780,11 @@ enum tsm_state {
 
 struct tsm_info {
     /*
-     * The current state of the TSM (see `tsm_state` enum above).
+     * The current state of the TSM.
      * If the state is not `TSM_READY`, the remaining fields are invalid and
      * will be initialized to `0`.
      */
-    uint32_t tsm_state;
+    enum tsm_state tsm_state;
     /*
      * Identifier of the TSM implementation, see `Reserved TSM Implementation IDs`
      * table below. This identifier is intended to distinguish among different TSM
@@ -2239,7 +2239,7 @@ Both `tvm_cap_addr` and `caps_size` must be page aligned.
 
 [source, C]
 -------
-enum HashAlgorithm {
+enum HashAlgorithm : uint32_t {
     /* SHA-384 */
     Sha_384,
     /* SHA-512 */
@@ -2285,7 +2285,7 @@ struct AttestationCapabilities {
     MeasurementRegisterDescriptor[MAX_MEASUREMENT_REGISTERS] msmt_regs;
 };
 
-enum MeasurementType {
+enum MeasurementType : uint32_t {
      /* Initial measurement */
      Initial,
 
@@ -2304,7 +2304,7 @@ struct MeasurementRegisterDescriptor {
        enum HashAlgorithm hash_algorithm;
 
        /* Initial or runtime measurement register */
-       enum MeasurementType  measurement_type;
+       enum MeasurementType measurement_type;
 
        /*
         * This is the TCG PCR index this measurement maps to, such as [0~16,23]
