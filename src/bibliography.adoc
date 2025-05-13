@@ -32,7 +32,7 @@ https://github.com/riscv/riscv-aia/releases[https://github.com/riscv/riscv-aia/r
 https://github.com/riscv-non-isa/riscv-sbi-doc/releases/download/v2.0-rc8/riscv-sbi.pdf
 
 * [[[EAT,11]]] IETF Entity Attestation Token (EAT)
-https://github.com/ietf-rats-wg/eat[https://github.com/ietf-rats-wg/eat]
+https://datatracker.ietf.org/doc/rfc9711/[https://datatracker.ietf.org/doc/rfc9711/]
 
 * [[[CBOR,12]]] Concise Binary Object Representation
 https://datatracker.ietf.org/doc/rfc8949/[https://datatracker.ietf.org/doc/rfc8949/
