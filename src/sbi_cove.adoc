@@ -1146,9 +1146,9 @@ The `tap_addr` is the 8-bytes aligned guest physical address of the
 For VMs that do not require local attestation (only the remote attestation),
 `tap_addr` must be set to `0`.
 The `entry_sepc` is the address at which the vCPU execution will resume.
-`tvm_identity_addr` is an optional, when set, it points to a 64-bytes buffer
-containing a host-defined TVM identity, see `sbi_covh_finalize_tvm()` for more
-details.
+`tvm_identity_addr` is an optional, when set, it points to a 8-byte aligned,
+64-bytes buffer containing a host-defined TVM identity,
+see `sbi_covh_finalize_tvm()` for more details.
 
 The VM should be promoted as early in the boot process as possible to minimize
 changes in memory contents so that the resulting integrity measurement hashes
