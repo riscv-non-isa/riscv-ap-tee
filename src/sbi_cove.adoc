@@ -94,30 +94,37 @@ the current status of the TSM. The TSM must be in `TSM_READY` in order to
 process further ECALLs.
 
 ===== TVM creation
-A TVM might be created in two ways:
-(1) the OS/VMM requests the TSM to promote an existing VM to a TVM using a
-single COVH call,
-(2) the OS/VMM assembles a TVM under the TSM's supervision in a sequence of
+A TVM might be created in two ways. A CoVE implementation must support at least
+one of them.
+(1) The OS/VMM requests the TSM to promote an existing VM to a TVM using a
+single COVH call.
+(2) The OS/VMM assembles a TVM under the TSM's supervision in a sequence of
 COVH calls.
 
-To promote a non-confidential VM to a TVM, the OS/VMM invokes the
-`sbi_covh_promote_to_tvm()`, presenting the VM's state (the CPU state, VM's
-data, page tables) to the TSM. The TSM then measures and then copies the entire
-VM's state into confidential memory. This is performed as a single operation
-after which the newly created TVM is in the `TVM_RUNNABLE` state.
-
-[NOTE]
-====
-Creating a TVM in a single step reduces the number of ABI calls, thus simplifies
-the TSM and OS/VMM implementation. However, it will block the CPU for the
-duration of the TVM creation.
-====
+In the first approach, the OS/VMM promotes an existing non-confidential VM to a
+TVM by invoking the `sbi_covh_promote_to_tvm()` call. As a response to this call,
+the TSM copies the entire VM's state into confidential memory. This is performed
+as a single operation after which the newly created TVM is in the `TVM_RUNNABLE`
+state.
 
 In the second approach, VMM assembles the TVM in a sequence of calls to TSM. The
 first call is `sbi_covh_create_tvm()` that creates a TVM in `TVM_INITIALIZING`
 state. With subsequent calls to TSM, VMM requests assignment of confidential
 memory for page tables, payload mapping, and vCPUs. The last call transitions
 TVM into the `TVM_RUNNABLE` state.
+
+[NOTE]
+====
+Compared to the multi-step TVM creation, the single step TVM creation minimizes
+the number of ABI calls that the TSM and OS/VMM must implement. The TSM
+remains also responsible for making allocation decisions for G-stage page tables.
+====
+
+[NOTE]
+====
+The single step TVM creation reduces also the number ABI calls invocations, but
+it blocks the CPU for the entire duration of the TVM instantiation.
+====
 
 ===== TVM memory management
 The host is responsible for the following memory management functions:
@@ -1149,11 +1156,12 @@ are deterministic. The VM must not use registers associated with RISC-V
 extensions, e.g., vector, floating point, before promotion, because these
 registers will be zeroized during the promotion.
 
-The TSM recreates TVM vCPUs in confidential memory. All TVM vCPUs are in the
-reset state, except the TVM Boot vCPU, which is the state of the reflected VM's
-vCPU. This VM's vCPU state is reflected using NACL shared memory. The TSM
-recreates in confidential memory the reflected VM's data and the VM's page
-tables, following the page table configuration defined in HGATP.
+The TVM vCPUs are recreated in confidential memory. The TSM reads the number of
+vCPUs from the FDT and sets all TVM vCPUs but the TVM's boot vCPU to reset state.
+The TVM's boot vCPU state is reflected in NACL shared memory and its program
+counter value in the `entry_sepc` call's argument. The TSM recreates in
+confidential memory the reflected VM's data and the VM's page tables, following
+the page table configuration defined in HGATP.
 
 Once the TVM's image is completed, the TSM calculates the TVM measurement.
 If `tap_addr` is defined, the TSM uses this TVM measurement to authenticate and
@@ -2438,7 +2446,7 @@ creation via `sbi_covh_promote_to_tvm()`. Only the TVMs that were correctly
 authenticated and authorized during local attestation can receive the secret
 embedded in TAP.
 
-`buf_addr` is the 4 KiB-aligned address in the TVM address space to which the
+`buf_addr` is the 8B-aligned address in the TVM address space to which the
 TSM will write the secret.
 `buf_size` is the length of the buffer. The buffer cannot be larger than the
 4 KiB page size.
@@ -2806,4 +2814,3 @@ state save and restore of the performance monitoring inhibit and trigger
 controls). The specification of this interface is TBD.
 
 |===
-
