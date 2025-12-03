@@ -965,45 +965,52 @@ key is encrypted inside lockboxes.
 [title= "TAP Format in CDDL"]
 [source,cddl]
 ----
+tap-header = bytes .size 10                           ; Semantic structure applied externally (non-CBOR)
 
 tap-confidential-sections = {
-   tap-measurements: tap-measurements,
-   tap-attributes: tap-attributes,
-   tap-secrets: tap-secrets
+   0 => tap-measurements,
+   1 => tap-attributes,
+   2 => tap-secrets
 }
 
-tap = {
-   tap-header: tap-header,
-   tap-lockboxes: tap-lockboxes,
-   tap-confidential-sections: COSE_Encrypt1
-}
+tap-confidential-sections-encrypted = COSE_Encrypt1   ; The plaintext is defined as tap-confidential-sections
+
+tap = (
+   tap-header,
+   tap-lockboxes,
+   tap-confidential-sections-encrypted
+)
 ----
 
 ===== Header
 The header section carries information about the size, version, and encoding
 of the TAP that are used by a parser to interpret the binary representation of
-the TAP. The version field allows future extensions of the TAP format while
+the TAP. The header must be always 4B aligned, 10 bytes long, and be serialized
+in a binary format.
+
+The version field allows future extensions of the TAP format while
 preserving backward compatibility. The `encoding` field enables use of
 implementation-specific encoding format, for example binary, concise binary object
 representation (CBOR), or JavaScript object notation (JSON).
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
-[title= "TAP Header Format in CDDL"]
-[source,cddl]
+[title= "TAP Header Format (binary)"]
+[source]
 ----
-tap-header-version = 0 / int .ge 0 .le 65535
+version = 0                          ; Reserved
+         / 1                         ; Version 1
+         / int .ge 2 .le 255         ; Reserved
 
-tap-header-encoding = (
-   binary: 0
-   cbor: 1,
-) / int .ge 0 .le 65535
+encoding = 0                         ; Binary format
+         / 1                         ; CBOR format
+         / int .ge 2 .le 255         ; Reserved
 
-tap-header = {
-    magic: h'ACE0ACE0',       ; 4-byte constant
-    tap-header-size: int .ge 8 .le 65535,
-    tap-header-version: tap-header-version,
-    tap-header-encoding: tap-header-encoding
-}
+Offset | Size | Field
+-------+-------+---------------------
+0      | 4     | magic constant (ACE0ACE0)
+4      | 4     | size (uint32 little-endian)
+8      | 1     | version (0–255)
+9      | 1     | encoding (0–255)
 ----
 
 ===== Lockboxes
@@ -1027,8 +1034,8 @@ tap-lockbox-name = bstr
 tap-lockbox-value = COSE_Sign1
 
 tap-lockbox = {
-   tap-lockbox-name          ; Platform identifier, e.g., fingerprint
-   tap-lockbox-value         ; Encrypted TSK
+   0 => tap-lockbox-name                  ; Platform identifier, e.g., fingerprint
+   1 => tap-lockbox-value                 ; Encrypted TSK
 }
 
 tap-lockboxes = [
@@ -1039,30 +1046,80 @@ tap-lockboxes = [
 ===== Measurements
 The measurements sections contains the TVM reference integrity measurements.
 In order to expose secrets to a TVM, the TSM must verify that the TVM's
-integrity matches all defined reference measurements for a TSM-selected
-algorithm. If the `attributes` section is not empty, then the TSM must
-additionally verify all attributes before releasing the key.
+integrity matches all defined reference measurements for an algorithm selected
+by the TSM. If the `attributes` section is not empty, then the TSM must
+additionally verify all attributes before releasing a secret.
+
+Typically, the value stored in a measurement register represents the result of
+aggregation of multiple integrity measurements combined using a cryptographic
+hash function. Different standards specify what intermediate integrity
+measurements and in which
+order are applied to produce the final value. The tap-measurement-profile
+field allows a TVM creator to distinguish between these standards.
+A CoVE implementation must support at least one of these standards and the TSM
+must ensure that all measurements of supported standards match the reference
+values.
+
+The tap-measurement-layer field allows a TVM creator to specify reference
+measurements for different layers of software on the platform to distinguish
+between measurement registers corresponding to virtualized and non-virtualized
+environments. The TSM must ensure that the integrity of every layer defined in
+the TAP matches the reference values.
+
+[NOTE]
+====
+One of the use cases for introducing the tap-measurement-layer field is to
+additionally constrain the TVM's execution to platform running expected OS/VMM.
+A TVM owner can define reference integrity measurements for the non-virtualized
+(OS/VMM) layer and virtualized (TVM) layer. A CoVE implementation might, for
+example, use then measured boot and a TPM to store integrity measurement of OS/VMM
+and a vTPM to store integrity measurements of a TVM. The layer field provides
+a way to distinguish between these measurements.
+====
 
 [caption="Figure {counter:image}: ", reftext="Figure {image}"]
 [title= "TAP Measurements Format in CDDL"]
 [source,cddl]
 ----
-tap-measurement-pcr-id = int
+tap-measurement-id = (
+   (0..23)   /                            ; Register's identifier
+   (24..255)                              ; Reserved
+)
 
-tap-measurement-algorithm = 1 / 2 / 3 ; 1=sha256, 2=sha384, 3=sha512
+tap-measurement-layer = (
+   0         /                            ; virtualized (TVM)
+   1         /                            ; non-virtualized (OS/VMM)
+   (2..255)                               ; Reserved to support nested virtualization
+)
+
+tap-measurement-profile = (
+   0         /                            ; CoVE implementation-specific profile
+   1         /                            ; TCG PC Client Platform Firmware Profile Specification, Level 00 Version 1.06 Revision 52 Family 2.0
+   (2..255)                               ; Reserved
+)
+
+tap-measurement-algorithm = int           ; See https://www.iana.org/assignments/cose/cose.xhtml
 
 tap-measurement-value = bstr
 
 tap-measurement = {
-   tap-measurement-pcr-id        ; Measurement register index
-   tap-measurement-algorithm     ; Hash algorithm identifier
-   tap-measurement-value         ; Measurement value
+   0 => tap-measurement-id                ; Measurement register index
+   1 => tap-measurement-layer             ; Measurement layer
+   1 => tap-measurement-profile           ; Measurement profile
+   2 => tap-measurement-algorithm         ; Hash algorithm identifier
+   3 => tap-measurement-value             ; Measurement value
 }
 
 tap-measurements = [
    * tap-measurement
 ]
 ----
+
+[NOTE]
+====
+To allow use cases where, for example, secrets are provided to any TVM executing
+on a platform, the TAP format allows the measurements section to be empty.
+====
 
 ===== Attributes
 The attributes section contains a set of rules that define the conditions
@@ -1076,32 +1133,42 @@ verification.
 [title= "TAP Attributes Format in CDDL"]
 [source,cddl]
 ----
-tap-attribute-key = int {
-   0 => hardware_serial_number,      ; A unique number identifying hardware
-   1 => firmware_build_time,         ; Time at which the firmware was built
-   2 => license_expiration,          ; Time at which the license expires
-   3 => bios_version,                ; BIOS/UEFI version string
-   4 => secure_boot_enabled,         ; Boolean (1=true, 0=false)
-   5 => tcb_version,                 ; Trusted Computing Base version
-   6 => enclave_debug_allowed,       ; Boolean, e.g., SGX/TDX
-   7 => max_allowed_uptime           ; Maximum platform uptime in seconds
-}
+hardware_serial_number = 0               ; Unique number identifying hardware
+firmware_build_time = 1                  ; Firmware build timestamp
+firmware_version = 2                     ; BIOS/UEFI version string
+tcb_svn = 3                              ; TCB's Secure Version Number (SVN)
+secure_boot_enabled = 4                  ; Boolean (1=true, 0=false)
+platform_debug_enabled = 5               ; Boolean (1=true, 0=false)
+tvm_debug_enabled = 6                    ; Boolean (1=true, 0=false)
+max_allowed_uptime = 7                   ; Maximum platform uptime in seconds
+license_expiration = 8                   ; License expiration timestamp
 
-tap-attribute-operand = int {
-   0 => eq,
-   1 => ne,
-   2 => gt,
-   3 => lt,
-   4 => ge,
-   5 => le
-}
+tap-attribute-key = hardware_serial_number
+                  / firmware_build_time
+                  / firmware_version
+                  / tcb_svn
+                  / secure_boot_enabled
+                  / platform_debug_enabled
+                  / tvm_debug_enabled
+                  / max_allowed_uptime
+                  / license_expiration
+                  / int .ge 9 .le 65535  ; Reserved range
+
+eq = 0
+ne = 1
+gt = 2
+lt = 3
+ge = 4
+le = 5
+
+tap-attribute-operand = eq / ne / gt / lt / ge / le
 
 tap-attribute-value = bstr
 
-tap-attribute-entry = {
-   tap-attribute-operand    ; An operand to define how to compare the values
-   tap-attribute-value      ; The value of the property
-}
+tap-attribute-entry = (
+   tap-attribute-operand                 ; An operand to define how to compare the values
+   tap-attribute-value                   ; The value of the property
+)
 
 tap-attributes = {
    * tap-attribute-key => tap-attribute-entry
