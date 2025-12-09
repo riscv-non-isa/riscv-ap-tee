@@ -1,7 +1,7 @@
 :imagesdir: ./images
 
 [[overview]]
-== Architecture Overview and Threat Model
+== Architecture Overview
 
 Virtualization platforms are typically comprised of several components including
 platform firmware, host OS, VMM, and the actual workload (typically in a VM)
