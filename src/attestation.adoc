@@ -41,8 +41,8 @@ M_{extended} = H_{alg}(M_{current} || NewData)
 ++++
 
 Measurements must be stored in integrity protected measurement registers,
-either in the Hardware RoT of Measurement (RoTM) or in the TSM when it acts as
-an extended RoTM.
+either in the Hardware RoT for Measurement (RTM) or in the TSM when it acts as
+an extended RTM.
 
 In order to verify a workload environment trustworthiness, the remote
 attestation service must be able to compare the CoVE TCB measurements with a
@@ -107,9 +107,9 @@ initial measurement registers cover platform, TSM & TVM specific TCB element
 measurements.
 
 Since they hold TCB elements measurements bound to the platform lifetime, the
-platform/TSM measurement registers may be stored in the hardware RoTM. The TVM
+platform/TSM measurement registers may be stored in the hardware RTM. The TVM
 measurements must be maintained in TSM confidential memory with TVM-bound
-lifecycle, effectively making the TSM an extended RoTM for the TVM.
+lifecycle, effectively making the TSM an extended RTM for the TVM.
 
 The initial TCB measurement mechanism and storage layout is
 implementation-specific. One such possible layout, based on a 6 initial
@@ -179,7 +179,7 @@ event log creation.
 
 === Remote Attestation
 
-All above described TCB elements measurements are added to a remote attestation
+All above described TCB elements measurements are added to an attestation
 evidence and then reported to relying parties. The remote attestation mechanism
 and protocol that take place between the attester (i.e., the TVM) and the
 remote attestation service are out of the scope of this document.
