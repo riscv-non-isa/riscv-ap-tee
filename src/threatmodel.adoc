@@ -449,7 +449,8 @@ data, e.g., via shared caches, branch predictor poisoning, page-faults.
 | Attacker can extract TVM data via various side-channel leakage methods
 
 6+^| **Description**
-6+a| A privileged host software component directly accesses CPU state that is
+6+a| A privileged host software component directly accesses CPU state or memory that is
+     exclusively assigned to a TVM or generally to another supervisor
      domain.
 
 6+^| **Mitigations**
