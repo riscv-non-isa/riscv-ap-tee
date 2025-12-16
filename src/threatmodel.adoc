@@ -547,7 +547,7 @@ dictionary attack on TCB components to extract confidential data.
      cpu state by using RISC-V privileged ISA privilege levels (M, S, HS, U) and
      must enforce cipher text read prevention using Sv (MMU), PMP, Smmpt to
      prevent non-TCB components from accessing encrypted TEE memory +
-     See reference TEE.fail [Ref]
+     See reference TEE.fail [[Ref](https://tee.fail/)]
 |===
 
 ==== CoVE-T015 - Tamper of TVM state during TVM Migration
