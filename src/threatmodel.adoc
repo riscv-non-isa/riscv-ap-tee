@@ -491,8 +491,8 @@ other shared resources, e.g., via prime/probe, flush/reload approaches.
   shared HW resources
 
 6+^| **Description**
-6+a| A privileged host software component directly accesses CPU state that is
-     domain.
+6+a| A privileged host software component indirectly accesses CPU state that
+        contains confidential data for another domain or another TVM.
 
 6+^| **Mitigations**
 6+a| The RDSM must prevent untrusted host software from accessing confidential
