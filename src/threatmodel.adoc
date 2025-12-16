@@ -248,7 +248,7 @@ registers, CSRs, mode switches via adversaries using physical attacks.
 
 | Asset | Threat | Adversary | Requirement | Scope | Result
 
-| TVM exection state
+| TVM execution state
 | Tamper/Integrity
 | Privileged host software
 | Execution State integrity
