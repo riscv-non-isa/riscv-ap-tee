@@ -655,7 +655,9 @@ consume stale/invalid data).
   confidential memory via stale address translation entries.
 
 6+^| **Description**
-6+a| A privileged host software component directly accesses CPU state that is
+
+6+a| A privileged host software component directly accesses CPU state or memory that is
+     exclusively assigned to a TVM or generally to another supervisor
      domain.
 
 6+^| **Mitigations**
