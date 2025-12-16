@@ -696,7 +696,7 @@ debug mode accessible information.
      domain.
 
 6+^| **Mitigations**
-6+a| The RDSM must enforce context switch of perf. mon. counters for supervisor
+6+a| The RDSM must enforce context switch of performance monitoring state for supervisor
      domains to ensure TEEs get correct PMU info and prevent data leakage due
      to PMU information (fingerprint attacks) +
      The RoT must enforce that any intrusive debug or trace is enabled via the
