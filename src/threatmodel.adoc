@@ -156,7 +156,7 @@ row-hammer attacks on memory.
 
 6+^| **Description**
 6+a| A privileged host software component directly accesses non-confidential
-     memory adjoining confidential memory to exercise row-hammer attacks. +
+     memory adjoining confidential memory to exercise [RowHammer](https://en.wikipedia.org/wiki/Row_hammer) attacks. +
      A TVM uses row-hammer to target another TVMs or ordinary VMs memory via
      row-hammer approaches.
 
