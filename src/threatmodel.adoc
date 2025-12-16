@@ -718,13 +718,13 @@ or on other TVMs or ordinary VM workloads.
 
 | Asset | Threat | Adversary | Requirement | Scope | Result
 
-| TVM
-| Disclosure
-| Privileged host software
-| Execution State confidentiality
+| Platform Services
+| Denial of service
+| Deprivileged TVM 
+| Host Denial of service
 | In scope
-| Host-controlled (logical or physical) component reads TVM
-  confidential execution state
+| Logical or physical component controlled by the TVM
+  causes denial of service of the platform.
 
 6+^| **Description**
 6+a| A privileged host software component directly accesses CPU state that is
