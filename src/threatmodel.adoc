@@ -428,7 +428,7 @@ to a TVM must enforce similar properties as the TEE hosted on the platform.
      programming the IO-MPT to associate the device with the IOMMU and SDID. +
      The TSM must enforce that the device page tables prevent untrusted TVMs
      from accessing TVM confidential memory. +
-     Please refer to CoVE-IO [Ref] for a detailed threat model for devices
+     Please refer to <<RVICOVEIO>> for a detailed threat model for devices
      assigned to a TVMs.
 |===
 
