@@ -502,10 +502,11 @@ tagging/ partitioning/ flushing techniques to address those types of side
 channels due to temporal/spatial shared resources
 
 Control channels, single-step/zero-step attacks
-* Leverage hardware/software TCB mechanisms to enforce restrictions on
+
+- Leverage hardware/software TCB mechanisms to enforce restrictions on
 single-stepping or zero-stepping via use of state flushing/barriers, entropy
 defenses and detection mechanisms.
-* Prevent interrupt/exception injection
+- Prevent interrupt/exception injection
 (combined with cache side channel to leak sensitive data)
 
 Architectural cache side channel
