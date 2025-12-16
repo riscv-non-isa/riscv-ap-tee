@@ -510,6 +510,7 @@ defenses and detection mechanisms.
 (combined with cache side channel to leak sensitive data)
 
 Architectural cache side channel
+
 cache partitioning-based defenses; Prevent shared resource contention,
 e.g., attacks such as prime probe
 
