@@ -692,8 +692,8 @@ debug mode accessible information.
   confidential execution state
 
 6+^| **Description**
-6+a| A privileged host software component directly accesses CPU state that is
-     domain.
+6+a| A privileged host software component leaks TVM confidential data via
+        use of performance monitoring or debug mechanisms as a side-channel. 
 
 6+^| **Mitigations**
 6+a| The RDSM must enforce context switch of performance monitoring state for supervisor
