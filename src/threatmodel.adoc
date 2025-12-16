@@ -515,6 +515,7 @@ cache partitioning-based defenses; Prevent shared resource contention,
 e.g., attacks such as prime probe
 
 Architectural timing side channel
+
 Data independent execution latency (DIEL) operations, uArch state flushing;
 Leveraging data dependency timing channels
 |===
