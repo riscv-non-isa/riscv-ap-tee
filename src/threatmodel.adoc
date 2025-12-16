@@ -456,17 +456,18 @@ data, e.g., via shared caches, branch predictor poisoning, page-faults.
 6+^| **Mitigations**
 6+a| The RDSM must prevent untrusted host software from accessing confidential
      cpu state by using RISC-V privileged ISA privilege levels (M, S, HS, U).
-Transient-execution attack (TEA) side channels
-* Bounds check bypass TEA and variants - should be
+Transient-execution attack (TEA) side channels:
+
+- Bounds check bypass TEA and variants - should be
 addressed by TVM software using apropos synchronization. Software TCB should use
 synchronization to isolate TCB code from non-TCB code.
-* Branch target injection TEA and variants - should be addressed by software TCB
+- Branch target injection TEA and variants - should be addressed by software TCB
 via flushing across privilege boundaries to remove untrusted state injected by
 non-TCB software
-* Speculative store bypass TEA and variants- should be addressed by TCB hardware
+- Speculative store bypass TEA and variants- should be addressed by TCB hardware
 via synchronization/barriers to prevent speculative execution of memory reads
-which may allow unauthorized disclosure of information.
-* Implementations should mitigate attacks such as these spectre variants (In
+which may allow unauthorized disclosure of information. 
+- Implementations should mitigate attacks such as these spectre variants (In
 practice, it is difficult to defend against such attacks in advance)
 
 |===
