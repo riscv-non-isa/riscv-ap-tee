@@ -234,8 +234,6 @@ adversaries using physical attacks.
      /cold-boot attacks. Per implementations, each TVM may also have one or more
      unique keys, however additional considerations must be taken into account
      to address integrity and replay attacks. +
-     Also see related requirements around ciphertext disclosure when encryption
-     is used. +
      The RDSM may address physical write attacks via memory integrity
      checks in hardware, to prevent consumption of out-of-band modified memory.
 |===
