@@ -575,6 +575,7 @@ the platform or from one platform to another.
 6+^| **Mitigations**
 6+a| The RDSM and TSM must prevent untrusted host software from accessing
      confidential cpu and memory state for a TVM during migration by enforcing:
+     
      - a secure session based on platform attestation between the source and
        destination platforms
      - negotiation of the capabilities of the two platforms to enforce a
