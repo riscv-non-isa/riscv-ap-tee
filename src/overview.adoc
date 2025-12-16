@@ -24,16 +24,19 @@ Supervisor Domain to enforce TCB and confidentiality properties, while using an
 isolated (Hosting) Supervisor Domain for the host domain, thus maintaining the
 OS/VMMs role as the resource manager (for both legacy VMs and TVMs).
 
-On processors supporting multiple supervisor domains (the Smmtt extension), the
-resources managed by the hosting supervisor domain (OS/VMM) include memory, CPU,
+On processors supporting multiple supervisor domains (using the RISC-V
+Supervisor Domains privileged ISA extension), an M-mode root domain security
+manager (RDSM) isolates memory, hart execution state and IO resources. The
+hosting supervisor domain (OS/VMM) manages the memory, CPU,
 I/O resources and platform capabilities required to host the TVM workload. The
 terms hosting supervisor domain and OS/VMM are used interchangeably in this
 specification. The underlying memory isolation mechanism for supervisor domains
-(Smmtt) is agnostic of the number of supervisor domains. On processors that do
-not support multiple supervisor domains where Smmtt is not mandated, a single
+(Smmpt) is agnostic of the number of supervisor domains. On processors that do
+not support multiple supervisor domains where Smmpt is not implemented, a single
 confidential  supervisor domain and a single hosting supervisor domain can be
-supported using other hardware memory isolation techniques like PMP
-(for example <<dep3>>, other deployment models are also possible).
+supported using other hardware memory isolation techniques like PMP, G-stage
+page tables. See, for example <<dep2>> and <<dep3>>, other deployment models may
+also be possible.
 
 [id=dep1]
 [caption="Figure {counter:image}", reftext="Figure {image}"]
@@ -46,15 +49,14 @@ Supervisor Domain Manager (the OS/VMM). The Confidential Supervisor Domain
 Manager is called the " *TEE Security Manager* " or *(TSM)* and acts as the
 trusted intermediary between TEE and non-TEE workloads on the same platform.
 The TSM should have a minimal hardware-attested footprint. The TCB (which
-includes
-the TSM and hardware) enforces strict confidentiality and integrity security
-properties for workloads in this supervisor domain. The Root Domain Security Manager,
-also called the " *TSM-driver* ", isolates the Confidential Supervisor Domain
-from all other Supervisor domains and other platform components
-(non-confidential and
-confidential). The responsibility of the TSM is to enforce the security
-objectives accorded to TEE workloads (TVMs) assigned to that supervisor domain.
-The VMM is expected to continue to manage the security for non-confidential
+includes the TSM and hardware) enforces strict confidentiality and integrity
+security properties for workloads in this supervisor domain. The Root Domain
+Security Manager, also called the " *TSM-driver* ", isolates the Confidential
+Supervisor Domain from all other Supervisor domains and other platform
+components (non-confidential and confidential). The responsibility of the TSM
+is to enforce the security objectives accorded to TEE workloads (TVMs) assigned
+to that supervisor domain.
+The host VMM is expected to continue to manage the security for non-confidential
 workloads, and importantly the resource-assignment and scheduling management
 functions for all confidential and non-confidential workloads.
 Note that CoVE implementations may partition the TSM and TSM-driver
@@ -100,26 +102,32 @@ Each TVM may consist of the guest firmware, a guest OS and applications. The
 software components included in the TVM are implementation specific.
 
 <<dep1>> shows the deployment model in which the TSM-driver runs in M-mode and
-TSM runs in HS-mode. Systems without Smmtt or the requirement for multiple
+TSM runs in HS-mode. Systems without Smmpt or the requirement for multiple
 supervisor domains can combine the functions of the TSM-driver and TSM in
 M-mode, see <<appendix_d>>.
-When supervisor domains are in use, the TSM-driver is in the TCB of all
+When supervisor domains priv. ISA is in use, the TSM-driver is in the TCB of all
 supervisor domains and hence in the TCB for all CoVE workloads hosted on the
 platform. The TSM-driver, which always operates in M-mode, uses the hardware
 capabilities to provide:
 
-* Isolation of memory associated with TEEs (including the TSM). We describe
-*Confidential memory* as memory that is subject to access-control,
+* Creation and initialization of supervisor domains with a configuration
+provided by the host to allocate memory and IO devices to the supervisor domain.
+
+* Isolation of memory between supervisor domains - for CoVE, a confidential
+supervisor domain is instantiated to host TEE VMs (including the TSM). We
+describe *Confidential memory* as memory that is subject to access-control,
 confidentiality and integrity suitable per threat model for CoVE components.
-For Supervisor Domain memory isolation, the Smmtt extension may be used for
+For Supervisor Domain memory isolation, the Smmpt extension may be used for
 deployment scenarios where the TSM is at the same privilege level as the VMM.
 The TEEI operations for memory management are described in detail below.
-* Context switching of the hart supervisor domain id and MTT on TEECALL/TEERET
+
+* Context switching of the hart supervisor domain id and MPT on TEECALL/TEERET
 synchronous transitions or asynchronous transitions (due to interrupts).
+
 * A machine agnostic ABI as part of the TEEI, to allow lower privileged
 software to interact with the TSM-driver in an OS and platform agnostic manner.
 
-The TSM-driver delegates parts of the TEE management functions to the TSM,
+The TSM-driver delegates parts of the TVM management functions to the TSM,
 specifically isolation across confidential memory assigned to TVMs. The TSM is
 designed to be portable across RISC-V platforms (that support CoVE) and interact
 with the machine specific capabilities in the platform through the TEEI. The TSM
@@ -137,7 +145,7 @@ This is achieved by enforcing isolation for memory assigned to the supervisor
 domain that the TSM occupies. This memory region is called *TSM-memory-region*
 and is expected to be a static region of memory that holds the TSM code and
 data. It must be access-controlled from all software outside the TCB (e.g.,
-using Smmtt or PMP), and may be additionally protected against physical access
+using Smmpt or PMP), and may be additionally protected against physical access
 with help of cryptographic mechanisms.
 
 Access to the TSM-memory-region and execution of code from the
@@ -149,7 +157,7 @@ via the TEERET interface to context restore to the hosting supervisor domain.
 Access to TEE-assigned memory is allowed for the hart when access is
 permitted as per the active permissions enforced by the memory management unit
 (MMU) for the supervisor domain active on the hart (enforced through Sv and
-Smmtt for CoVE). This per-hart execution context is used by the processor to
+Smmpt for CoVE). This per-hart execution context is used by the processor to
 enforce access-control properties on memory accessed by TEE workloads managed by
 the TSM. The details of the supervisor domain access protection is specified in
 the Smmpt specification <<RVISD>>.
