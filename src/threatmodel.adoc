@@ -416,7 +416,7 @@ to a TVM must enforce similar properties as the TEE hosted on the platform.
 | Attacker accesses TVM data via DMA via local devices under attacker control
 
 6+^| **Description**
-6+a| A privileged host or TVM programs a DMA bus master device to perform DMA
+6+a| A privileged host or TVM programs a DMA-capable device to perform direct memory access
      access to other contexts confidential memory.
 
 6+^| **Mitigations**
