@@ -85,21 +85,25 @@ finalized.
 The OS/VMM can create a new TVM in a single operation by requesting the TSM to
 construct a TVM from the existing non-confidential VM.
 First, the OS/VMM creates a regular VM by allocating memory for the VM's data
-and vCPUs and creating the G-Stage page table configuration. This is a standard
-process for creating non-confidential VMs implemented by existing OS/VMMs. In
-response to a request from a VM, `sbi_promote_to_tvm()`, the OS/VMM requests the
-TSM to promote the VM by executing the `sbi_covh_promote_to_tvm()` call. The TSM
-creates a new TVM from the reflected VM state (VM data, page table configuration
-, vCPU state). After promotion, the OS/VMM releases the previously allocated VM
-resources and begins interacting with the TVM through the TSM as described in
-the next sections.
+and vCPUs and creating the G-stage page table configuration. This is a standard
+process for creating non-confidential VMs implemented by existing OS/VMMs. The
+OS/VMM requests then the TSM to promote the VM by executing the
+`sbi_covh_promote_to_tvm()` call. The TSM recreates a new TVM from the reflected
+VM state (VM data, page table configuration, vCPU state). After promotion, the
+OS/VMM should release the previously allocated VM resources and must begin
+interacting with the TVM through the TSM as described in the next sections.
 
-[NOTE]
-====
-The promotion should be done early during the TVM's bootstrap so that the
-integrity measurements calculated by TSM over the TVM data in confidential
-memory are deterministic and therefore meaningful for attestation.
-====
+The mechanism by which the TSM recreates the VM state in confidential memory is
+implementation-specific. In CoVE implementations that support dynamic conversion
+between confidential and non-confidential memory, the TSM should perform page
+conversion while traversing G-stage page-table mappings. Conversely, CoVE
+implementations that support only static memory partitioning, or that seek to
+reduce the attack surface by preventing the VMM/OS from selecting the physical
+locations of TVM's pages, must instead assign the TSM authority to allocate
+physical pages within confidential memory. Such designs incur greater TSM
+implementation complexity, as the TSM must provide its own page-allocation
+mechanism, and may incur additional performance overhead, as the TSM must copy
+VM data from non-confidential pages into confidential pages during promotion.
 
 === TVM execution
 
