@@ -105,7 +105,7 @@ software components included in the TVM are implementation specific.
 TSM runs in HS-mode. Systems without Smmpt or the requirement for multiple
 supervisor domains can combine the functions of the TSM-driver and TSM in
 M-mode, see <<appendix_d>>.
-When supervisor domains priv. ISA is in use, the TSM-driver is in the TCB of all
+When the supervisor domains privileged ISA is in use, the TSM-driver is in the TCB of all
 supervisor domains and hence in the TCB for all CoVE workloads hosted on the
 platform. The TSM-driver, which always operates in M-mode, uses the hardware
 capabilities to provide:
