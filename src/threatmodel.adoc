@@ -1,4 +1,8 @@
+
+:imagesdir: ./images
+
 [[threatmodel]]
+== Adversary and Threat Model
 
 The RISC-V Security Model <<RVISEC>> describes the common security principles
 for RISC-V platforms, and the normative requirements for security building
@@ -49,71 +53,818 @@ utilized by this adversary.
 
 === Threat Model
 
-T1: Loss of confidentiality of TVMs and TSM confidential memory via in-scope
-adversaries that may read TSM/TVM confidential memory via CPU.
+==== Note on scope
 
-T2: Tamper/content-injection to TVM and TSM memory from in-scope
+This specification describes the threats that a system implementing CoVE should
+address, however, it does not prescribe the scope of mitigations; instead it
+focusses on mitigations enabled via the CoVE interface and the use of the RISC-V
+ISA and extensions such as Supervisor Domains (Smsdid, Smmpt etc.). This
+specification also provides recommendations that implementations of CoVE
+must address per their chosen scope of adversaries from the list of adversaries
+discussed above vis-a-vis the performance & security trade-offs they accept.
+Implementations may choose to mitigate threats using additional platform
+capabilities as needed. For all scenarios though, denial of service by TVMs must
+be prevented. At the same time, denial of service by the hosting environment is
+explicitly out of scope.
+
+==== CoVE-T001 - Malicious (logical) access of confidential memory
+
+Loss of confidentiality of TVMs and TSM confidential memory via in-scope
+adversaries that may read TSM/TVM confidential memory via in-band means.
+
+.CoVE-T001
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM confidential memory
+| Tamper and Disclosure
+| Privileged host software
+| Memory Confidentiality
+| In scope
+| Attacker software component reads or writes to TVM confidential data
+
+6+^| **Description**
+6+a| A privileged host software component directly accesses memory that is
+     exclusively assigned to another TVM or generally to another supervisor
+     domain. In the case of supervisor domains, the memory may or may not be
+     assigned to a supervisor workload or TVM as confidential memory.
+
+6+^| **Mitigations**
+6+a| The RDSM must prevent untrusted host software from accessing confidential
+     memory by using RISC-V privileged ISA (Sv), PMP, and/or Smmpt (Supervisor
+     domains). In the case of supervisor domains, the S/HS mode TSM must
+     prevent workloads in its context from accessing other workloads
+     confidential memory by using S-stage and G-stage page tables.
+|===
+
+==== CoVE-T002 - Malicious (logical) access of TVM cpu state
+
+Tamper/content-injection to TVM and TSM memory from in-scope
 adversaries that may modify TSM/TVM memory via CPU side accesses.
 
-T3: Tamper of TVM/TSM memory from in-scope adversaries via software-induced
+.CoVE-T002
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM CPU State confidentiality and integrity
+| Tamper and Disclosure
+| Privileged host software
+| TEE CPU State Protection
+| In scope
+| Attacker reads or writes to TVM virtual CPU state (registers)
+
+6+^| **Description**
+6+a| A privileged host software component directly accesses virtual CPU state
+     for a CPU that is exclusively assigned to a TVM or generally to another
+     supervisor domain. In the case of supervisor domains, the CPU may be
+     executing the S/HS TSM or assigned to a workload or TVM.
+
+6+^| **Mitigations**
+6+a| The RDSM enforces initialization of vcpu state associated with TSM contexts
+     to prevent runtime integrity or injection attacks. +
+     The RDSM and TSM prevents untrusted host software from accessing
+     confidential CPU state by using RISC-V privileged ISA privilege levels
+     (M, S, HS, U) and execution context using ASID, VMID and SDID (Smsdid) to
+     tag architectural state associated with the workload context. +
+     Any CPU state context-switched is saved-to and restored-from confidential
+     memory (protected per CoVE-T001) and exclusively accessible only to the
+     workload context.
+
+|===
+
+==== CoVE-T003 - Malicious tamper of TVM memory state via row-hammer
+
+Tamper of TVM/TSM memory from in-scope adversaries via software-induced
 row-hammer attacks on memory.
 
+.CoVE-T003
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM confidential memory
+| Tamper
+| Privileged host software
+| Memory Integrity
+| In scope
+| Attacker modifies confidential memory contents without direct access
+
+6+^| **Description**
+6+a| A privileged host software component directly accesses non-confidential
+     memory adjoining confidential memory to exercise [RowHammer](https://en.wikipedia.org/wiki/Row_hammer) attacks. +
+     A TVM uses row-hammer to target another TVMs or ordinary VMs memory via
+     row-hammer approaches.
+
+6+^| **Mitigations**
+6+a| The RDSM prevent untrusted host software from accessing adjoining
+     confidential memory by using RISC-V privileged ISA (Sv), PMP, and/or
+     Smmpt. In the case of supervisor domains, the S/HS mode TSM must prevent
+     workloads in its context from accessing other workloads' adjoining
+     confidential memory by using S-stage and G-stage page tables. +
+     Alternately, hardware memory integrity mechanisms may be used to detect
+     software induced row-hammer tamper of memory.
+
+|===
+
+==== CoVE-T004 - Malicious injection into TVM execution context via memory alias
 T4: Malicious injection of content into TSM/TVM execution context using
 physical memory aliasing attacks via system firmware adversary.
 
-T5: Information leakage of workload data via CPU registers, control status
-registers (CSRs) via in-scope adversaries.
+.CoVE-T004
+[options="header"]
+|===
 
-T6: Incorrect execution of workload via runtime modification of CPU
-registers, CSRs, mode switches via in-scope adversaries.
+| Asset | Threat | Adversary | Requirement | Scope | Result
 
-T7: Invalid code execution or data injection/replacement via G-stage
+| TVM execution state
+| Tamper and Disclosure
+| Privileged host software
+| TEE CPU and Memory State Protection
+| In scope
+| Attacker can read or execute TVM memory via alias and/or cause TVM to
+  access invalid memory
+
+6+^| **Description**
+6+a| A privileged host software component creates malicious physical memory
+     aliases causes two memory addresses to reference the same physical region.
+
+6+^| **Mitigations**
+6+a| The platform TCB (firmware, RoT, RDSM) must enforce anti-aliasing of
+     physical memory intended to be used as confidential memory during memory
+     initialization. +
+     The RDSM and TSM prevents untrusted host software from assigning any
+     aliased memory regions to be converted to confidential memory.
+
+|===
+
+==== CoVE-T005 - Malicious (physical) access of TVM memory state
+Content injection, exfiltration or replay (within and across TEE
+memory) via hardware approaches, including via exposed interface/links to
+other CPU sockets, memory and/or devices assigned to TEE. Attacks leading to
+information leakage/tamper of workload data via confidential memory access via
+adversaries using physical attacks.
+
+.CoVE-T005
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM confidential memory state
+| Disclosure
+| Privileged host software
+| Memory State confidentiality and integrity
+| Implementation-specific
+| Attacker controlled execution or data consumption in the TVM
+
+6+^| **Description**
+6+a| A privileged host software component directly accesses CPU state that is
+     exclusively assigned to a TVM or generally to another supervisor
+     domain.
+
+6+^| **Mitigations**
+6+a| The RDSM may address disclosure and tamper attacks via cryptography. When
+     memory encryption is used for confidentiality, the TEE domain should have
+     at least a unique encryption key from the hosting domain to address static
+     /cold-boot attacks. Per implementations, each TVM may also have one or more
+     unique keys, however additional considerations must be taken into account
+     to address integrity and replay attacks. +
+     The RDSM may address physical write attacks via memory integrity
+     checks in hardware, to prevent consumption of out-of-band modified memory.
+|===
+
+==== CoVE-T006 - Malicious (physical) access of TVM CPU state
+Incorrect execution of workload via runtime modification of TVM CPU
+registers, CSRs, mode switches via adversaries using physical attacks.
+
+.CoVE-T006
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM execution state
+| Tamper/Integrity
+| Privileged host software
+| Execution State integrity
+| Implementation-specific
+| Attacker controlled execution of TVM
+
+6+^| **Description**
+6+a| A privileged host software component directly accesses CPU state that is
+     associated with a TEE domain component (RDSM, TSM) or TVM workload. Host
+     software may also peform physical attacks such as fault injection, glitch
+     etc. to tamper with hardware state in registers, CSRs or internal state.
+
+6+^| **Mitigations**
+6+a| The RDSM must prevent untrusted host software from accessing confidential
+     cpu state by using RISC-V privileged ISA privilege levels (M, S, HS, U).
+     Out of band (physical) CPU state attacks may be  protected via integrity
+     checks on internal registers, caches, lock-step execution and other such
+     hardware mechanisms.
+|===
+
+==== CoVE-T007 - Malicioud code/data access via G-stage page table remap attacks
+Invalid code execution or data injection/replacement via G-stage
 paging remap attacks via system software adversary.
 
-T8: Malicious asynchronous interrupt injection or dropped leading to
+.CoVE-T007
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM data
+| Integrity
+| Privileged host software
+| Execution Integrity
+| In scope
+| TVM executes invalid code or accesses invalid data causing unexpected errors
+
+6+^| **Description**
+6+a| A privileged host software component modifies G-stage mappings to cause
+     TVM to access invalid (non-confidential or confidential) memory.
+
+6+^| **Mitigations**
+6+a| The RDSM must enforce that page address translation structures must be
+     fetched from confidential memory. +
+     The RDSM must enforce isolation of confidential memory from non-TCB
+     elements using RISC-V privileged ISA privilege levels (M, S, HS, U) as
+     well as memory isolation via Sv, PMP, Smmpt as well as IOMMU, IO-MPT.
+|===
+
+==== CoVE-T008 - Malicious execution via virtual interrupt attacks
+Malicious asynchronous interrupt injection or dropped leading to
 information leakage or incorrect execution of the TEE.
 
-T9: Malicious manipulation of time read from the virtualized time CSRs
+.CoVE-T008
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM data
+| Integrity
+| Privileged host software
+| Execution integrity
+| In scope
+| TVM execution failures due to invalid interrupt handler execution or
+  missed interrupts causing potential information disclosure.
+
+6+^| **Description**
+6+a| A privileged host software component modifies guest interrupt file/cpu
+     state to cause TVM to operate incorrectly potentially leading to
+     information disclosure.
+
+6+^| **Mitigations**
+6+a| The RDSM must enforce that guest interrupt files must be managed in
+     confidential memory. +
+     The RDSM must enforce isolation of confidential memory from non-TCB
+     elements using RISC-V privileged ISA privilege levels (M, S, HS, U) as
+     well as memory isolation via Sv, PMP, Smmpt as well as IOMMU, IO-MPT. +
+     The TSM must enforce that TVM guest interrupt cpu state is context-
+     switched into TSM-exclusive confidential memory. +
+     The RDSM, TSM must prevent IRQ injections that violation priority or
+     interrupt masking.+
+     Priv ISA extensions such as AIA, Smsdia, Smgeien may be used to enforce
+     these properties.
+|===
+
+==== CoVE-T009 - Malicious execution due to time manipulation
+Malicious manipulation of time read from the virtualized time CSRs
 causing invalid execution of TVM workload.
 
-T10: Loss of Confidentiality via DMA access from devices under adversary
+.CoVE-T009
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM data
+| Integrity
+| Privileged host software
+| Execution State integrity
+| In scope
+| TVM execution failure due to invalid time state causing potential disclosure
+
+6+^| **Description**
+6+a| A privileged host software component modifies TVM CPU time state to cause
+     TVM failures.
+
+6+^| **Mitigations**
+6+a| The RDSM must prevent untrusted host software from accessing confidential
+     cpu state by using RISC-V privileged ISA privilege levels (M, S, HS, U). +
+     The host must be able to read a TVM's vstimecmp (for scheduling
+     purposes), however it must not be able to overwrite it. The RDSM and TSM
+     must restore the vstimecmp CSR intact when context-switching to the host,
+     and must always restore the vstimecmp CSR from TVM saved state in
+     confidential memory when resuming the TVM.
+|===
+
+==== CoVE-T010 - Malicious read of confidential memory via host devices
+Loss of Confidentiality via DMA access from devices under adversary
 control, e.g., via manipulation of IOMMU programming.
 
-T11: Loss of Confidentiality from devices assigned to a TVM. Devices bound
+.CoVE-T010
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM Data
+| Disclosure
+| Privileged host
+| Memory confidentiality
+| In scope
+| Attacker accesses TVM data via DMA via IOMMU programming
+
+6+^| **Description**
+6+a| A privileged host software componenent programs the IOMMU to redirect DMA
+     access to confidential memory, and thus write or read confidential memory.
+
+6+^| **Mitigations**
+6+a| The RDSM must prevent untrusted host software from accessing the register
+     programming interface of devices such as IOMMU, IO-MPT. It can achieve this
+     by using RISC-V privileged ISA such as Sv (MMU), PMP, Smmpt to control
+     access to memory-mapped interfaces to platform devices. +
+     The RDSM may assign an IOMMU to a supervisor domain, allowing the TSM to
+     manage the IOMMU for devices associated with the domain. +
+     Please refer to CoVE-IO [Ref] for a detailed threat model for devices
+     assigned to a TVMs.
+|===
+
+==== CoVE-T011 - Malicious read of confidential memory via TVM devices
+Loss of Confidentiality from devices assigned to a TVM. Devices bound
 to a TVM must enforce similar properties as the TEE hosted on the platform.
 
-T12: Content injection, exfiltration or replay (within and across TEE
-memory) via hardware approaches, including via exposed interface/links to
-other CPU sockets, memory and/or devices assigned to a TVM.
+.CoVE-T011
+[options="header"]
+|===
 
-T13: Downgrading TEE TCB elements (example TSM-driver, TSM) to older
-versions or loading invalid TEE TCB elements on the platform to enable
-confidentiality, integrity attacks.
+| Asset | Threat | Adversary | Requirement | Scope | Result
 
-T14: Leveraging transient execution side-channel attacks in TSM-driver,
+| TVM Data
+| Disclosure
+| Privileged host
+| Memory confidentiality
+| In scope
+| Attacker accesses TVM data via DMA via local devices under attacker control
+
+6+^| **Description**
+6+a| A privileged host or TVM programs a DMA-capable device to perform direct memory access
+     access to other contexts confidential memory.
+
+6+^| **Mitigations**
+6+a| The RDSM must enforce that the IO interface (e.g. Root Port for PCIe) and
+     associated IOMMU and devices are accessible exclusively to the TVM context
+     or supervisor domain (under the TSM purview). It can achieve this by
+     programming the IO-MPT to associate the device with the IOMMU and SDID. +
+     The TSM must enforce that the device page tables prevent untrusted TVMs
+     from accessing TVM confidential memory. +
+     Please refer to <<RVICOVEIO>> for a detailed threat model for devices
+     assigned to a TVMs.
+|===
+
+==== CoVE-T012 - Leaking TVM data via transient execution side-channels
+Leveraging transient execution side-channel attacks in TSM-driver,
 TSM, TVM, host OS/VMM or non-confidential workloads to leak confidential
 data, e.g., via shared caches, branch predictor poisoning, page-faults.
 
-T15: Leveraging architectural side-channel attacks due to shared cache and
+.CoVE-T012
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM data
+| Disclosure
+| Privileged host software
+| Memory and CPU state confidentiality
+| Implementation-specific
+| Attacker can extract TVM data via various side-channel leakage methods
+
+6+^| **Description**
+6+a| A privileged host software component directly accesses CPU state or memory that is
+     exclusively assigned to a TVM or generally to another supervisor
+     domain.
+
+6+^| **Mitigations**
+6+a| The RDSM must prevent untrusted host software from accessing confidential
+     cpu state by using RISC-V privileged ISA privilege levels (M, S, HS, U).
+Transient-execution attack (TEA) side channels:
+
+- Bounds check bypass TEA and variants - should be
+addressed by TVM software using apropos synchronization. Software TCB should use
+synchronization to isolate TCB code from non-TCB code.
+- Branch target injection TEA and variants - should be addressed by software TCB
+via flushing across privilege boundaries to remove untrusted state injected by
+non-TCB software
+- Speculative store bypass TEA and variants- should be addressed by TCB hardware
+via synchronization/barriers to prevent speculative execution of memory reads
+which may allow unauthorized disclosure of information. 
+- Implementations should mitigate attacks such as these spectre variants (In
+practice, it is difficult to defend against such attacks in advance)
+
+|===
+
+==== CoVE-T013 - Leaking TVM data via architectural and covert side-channels
+Leveraging architectural side-channel attacks due to shared cache and
 other shared resources, e.g., via prime/probe, flush/reload approaches.
 
-T16: Malicious access to ciphertext with known plaintext to launch a
+.CoVE-T013
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM Data
+| Disclosure
+| Privileged host software
+| Memory and Execution State confidentiality
+| Implementation-specific
+| Attacker leaks TVM confidential data via architectural side-channels using
+  shared HW resources
+
+6+^| **Description**
+6+a| A privileged host software component indirectly accesses CPU state that
+        contains confidential data for another domain or another TVM.
+
+6+^| **Mitigations**
+6+a| The RDSM must prevent untrusted host software from accessing confidential
+     cpu state by using RISC-V privileged ISA privilege levels (M, S, HS, U).
+Address mapping caches (controlled side channel) - hardware/software TCB should use
+tagging/ partitioning/ flushing techniques to address those types of side
+channels due to temporal/spatial shared resources
+
+Control channels, single-step/zero-step attacks
+
+- Leverage hardware/software TCB mechanisms to enforce restrictions on
+single-stepping or zero-stepping via use of state flushing/barriers, entropy
+defenses and detection mechanisms.
+- Prevent interrupt/exception injection
+(combined with cache side channel to leak sensitive data)
+
+Architectural cache side channel
+
+cache partitioning-based defenses; Prevent shared resource contention,
+e.g., attacks such as prime probe
+
+Architectural timing side channel
+
+Data independent execution latency (DIEL) operations, uArch state flushing;
+Leveraging data dependency timing channels
+|===
+
+==== CoVE-T014 - Prevent cipher text read of TVM memory
+Malicious access to ciphertext with known plaintext to launch a
 dictionary attack on TCB components to extract confidential data.
 
-T17: Tamper of TVM state during migration of a TEE workload assets within
+.CoVE-T014
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM
+| Disclosure
+| Privileged host software
+| Execution State confidentiality
+| In scope
+| Host-controlled (logical) component reads TVM ciphertext for confidential
+  execution state
+
+6+^| **Description**
+6+a| A privileged host software component directly accesses memory ciphertext
+     for memory assigned to a TEE domain
+
+6+^| **Mitigations**
+6+a| The RDSM must prevent untrusted host software from accessing confidential
+     cpu state by using RISC-V privileged ISA privilege levels (M, S, HS, U) and
+     must enforce cipher text read prevention using Sv (MMU), PMP, Smmpt to
+     prevent non-TCB components from accessing encrypted TEE memory +
+     See reference TEE.fail [[Ref](https://tee.fail/)]
+|===
+
+==== CoVE-T015 - Tamper of TVM state during TVM Migration
+Tamper of TVM state during migration of a TEE workload assets within
 the platform or from one platform to another.
 
-T18: Forging of attestation evidence and sealed data associated with a TVM.
+.CoVE-T015
+[options="header"]
+|===
 
-T19: Stale TLB translations (for U/HS mode or for VU/VS) created during TSM
-or TVM operations are used to execute non-TCB code in the TVM (or consume
-stale/invalid data).
+| Asset | Threat | Adversary | Requirement | Scope | Result
 
-T20: Isolation of performance monitoring and/or debug state for a TVM
+| TVM
+| Disclosure
+| Privileged host software
+| Execution State confidentiality
+| In scope
+| Host-controlled (logical or physical) component reads TVM
+  confidential execution and memory state during live migration of the TVM
+
+6+^| **Description**
+6+a| A privileged host software component directly accesses CPU state that is
+     staged for migration from one platform to another.
+
+6+^| **Mitigations**
+6+a| The RDSM and TSM must prevent untrusted host software from accessing
+     confidential cpu and memory state for a TVM during migration by enforcing:
+     
+     - a secure session based on platform attestation between the source and
+       destination platforms
+     - negotiation of the capabilities of the two platforms to enforce a
+       successful migration that prevents downgrade attacks.
+     - a confidential, integrity protected and replay protected transport that
+       allows state for the TVM to be transferred such that the migrated TVM
+       retains the initial measurements and the integrity of dynamic state.
+     - enforce that copies of the TVM cannot be created unless authorized
+
+|===
+
+==== CoVE-T016 - Host generates malicious TVM attestation evidence
+Forging attestation evidence or attcks on TCB that lead to invalid attestation
+evidence for a TVM. Downgrading TEE TCB elements (RDSM, TSM) to older
+versions or loading invalid TEE TCB elements on the platform to enable
+secondary confidentiality, integrity attacks.
+
+.CoVE-T016
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM
+| Disclosure, Integrity. Authorization
+| Privileged host software
+| Attestation
+| In scope
+| Host defeats the attestation of a TVM to a relying party or to the platform
+  TCB to get access to confidential data meant for the TVM
+
+6+^| **Description**
+6+a| A host software or hardware component tampers with or injects malicious
+    attestation evidence to forge or masquerade as a TVM.
+
+6+^| **Mitigations**
+6+a| The platform TCB (RoT, RDSM, TSM) must enforce the measured boot chain to
+     enforce measurment of all TCB elements, and implement a RTM (root of trust
+     for measurement) and RTR (root of trust for reporting) functions to record
+     and report measurements of TCB elements as cryptographically-signed
+     evidence of the static and dynamic state of the TCB. +
+     Any tamper of the boot of the platform TEE elements or the dynamic
+     measurements of the TVM assets (code/data) must be reported via
+     cryptographically-hashed attestation evidence. +
+     The attestation data must be well documented (transparent and auditable),
+     and use key strengths and algorithms appropos geo-specific guidelines,
+     for example, ECDSA with SHA512. +
+     Each layer of the TCB must be reported and must be appropriately isolated
+     to be able to protect the key material used to endorse the next privilege
+     layer, for example, using TCG DICE Protection Environment functions. +
+     Each TCB layer must be version controlled to prevent downgrade attacks by
+     the operating host environment. +
+     All mutable TCB elements must be updatable, and ideally should be
+     updatable at runtime without requiring platform resets. TVMs may opt-in
+     if TCB updates are permitted. +
+     The TEE TCB should not be affected by other TCB reporting chains. TEE TCB
+     is seperately reportable and recoverable.
+|===
+
+==== CoVE-T017 - Malicious creation of stale address translation cache entries
+Stale address-translation cache entries (for U/HS mode or for VU/VS) created
+during TSM or TVM operations are used to execute non-TCB code in the TVM (or
+consume stale/invalid data).
+
+.CoVE-T017
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM
+| Disclosure and Integrity
+| Privileged host software
+| Execution State confidentiality
+| In scope
+| Host-controlled (logical or physical) component reads TVM
+  confidential memory via stale address translation entries.
+
+6+^| **Description**
+
+6+a| A privileged host software component directly accesses CPU state or memory that is
+     exclusively assigned to a TVM or generally to another supervisor
+     domain.
+
+6+^| **Mitigations**
+6+a| The RDSM must manage isolation of TEE memory and non-TEE memory such that
+     any conversion enforces address translation cache flushes to prevent stale
+     mappings that may be cached. For MPT usage, MFENCE.PA and MINVAL.SPA are
+     intrinsics provided to support such invalidation that may be needed for
+     SDID or mode changes +
+     The TSM must manage isolation of TVM memory for hosted TVMs such that
+     assignment of confidential memory and re-assignment within a SD is managed
+     using HFENCE intrinsics.
+
+|===
+
+==== CoVE-T018 - Malicious TVM data access via performance monitoring or debug
+Isolation of performance monitoring and/or debug state for a TVM
 leading to information loss via performance monitoring events/counters and
 debug mode accessible information.
 
-T21: A TVM causes a denial of service on the platform.
+.CoVE-T018
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM
+| Disclosure
+| Privileged host software
+| Execution State confidentiality
+| In scope
+| Host-controlled (logical or physical) component reads TVM
+  confidential execution state
+
+6+^| **Description**
+6+a| A privileged host software component leaks TVM confidential data via
+        use of performance monitoring or debug mechanisms as a side-channel. 
+
+6+^| **Mitigations**
+6+a| The RDSM must enforce context switch of performance monitoring state for supervisor
+     domains to ensure TEEs get correct performance monitoring information
+     and prevent data leakage due
+     to PMU information (fingerprint attacks) +
+     The RoT must enforce that any intrusive debug or trace is enabled via the
+     RoT authentication, and when enabled is reported in the attestation
+     evidence associated with the TVM. +
+     Any software (self-hosted) debug and performance monitoring state must be
+     safely context switched by the TSM, and for supervisor domains by the RDSM.
+
+|===
+
+==== CoVE-T019 - Malicious TVM causes denial of service
+TVM must not be able to cause a denial of service on the host platform services
+or on other TVMs or ordinary VM workloads.
+
+.CoVE-T019
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| Platform Services
+| Denial of service
+| Deprivileged TVM 
+| Host Denial of service
+| In scope
+| Logical or physical component controlled by the TVM
+  causes denial of service of the platform.
+
+6+^| **Description**
+6+a| A privileged host software component directly accesses CPU state that is
+     domain.
+
+6+^| **Mitigations**
+6+a| The RDSM is in the TCB of the platform provider (host) and enables the
+     host software (via the RDSM) to unilaterally interrupt a TVM and thus
+     prevent a TVM from holding resources and refusing to exit
+
+|===
+
+==== CoVE-T020 - Malicious host uses QoS capabilities to leak TVM data
+
+.CoVE-T020
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM
+| Disclosure
+| Privileged host software
+| Execution State confidentiality
+| In scope
+| Host-controlled (logical or physical) component reads TVM
+  confidential execution state
+
+6+^| **Description**
+6+a| A privileged host software component directly accesses CPU state that is
+     domain.
+
+6+^| **Mitigations**
+6+a| The RDSM must enforce isolation of QRI assigned to the supervisor domains
+     and prevent observation of resource accesses from an SD or the RDSM by
+     entities that are not within their TCB using the resource usage
+     monitors. Similarly, the resource allocations for an SD or the RDSM must
+     not be influenced by entities outside their TCB. +
+     To support this security objective: Multiple QoS register interfaces
+     (QRIs) may be implemented in the capacity and bandwidth controllers within
+     the SoC, and the RDSM may allocate a QRI exclusively to an SD or may
+     mediate access to a QRI among multiple SDs. A non-ISA supervisor domain
+     QRI extension provides this capability. +
+     Associating a QRI ID (QRID) with requests originating from SDs and RDSM
+     via the Smsdqosid extension enables partitioning of the RCID and MCID
+     associated with a QRI among the SDs shareing a QRI. +
+     The RDSM itself can use the Smqosid extension to configure QoS identifiers
+     for requests made by a hart with effective privilege mode equal to M.
+
+|===
+
+==== CoVE-T021 - Malicious host uses RAS capabilities to leak TVM data
+
+.CoVE-T021
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM
+| Disclosure
+| Privileged host software
+| Execution State confidentiality
+| In scope
+| Attacker causes RAS events and uses RAS capabilities as a side-channel
+  to extract TVM data
+
+6+^| **Description**
+6+a| A privileged host software component directly accesses CPU state that is
+     part of TVM domain via RAS reporting information.
+
+6+^| **Mitigations**
+6+a| The RDSM must prevent untrusted host software from accessing confidential
+     cpu state by using RISC-V privileged ISA privilege levels (M, S, HS, U). +
+     The RDSM must enforce RAS reporting information is reported to the host
+     without leaking TVM execution state, for e.g. via scrubbing state.
+
+|===
+
+==== CoVE-T022 - Malicious host violates emulation of H-extension emulation
+
+.CoVE-T022
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM
+| Disclosure
+| Privileged host software
+| Execution State & Memory confidentiality
+| In scope
+| Attacker host software emulating H-extension causes nested hypervisor
+  executing within a TVM to leak data to attacker.
+
+6+^| **Description**
+6+a| A privileged host hypervisor software component directly accesses CPU
+     state as part of the emulation of the H-extension ISA.
+
+6+^| **Mitigations**
+6+a| The RDSM must prevent untrusted host software from accessing confidential
+     cpu state by using RISC-V privileged ISA privilege levels (M, S, HS, U). +
+     The TSM must provide nested para-virtualization operations to the TVM to
+     enforce that nested workloads do not leak information to the host - this
+     includes nested G-stage page table emulation, MMIO emulation and H-ext ISA
+     emulation.
+
+|===
+
+==== CoVE-T023 - Malicious host or TVM exflitrates data via shared memory
+
+.CoVE-T023
+[options="header"]
+|===
+
+| Asset | Threat | Adversary | Requirement | Scope | Result
+
+| TVM Data
+| Disclosure
+| Privileged host software
+| Memory confidentiality
+| In scope
+| Attacker uses shared memory to exfiltrate TVM confidential data
+
+6+^| **Description**
+6+a| A privileged host software component or other TVM causes the target TVM
+     or TEE domain to leak data via shared memory regions.
+
+6+^| **Mitigations**
+6+a| The RDSM and TSM must enforce access-control permisions for shared memory
+     between TVMs and non-TCB components using mechanisms such as Sv (MMU),
+     PMP, Smmpt and optionally cryptography via a seperate key for shared
+     memory with hosting software. +
+     The TSM must prevent non-TCB code from setting up shared memory regions
+     accessible in the G-stage structures without TVM consent. +
+     The TSM must enforce invalidatin of address-translation caches when a
+     memory region is downgraded from confidential to shared or from shared to
+     confidential.
+
+|===
 
 [NOTE]
 ====
@@ -121,215 +872,3 @@ This threat model is not an exhaustive list and will be updated (via revisions
 of the RISC-V Security Model specification <<RVISEC>>) on a regular basis as
 attacks (are expected to) evolve.
 ====
-
-=== Scope
-
-This specification describes the threats that a system implementing CoVE should
-address, however, it does not prescribe the scope of mitigations; instead it
-focusses on mitigations enabled via the COVH/G interface and the use
-of the RISC-V ISA and its extensions, such as Smmtt. This specification also
-provides recommendations that implementations of this reference CoVE
-architecture must address per their chosen scope of adversaries from the list of
-adversaries discussed above, and what performance/security trade-offs they
-accept. For threats from any adversaries, implementations may choose to mitigate
-threats using additional platform capabilities as needed. For all scenarios
-though, denial of service by TVMs must be prevented. At the same time, denial of
-service by non-TCB software (e.g., in a hosting supervisor domain) is considered
-out of scope.
-
-[[design_survey]]
-=== TVM Security Requirements to address threat model
-
-|===
-| *Category*  |  *Security Criteria*  |  *CoVE Requirement* |  *Example methods
- to meet requirement* | *Description / Example* | *RVI normative or
-non-normative Reference*
-
-| Memory Assignment | Ability to make memory confidential or non-confidential |
-Required | MMU, xPMP, MTT | Confidential memory should be dynamically allocated/
-unallocated as required | RISC-V Priv. ISA, Supervisor Domains (Sdid, Smmtt)
-
-| TEE CPU State Protection | State Isolation | Required | Priv. levels (M, S, HS
-, U) and execution context (ASID, VMID, SDID) | Prevent non-TCB components from
-arbitrarily accessing/modifying TEE CPU state | Priv ISA w/ virtual memory
-system, Supervisor Domains (Sdid, Smmtt)
-
-| Memory Confidentiality | Memory isolation (read) | Required | Cryptography
- and/or MMU, xPMP, MTT extension | Prevent non-TCB components from reading
-TEE memory | Priv ISA w/ virtual memory system, Supervisor Domains (Smmtt)
-
-| Memory Confidentiality | Cipher text read prevention | Optional | Cryptography
- and/or MMU, xPMP, MTT extension | Prevent non-TCB components from accessing
-encrypted TEE memory | Supervisor Domains
-
-| Memory Confidentiality | TEE encryption | Implementation-specific |
-Cryptography and/or MMU, xPMP, MTT extension | TEE memory confidentiality
-against logical attacks via hart; additionally address physical attacks via
-cryptography. If cryptography used, TEE should have a unique encryption key;
-each TEE VM may also have one or more unique keys. Also see related
-requirements around ciphertext disclosure and memory integrity  |
-Supervisor Domains
-
-| Memory Confidentiality | Memory encryption strength | Implementation-specific
-| cryptography  | Encryption algorithm and key strength | Security Model
-
-| Memory Confidentiality | Number of encryption keys | Implementation-specific |
-cryptography | Number of TEE keys supported | Security Model
-
-| Memory Integrity | Memory integrity against software attacks | Required | MMU,
-xPMP, MTT | Prevent software attacks such as remapping aliasing replay
-corruption etc. | CoVE ABI
-
-| Memory Integrity | Memory integrity against hardware attacks | Implementation
-specific | cryptography and/or MMU, xPMP, MTT extension | Prevent hardware
-attacks DRAM-bus attacks and physical attacks that replace TEE memory with
-tampered / old data | Security Model
-
-| Memory Integrity | Memory isolation (Write exec) | Required | Cryptography
-and/or MMU, xPMP, MTT | Prevent TEE from executing from normal memory; Enforce
-integrity of TEE data on writes | Supervisor Domains (Sdid, Smmtt)
-
-| Memory Integrity | Rowhammer attack prevention | Implementation-specific |
-Cryptography and/or memory-specific extension | Prevent non-TCB components from
-flipping bits of TEE memory | Security Model
-
-| Shared Memory | TEE controls data shared with non-TCB components | Required |
-Cryptography and/or MMU, xPMP, MTT | Prevent non-TCB code from exfiltrating
-information without TEE consent/opt-in | Supervisor Domains (Sdid, Smmtt)
-
-| Shared Memory | TEE controls data shared with another TEE | Implementation
-specific | cryptography and/or MMU, xPMP, MTT | Ability to securely share memory
-with another TEE | Supervisor Domains
-
-| I/O Protection | DMA protection from non-TCB-admitted devices | Required | DMA
-access-control, e.g., IOPMP, IOMTT, IOMMU | Prevent non-TCB peripheral devices
-from accessing TEE memory | See CoVE-IO <<RVICOVEIO>>, IOMMU, Supervisor Domains
-(IOMTT)
-
-| I/O Protection | Trusted I/O from devices admitted into the TCB of a TVM |
-Implementation-specific | Device attestation <<SPDM>>, Link protection, IOMMU |
-Admission control to bind devices to TEEs | See CoVE-IO <<RVICOVEIO>>, IOMMU,
-Supervisor Domains (IOMTT)
-
-| Interrupts | Trusted (no spoofing/tampering/dropped) Interrupts | Required |
-Secure interrupt files, MMU, xPMP, MTT | Prevent IRQ injections that violate
-priority or masking | Supervisor Domains (Smsdia) w/ AIA
-
-| Secure Timestamp | Trusted timestamps | Required | Confidential supervisor
-domain qualifier for CSR accesses | Ensure TEE have consistent timestamp view |
-Supervisor Domains (Sdid)
-
-| Debug & Profile | Trusted performance monitoring unit data | Required |
-Confidential supervisor domain context switch of perf. mon. counters  |
-Ensure TEEs get correct PMU info; prevent data leakage due to PMU information
-(fingerprint attacks) | Supervisor Domains (Secure Debug)
-
-| Debug & Profile | Secure External Debug support | Required | Confidential
-supervisor domain qualifier for External debug controls | Support debug trigger
-registers for TVM | Supervisor Domains (Secure Debug)
-
-| Debug & Profile | Authenticated debug (Production device) | Required |
-Authorize debug via TEE RoT | Ensure hardware debug prob (e.g., JTAG SWD) is
-disabled in production | Supervisor Domains (Secure Debug)
-
-| Availability | TVM DoS Protection | Required | VMM retains ability to
-interrupt TVM | Prevent TVM from refusing to exit | Supervisor Domains
-
-| Availability | VMM DoS Protection | Implementation-specific | Not in scope
-for CoVE | Prevent non-TCB hosting components from denying service to a TVM |
-Not in scope
-
-| Side Channel | Address mapping caches (controlled side channel) | Required
-| Supervisor domain Id, MMU, xPMP, MTT | hardware/software TCB should use
-tagging/ partitioning/ flushing techniques to address those types of side
-channels due to temporal/spatial shared resources | Supervisor Domains,
-Security Model
-
-| Side Channel | Transient-execution attack (TEA) side channels |
-Implementation-specific | * Bounds check bypass TEA and variants - should be
-addressed by TVM software using apropos synchronization. Software TCB should use
-synchronization to isolate TCB code from non-TCB code.
-* Branch target injection TEA and variants - should be addressed by software TCB
-via flushing across privilege boundaries to remove untrusted state injected by
-non-TCB software
-* Speculative store bypass TEA and variants- should be addressed by TCB hardware
-via synchronization/barriers to prevent speculative execution of memory reads
-which may allow unauthorized disclosure of information.
-| Implementations should mitigate attacks such as these spectre variants (In
-practice, it is difficult to defend against such attacks in advance) |
-Supervisor Domain Id, additional recommendations in Security Model
-
-| Side Channel | Control channels, single-step/zero-step attacks | Required |
-leverage hardware/software TCB mechanisms to enforce restrictions on
-single-stepping or zero-stepping via use of state flushing/barriers, entropy
-defenses and detection mechanisms. | Prevent interrupt/exception injection
-(combined with cache side channel to leak sensitive data) | Security Model
-
-| Side Channel | Architectural cache side channel | Implementation-specific  |
-cache partitioning-based defenses | Prevent shared resource contention,
-e.g., attacks such as prime probe | Security Model
-
-| Side Channel | Architectural timing side channel | Implementation-specific  |
-data independent execution latency (DIEL) operations, uArch state flushing |
-Leveraging data dependency timing channels | Security Model
-
-| Secure and measured boot | Establishes root of trust in support of attestation
-| Required | RoT unique trust chain for TEE TCB | Enforcing initial firmware
-authorization and versioning | CoVE ABI, Security Model
-
-| Attestation | Remote attestation | Required | hardware RoT-rooted PKI (trust
-assertions) via Internet | Prevent fake hardware and software TCB; Prevent
-non-TCB hardware debugging in production. | CoVE ABI, Security Model
-
-| Attestation | Mutual attestation | Implementation-specific | S/U mode  |
-Attestation to another TEE on the same platform | CoVE ABI, Security Model
-
-| Attestation | Remote mutual attestation | Required | Internet |  Attestation
-to a relying party on a different platform. Requires provisioning of the TEEs
-to act as delegated relying parties | CoVE ABI, Security Model
-
-| Attestation | Local attestation | Implementation-specific | Sealing |
-Verification of attestation by TCB | Future CoVE ABI, Security Model
-
-| Attestation | TCB versioning (and updates) | Required | Mutable firmware where
- TVM has to opt-in at startup if TCB updates are allowed while the TVM is
- executing - hardware TCB then enforces lower TCB elements are updatable
- (with apropos controls like security version enforced) to enforce the
- opt-in policy. | Allow TCB updates - Prevent TCB rollback | CoVE ABI,
- Security Model
-
-| Attestation | TCB composition for confidential computing | Required |  Single
-root of trust for measurement and reporting | Malicious components introduced in
-the TCB | CoVE ABI, Security Model
-
-| Attestation | Dynamic vs Static Attestation interop (between platform TCB and
-TEE TCB) - enforce isolation of the entire trust chain | Required | TEE TCB
-should not be affected by other TCB reporting chains. TEE TCB is separately
-reportable and recoverable. | Malicious host tampers with TEE TCB or reporting
-chain | CoVE ABI, Security Model
-
-| Attestation | TCB transparency (and auditability) | Implementation-specific |
-Mutable firmware | TCB elements reviewable | CoVE ABI, Security Model
-
-| Attestation | Sealing | Implementation-specific | Hardware RoT sealing keys
-per TVM | Binding of secrets to TEEs | CoVE ABI, Security Model
-
-| Operational Features | TVM Migration | Implementation-specific | Secure
-migration of TEEs | Malicious host tampers with TVM assets during migration |
-Future CoVE ABI
-
-| Operational Features | TVM Nesting | Implementation-specific |  Nested TEE
-Workloads | Malicious host tampers with nested VMM policies | Future CoVE ABI
-
-| Operational Features | Memory introspection | Implementation-specific |
-Interoperability with security features for TVM workload | Unauthorised security
- TVM | Future CoVE ABI
-
-| Operational Features | QoS interoperability | Implementation-specific |
-Interoperability with QoS features for TVM workload | Malicious host uses QoS
-capabilities as a side-channel | Security Model
-
-| Operational Features | RAS interoperability | Implementation-specific |
-Interoperability with RAS features for TVM workload | Malicious host uses RAS
-capabilities as a side-channel or to cause integrity violations | Security Model
-|===
