@@ -15,10 +15,13 @@ appraisal policy). If valid, the  evidence attests to the trustworthiness of the
 TVM, so that the relying party  can release secrets or attestation result tokens
 to the TVM.
 
-Local attestation is a model where the TVM presents cryptographic evidence to
-the TSM  that enables the TSM to release a secret to the TVM if it is authorized
-to run on the platform. This form of attestation meets the needs of systems that
-have limited or no access to the network.
+Local attestation allows a TVM to be authorized and to receive secrets on
+systems with limited or no network access. In this model, the creator of a TVM
+generates an attestation payload that is cryptographically bound to the target
+platform. The payload contains reference evidence and secrets, with guarantees
+for their integrity and confidentiality. Only the TSM on the target platform can
+access the contents of this payload and, after verifying the TVM, delivers the
+secrets to it.
 
 This section describes the CoVE attestation evidence content, format and
 generation interface.
@@ -38,8 +41,8 @@ M_{extended} = H_{alg}(M_{current} || NewData)
 ++++
 
 Measurements must be stored in integrity protected measurement registers,
-either in the Hardware RoT of Measurement (RoTM) or in the TSM when it acts as
-an extended RoTM.
+either in the Hardware RoT for Measurement (RTM) or in the TSM when it acts as
+an extended RTM.
 
 In order to verify a workload environment trustworthiness, the remote
 attestation service must be able to compare the CoVE TCB measurements with a
@@ -55,7 +58,7 @@ The overall workload TCB is a composition of 3 independent TCBs:
 
 1. The Platform TCB is made of all hardware and software TCB elements for
 the CoVE host platform. They are not confidential compute specific and
-measurements for those elements could be shared with e.g. a measured boot
+measurements for those elements could be shared with, e.g., a measured boot
 attestation.
 2. The TSM TCB elements are the confidential compute specific but TVM agnostic
 elements for the overall TCB.
@@ -104,14 +107,13 @@ initial measurement registers cover platform, TSM & TVM specific TCB element
 measurements.
 
 Since they hold TCB elements measurements bound to the platform lifetime, the
-platform/TSM measurement registers may be stored in the hardware Root of Trust
-for Measurement (RTM). The TVM measurements must be maintained in TSM
-confidential memory with TVM bound life cycle, effectively making the TSM an
-extended RTM for the TVM.
+platform/TSM measurement registers may be stored in the hardware RTM. The TVM
+measurements must be maintained in TSM confidential memory with TVM-bound
+lifecycle, effectively making the TSM an extended RTM for the TVM.
 
-The initial TCB measurement mechanism and storage layout is implementation
-specific. One such possible layout, based on a 6 initial measurement registers
-CoVE implementation may look like the following table:
+The initial TCB measurement mechanism and storage layout is
+implementation-specific. One such possible layout, based on a 6 initial
+measurement registers CoVE implementation may look like the following table:
 
 .Initial Measurements Layout Example (6 registers)
 [cols="^1,^3,^5,^1", options="header"]
@@ -156,7 +158,7 @@ CoVE implementation may look like the following table:
 
 After the TVM is finalized, initial measurements are immutable and can no longer
 be modified. However, a TVM guest may want to measure some of its software
-components (Guest firmware, kernel OS, additional configuration parameters, etc)
+components (guest firmware, kernel OS, additional configuration parameters, etc)
 while it is booting or running.
 
 The TSM optionally provides an interface for TVM guests to extend their
@@ -175,17 +177,17 @@ computing for UEFI ABI related to runtime measurement extension and
 event log creation.
 ====
 
-=== Attestation
+=== Remote Attestation
 
 All above described TCB elements measurements are added to an attestation
-evidence and then reported to relying parties. The attestation mechanism
+evidence and then reported to relying parties. The remote attestation mechanism
 and protocol that take place between the attester (i.e., the TVM) and the
 remote attestation service are out of the scope of this document.
 
 In this section, we describe the high level model of remote attestation for CoVE
 , together with the attestation evidence content, format and generation process.
 
-==== Model
+==== Remote Attestation Model
 
 The CoVE attestation model follows the IETF RATS <<RATS>> Remote Attestation
 architecture. CoVE implementations perform the RATS Attester role, and each CoVE
@@ -898,4 +900,303 @@ the UCCS formatted evidence are described below:
 [source,cddl]
 ----
 riscv-cove-x509-ext = #6.601(riscv-cove-token) ; Unprotected CBOR Web Token
+----
+
+
+=== Local Attestation
+
+Systems that cannot rely on remote attestation due to unreliable network
+might use local attestation, in which the TSM attests to the integrity of the
+TVM and conditions under which it executes using the rules defined in a TVM
+attestation payload (TAP), a cryptographically protected file created by the
+authorized entity (TVM creator).
+
+[NOTE]
+====
+The TAP can be provided to the TSM at the time of the TVM creation or runtime.
+In the former case, the TSM can enforce that a TVM is allowed to execute and
+might provide it with a boot key. In the latter, it can provide the TVM with
+continuous access to secrets as part of a licensing model.
+====
+
+Local attestation utilizes one or more of the following properties:
+
+. TVM–Platform Binding: The TSM verifies that a TVM creator authorized the TVM
+to run on the platform.
+. TVM Authorization: The TSM enforces that only TVMs created by a trusted entity
+(e.g., a TVM creator) runs on the hardware.
+
+A CoVE-enabled platform supporting the TVM-platform binding must consist of a
+mechanism to identify the platform, for example via cryptographic keys exposed
+by an implementation-specific mechanism, such as a hardware root of trust with
+support for CoVE DICE.
+The creator of a TVM must then be able to link the identity key with the
+hardware and use it to encode the TAP.
+Only the TSM running on that platform must have access to the key that permits
+it to decode the TAP. Access to such key should be linked to the integrity of
+all TCB elements, such as the TSM and other M-mode firmware.
+After successful local attestation, the TVM should be able to request the TSM to
+retrieve secrets encoded in the TAP using an ABI call
+(`sbi_covg_retrieve_secret()`).
+
+A CoVE-enabled platform supporting the TVM authorization must restrict what
+TVMs are allowed to run. There must be an implementation-specific mechanism to
+provide the TSM with a list of public keys of those authorized to sign TVM
+images for execution on the platform. The creator of a TVM must sign the TAP
+associated with the TVM with the corresponding private key. During local
+attestation, the TSM verifies the signature inside the TAP using the list of
+authorized public keys to decide if the TVM is authorized to execute. If the
+signature is not valid, the TSM rejects to promote the VM to TVM.
+
+[id=tap_format]
+[caption="Figure {counter:image}"]
+[title= ": Format of the TVM Attestation Payload (TAP)"]
+image::tap_format.png[align=center]
+
+==== TVM Attestation Payload (TAP)
+The TAP carries information that allows the TSM to authorize the TVM's execution
+on the platform and provision the TVM with TVM-specific secrets.
+<<tap_format>> shows the TAP format that consists of five sections: header, lockboxes,
+measurements, attributes, and secrets. The last three sections are confidentiality
+and integrity protected using a symmetric encryption key, in which a symmetric
+key is encrypted inside lockboxes.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TAP Format in CDDL"]
+[source,cddl]
+----
+tap-header = bytes .size 10                           ; Semantic structure applied externally (non-CBOR)
+
+tap-confidential-sections = {
+   0 => tap-measurements,
+   1 => tap-attributes,
+   2 => tap-secrets
+}
+
+tap-confidential-sections-encrypted = COSE_Encrypt1   ; The plaintext is defined as tap-confidential-sections
+
+tap = (
+   tap-header,
+   tap-lockboxes,
+   tap-confidential-sections-encrypted
+)
+----
+
+===== Header
+The header section carries information about the size, version, and encoding
+of the TAP that are used by a parser to interpret the binary representation of
+the TAP. The header must be always 4B aligned, 10 bytes long, and be serialized
+in a binary format.
+
+The version field allows future extensions of the TAP format while
+preserving backward compatibility. The `encoding` field enables use of
+implementation-specific encoding format, for example binary, concise binary object
+representation (CBOR), or JavaScript object notation (JSON).
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TAP Header Format (binary)"]
+[source]
+----
+version = 0                          ; Reserved
+         / 1                         ; Version 1
+         / int .ge 2 .le 255         ; Reserved
+
+encoding = 0                         ; Binary format
+         / 1                         ; CBOR format
+         / int .ge 2 .le 255         ; Reserved
+
+Offset | Size | Field
+-------+-------+---------------------
+0      | 4     | magic constant (ACE0ACE0)
+4      | 4     | size (uint32 little-endian)
+8      | 1     | version (0–255)
+9      | 1     | encoding (0–255)
+----
+
+===== Lockboxes
+The lockboxes section supports use of the same TAP across different platforms
+and enables use of different cryptographic primitives. Each lockbox contains
+the TAP symmetric key (TSK) that is encrypted using an identity key of one of
+the target platforms. Only the TSM running on the target platform within the
+expected TCB can access the TSK and thus decrypt the confidential sections.
+
+To construct a TAP, the TVM owner combines the confidential sections into a
+single blob and encrypts it with a freshly generated random symmetric key (TSK).
+He creates then lockboxes for target platforms by encrypting the TSK with the
+target platform's identity key and stores them in form of a list in the
+`lockboxes` section.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TAP Lockboxes Format in CDDL"]
+[source,cddl]
+----
+tap-lockbox-name = bstr
+tap-lockbox-value = COSE_Sign1
+
+tap-lockbox = {
+   0 => tap-lockbox-name                  ; Platform identifier, e.g., fingerprint
+   1 => tap-lockbox-value                 ; Encrypted TSK
+}
+
+tap-lockboxes = [
+   * tap-lockbox
+]
+----
+
+===== Measurements
+The measurements sections contains the TVM reference integrity measurements.
+In order to expose secrets to a TVM, the TSM must verify that the TVM's
+integrity matches all defined reference measurements for an algorithm selected
+by the TSM. If the `attributes` section is not empty, then the TSM must
+additionally verify all attributes before releasing a secret.
+
+Typically, the value stored in a measurement register represents the result of
+aggregation of multiple integrity measurements combined using a cryptographic
+hash function. Different standards specify what intermediate integrity
+measurements and in which
+order are applied to produce the final value. The tap-measurement-profile
+field allows a TVM creator to distinguish between these standards.
+A CoVE implementation must support at least one of these standards and the TSM
+must ensure that all measurements of supported standards match the reference
+values.
+
+The tap-measurement-layer field allows a TVM creator to specify reference
+measurements for different layers of software on the platform to distinguish
+between measurement registers corresponding to virtualized and non-virtualized
+environments. The TSM must ensure that the integrity of every layer defined in
+the TAP matches the reference values.
+
+[NOTE]
+====
+One of the use cases for introducing the tap-measurement-layer field is to
+additionally constrain the TVM's execution to platform running expected OS/VMM.
+A TVM owner can define reference integrity measurements for the non-virtualized
+(OS/VMM) layer and virtualized (TVM) layer. A CoVE implementation might, for
+example, use then measured boot and a TPM to store integrity measurement of OS/VMM
+and a vTPM to store integrity measurements of a TVM. The layer field provides
+a way to distinguish between these measurements.
+====
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TAP Measurements Format in CDDL"]
+[source,cddl]
+----
+tap-measurement-id = (
+   (0..23)   /                            ; Register's identifier
+   (24..255)                              ; Reserved
+)
+
+tap-measurement-layer = (
+   0         /                            ; virtualized (TVM)
+   1         /                            ; non-virtualized (OS/VMM)
+   (2..255)                               ; Reserved to support nested virtualization
+)
+
+tap-measurement-profile = (
+   0         /                            ; CoVE implementation-specific profile
+   1         /                            ; TCG PC Client Platform Firmware Profile Specification, Level 00 Version 1.06 Revision 52 Family 2.0
+   (2..255)                               ; Reserved
+)
+
+tap-measurement-algorithm = int           ; See https://www.iana.org/assignments/cose/cose.xhtml
+
+tap-measurement-value = bstr
+
+tap-measurement = {
+   0 => tap-measurement-id                ; Measurement register index
+   1 => tap-measurement-layer             ; Measurement layer
+   1 => tap-measurement-profile           ; Measurement profile
+   2 => tap-measurement-algorithm         ; Hash algorithm identifier
+   3 => tap-measurement-value             ; Measurement value
+}
+
+tap-measurements = [
+   * tap-measurement
+]
+----
+
+[NOTE]
+====
+To allow use cases where, for example, secrets are provided to any TVM executing
+on a platform, the TAP format allows the measurements section to be empty.
+====
+
+===== Attributes
+The attributes section contains a set of rules that define the conditions
+under which a TVM can execute and access the secrets. The TSM implementation
+might not support all types of attributes. It must not expose secrets to a TVM,
+if any condition fails. If there is an attribute that the TSM does not support,
+then the TSM must consider that the condition defined by the attribut failed
+verification.
+
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TAP Attributes Format in CDDL"]
+[source,cddl]
+----
+hardware_serial_number = 0               ; Unique number identifying hardware
+firmware_build_time = 1                  ; Firmware build timestamp
+firmware_version = 2                     ; BIOS/UEFI version string
+tcb_svn = 3                              ; TCB's Secure Version Number (SVN)
+secure_boot_enabled = 4                  ; Boolean (1=true, 0=false)
+platform_debug_enabled = 5               ; Boolean (1=true, 0=false)
+tvm_debug_enabled = 6                    ; Boolean (1=true, 0=false)
+max_allowed_uptime = 7                   ; Maximum platform uptime in seconds
+license_expiration = 8                   ; License expiration timestamp
+
+tap-attribute-key = hardware_serial_number
+                  / firmware_build_time
+                  / firmware_version
+                  / tcb_svn
+                  / secure_boot_enabled
+                  / platform_debug_enabled
+                  / tvm_debug_enabled
+                  / max_allowed_uptime
+                  / license_expiration
+                  / int .ge 9 .le 65535  ; Reserved range
+
+eq = 0
+ne = 1
+gt = 2
+lt = 3
+ge = 4
+le = 5
+
+tap-attribute-operand = eq / ne / gt / lt / ge / le
+
+tap-attribute-value = bstr
+
+tap-attribute-entry = (
+   tap-attribute-operand                 ; An operand to define how to compare the values
+   tap-attribute-value                   ; The value of the property
+)
+
+tap-attributes = {
+   * tap-attribute-key => tap-attribute-entry
+}
+----
+
+===== Secrets
+The secrets section is a key value pair, where a key is used to retrieve a value
+and a value is a secret, for example, a cryptographic key or an SSH key.
+The keys for the key value pairs must be unique.
+The TVM can retrieve secrets from the TSM using the `sbi_covg_retrieve_secret()`
+ABI.
+
+[NOTE]
+====
+A common deployment pattern is to protect the confidentiality of the TVM image
+at rest by encrypting the VM's disk with a key that the TVM obtains during boot
+following successful attestation. In such a case, the TAP would contain a
+disk encryption secret that the TVM firmware could retrieve from TSM.
+
+====
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
+[title= "TAP Secrets Format in CDDL"]
+[source,cddl]
+----
+tap-secret-value = bstr
+
+tap-secrets = {
+   * (0..65535) => tap-secret-value
+}
 ----
