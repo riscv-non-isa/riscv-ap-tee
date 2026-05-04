@@ -805,7 +805,7 @@ struct tsm_info {
     uint64_t tsm_capabilities;
     /*
      * The number of 4 KiB pages which must be donated to the TSM for storing TVM
-     * state in sbi_covh_create_tvm_vcpu(). `0` if the TSM does not support the
+     * state in sbi_covh_create_tvm(). `0` if the TSM does not support the
      * dynamic memory allocation capability.
      */
     unsigned long tvm_state_pages;
