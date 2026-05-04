@@ -740,8 +740,7 @@ enum tvm_state {
 === Function: COVE Host Get TSM Info (FID #0)
 [source, C]
 -----
-struct sbiret sbi_covh_get_tsm_info(unsigned long tsm_info_address,
-                                    unsigned long tsm_info_len);
+struct sbiret sbi_covh_get_tsm_info(unsigned long tsm_info_address);
 -----
 Reads the current TSM state, its configuration, and supported features. The
 information returned by the call is intended to be used by the VMM to configure
@@ -749,15 +748,12 @@ parameters for other TVM-related calls.
 
 `tsm_info_address` must be the 4B-aligned physical memory address to which the
 TSM will write the content of the `tsm_info` struct.
-`tsm_info_len` should be the size of the `tsm_info` struct below.
 The entire buffer must reside in a physical memory region that the OS/VMM and
 TSM can access.
 
 `tsm_info.tsm_capabilities` defines features supported by both the TSM and hardware.
 The OS/VMM can verify that the TSM and hardware support capability `i` by
 checking that the bit `i` is set.
-
-*Returns* the number of bytes written to `tsm_info_address` on success.
 
 [source, C]
 ------
@@ -861,8 +857,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
-| SBI_ERR_INVALID_ADDRESS | `tsm_info_address` was invalid.
-| SBI_ERR_INVALID_PARAM   | `tsm_info_len` was insufficient.
+| SBI_ERR_INVALID_ADDRESS | The whole `struct tsm_info` couldn't be written to `tsm_info_address`.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
@@ -983,13 +978,11 @@ The possible error codes returned in `sbiret.error` are shown below.
 === Function: COVE Host Create TVM (FID #5)
 [source, C]
 -----
-struct sbiret sbi_covh_create_tvm(unsigned long tvm_create_params_addr,
-                                      unsigned long tvm_create_params_len);
+struct sbiret sbi_covh_create_tvm(unsigned long tvm_create_params_addr);
 -----
 Creates a confidential TVM using the specified parameters. The
 `tvm_create_params_addr` is the physical address of the buffer containing the
-`tvm_create_params` structure described below, and `tvm_create_params_len` is
-the size of the structure in bytes.
+`tvm_create_params` structure described below.
 
 TVM creation (static) process where a set of TEE pages are assigned for a TVM
 to hold a TVM's global state. This routine also configures the global
@@ -1048,7 +1041,6 @@ The possible error codes returned in `sbiret.error` are shown below.
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
 | SBI_ERR_INVALID_ADDRESS | `tvm_create_params_addr` was invalid.
-| SBI_ERR_INVALID_PARAM   | `tvm_create_params_len` was invalid.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
