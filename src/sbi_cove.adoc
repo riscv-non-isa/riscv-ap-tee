@@ -1011,7 +1011,7 @@ struct tvm_create_params {
     /*
      * The base physical address of the confidential memory region to be used
      * to hold the TVM's state. Must be page-aligned and the number of
-     * pages must be at least the value returned in tsm_info.vm_state_pages
+     * pages must be at least the value returned in tsm_info.tvm_state_pages
      * returned by the call to sbi_covh_get_tsm_info().
      */
     unsigned long tvm_state_addr;
