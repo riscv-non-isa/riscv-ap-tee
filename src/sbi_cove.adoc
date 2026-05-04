@@ -1398,7 +1398,7 @@ struct sbiret sbi_covh_create_tvm_vcpu(unsigned long tvm_guest_id,
                                            unsigned long tvm_vcpu_id,
                                            unsigned long tvm_state_page_addr);
 -----
-Adds a vCPU with ID `vcpu_id` to the TVM specified by `tvm_guest_id`.
+Adds a vCPU with ID `tvm_vcpu_id` to the TVM specified by `tvm_guest_id`.
 `tvm_state_page_addr` must be page-aligned and point to a confidential memory
 region used to hold the TVM's vCPU state, and must be
 `tsm_info::tvm_state_pages` pages in length. This call must not be made after
@@ -1412,7 +1412,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 | Error code            | Description
 | SBI_SUCCESS           | The operation completed successfully.
-| SBI_ERR_INVALID_ADDRESS | `tvm_stage_page_address` was invalid.
+| SBI_ERR_INVALID_ADDRESS | `tvm_state_page_addr` was invalid.
 | SBI_ERR_INVALID_PARAM | `tvm_guest_id` or `tvm_vcpu_id` were invalid,
                           or the TVM wasn't in `TVM_INITIALIZING` state.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
