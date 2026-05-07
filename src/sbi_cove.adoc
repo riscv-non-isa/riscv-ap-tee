@@ -801,11 +801,14 @@ struct tsm_info {
     uint64_t tsm_capabilities;
     /*
      * The number of 4 KiB pages which must be donated to the TSM for storing TVM
-     * state in sbi_covh_create_tvm() with vcpu_count = tvm_max_vcpu_vcpus.
+     * state in sbi_covh_create_tvm() can be computed as
+     * (tvm_state_base_bytes + tvm_state_extra_bytes_per_vcpu * vcpu_count
+     *  + 4095) / 4096.
      * `0` if the TSM does not support the dynamic memory allocation capability
      * or if it uses reserved memory for TVM state.
      */
-    unsigned long tvm_state_pages;
+    unsigned long tvm_state_base_bytes;
+    unsigned long tvm_state_extra_bytes_per_vcpu;
     /*
      * The maximum number of vCPUs a TVM can support.
      */
@@ -813,7 +816,7 @@ struct tsm_info {
     /*
      * The number of 4 KiB pages which must be donated to the TSM when creating
      * a new vCPU. `0` if the TSM does not support the dynamic memory allocation
-     * capability or if the TSM uses `tvm_state_pages` for vCPU state.
+     * capability or if the TSM uses `tvm_state_addr` for vCPU state.
      */
     unsigned long tvm_vcpu_state_pages;
 };
@@ -874,27 +877,6 @@ States for TSM update).
 | TSM_LOADED         | TSM has been loaded, but has not yet been initialized.
 | TSM_READY          | TSM has been loaded & initialized, and is ready to
 accept ECALLs.
-|===
-
-[#sbi_covh_get_tvm_state_size]
-=== Function: COVE Host Get TVM state size (FID unspecified)
-[source, C]
------
-struct sbiret sbi_covh_get_tvm_state_size(unsigned long vcpu_count);
------
-
-Returns the number of 4KiB pages that need to be passed to sbi_covh_create_tvm
-for vcpu_count or lower.
-
-The number of pages is never greater than tsm_info.tvm_state_pages.
-
-[#table_sbi_covh_get_tvm_state_size]
-.COVE Host Get TSM Info
-[cols="2,3", width=90%, align="center", options="header"]
-|===
-| Error code              | Description
-| SBI_SUCCESS             | The operation completed successfully.
-| SBI_ERR_INVALID_PARAM   | The vcpu_count is not supported.
 |===
 
 [#sbi_covh_convert_pages]
@@ -1010,13 +992,13 @@ Creates a confidential TVM using the specified parameters.
 confidential memory region that will be used for the TVM's page directory.
 Must be 16 KiB-aligned.
 
-`tvm_state_addr` is ignored if `sbi_covh_get_tvm_state_size(vcpu_count)`
-returns `0` on success, otherwise
+`tvm_state_addr` is ignored if `tsm_info.tvm_state_base_bytes` and
+`tsm_info.tvm_state_extra_bytes_per_vcpu` are both `0`, otherwise
 `tvm_state_addr` is the base physical address of the confidential memory region
 to be used to hold the TVM's state, must be page-aligned and the number of
-pages must be at least the value returned in `tsm_info.tvm_state_pages` for
-`tsm_info.tvm_max_vcpus` of at least `vcpu_count`, as provided by a call to
-`sbi_covh_get_tvm_state_size()`.
+pages must be at least the value computed as
+`(tsm_info.tvm_state_base_bytes + tsm_info.tvm_state_extra_bytes_per_vcpu
+* vcpu_count + 4095) / 4096`.
 
 `vcpu_count` is the minimal number of vCPUs that the TVM must support.
 
