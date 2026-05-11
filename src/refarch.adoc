@@ -387,7 +387,7 @@ any v/f register state must be restored by the caller.
 * TSM-driver passes TSM/TVM-specified register contents to the OS/VMM to
 return status from TEERET (TSM sets a0, a1 registers always - other
 registers may be selected by the TVM)
-* Enable hosting supervisor domain on hart (via Superisor Domains <<RVISD>>
+* Enable hosting supervisor domain on hart (via Supervisor Domains <<RVISD>>
 M-mode CSR `mmpt` to disable non-TCB accesses to confidential memory.)
 * MRET to resume execution in OS/VMM at mepc set to THCS.hssa.pc
 (THCS.hssa.pc adjusted to refer to opcode after the ECALL that triggered
