@@ -64,7 +64,7 @@ resources.
 
 | MMU | Memory management unit (MMU).
 
-| MTT | Memory Tracking Table (MTT).
+| MPT | Memory Protection Table (MPT).
 
 | Relying party | An entity that depends on the validity of information about
 another entity, typically for purposes of authorization <<RATS>>.
