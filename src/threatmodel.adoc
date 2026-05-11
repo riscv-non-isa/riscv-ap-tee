@@ -156,7 +156,7 @@ row-hammer attacks on memory.
 
 6+^| **Description**
 6+a| A privileged host software component directly accesses non-confidential
-     memory adjoining confidential memory to exercise [RowHammer](https://en.wikipedia.org/wiki/Row_hammer) attacks. +
+     memory adjoining confidential memory to exercise RowHammer <<ROWHAMMER>> attacks. +
      A TVM uses row-hammer to target another TVMs or ordinary VMs memory via
      row-hammer approaches.
 
@@ -269,7 +269,7 @@ registers, CSRs, mode switches via adversaries using physical attacks.
      hardware mechanisms.
 |===
 
-==== CoVE-T007 - Malicioud code/data access via G-stage page table remap attacks
+==== CoVE-T007 - Malicious code/data access via G-stage page table remap attacks
 Invalid code execution or data injection/replacement via G-stage
 paging remap attacks via system software adversary.
 
@@ -384,7 +384,7 @@ control, e.g., via manipulation of IOMMU programming.
 | Attacker accesses TVM data via DMA via IOMMU programming
 
 6+^| **Description**
-6+a| A privileged host software componenent programs the IOMMU to redirect DMA
+6+a| A privileged host software component programs the IOMMU to redirect DMA
      access to confidential memory, and thus write or read confidential memory.
 
 6+^| **Mitigations**
@@ -394,7 +394,7 @@ control, e.g., via manipulation of IOMMU programming.
      access to memory-mapped interfaces to platform devices. +
      The RDSM may assign an IOMMU to a supervisor domain, allowing the TSM to
      manage the IOMMU for devices associated with the domain. +
-     Please refer to CoVE-IO [Ref] for a detailed threat model for devices
+     Please refer to CoVE-IO <<RVICOVEIO>> for a detailed threat model for devices
      assigned to a TVMs.
 |===
 
@@ -547,7 +547,7 @@ dictionary attack on TCB components to extract confidential data.
      cpu state by using RISC-V privileged ISA privilege levels (M, S, HS, U) and
      must enforce cipher text read prevention using Sv (MMU), PMP, Smmpt to
      prevent non-TCB components from accessing encrypted TEE memory +
-     See reference TEE.fail [[Ref](https://tee.fail/)]
+     See reference TEE.fail <<TEEFAIL>>.
 |===
 
 ==== CoVE-T015 - Tamper of TVM state during TVM Migration
@@ -588,7 +588,7 @@ the platform or from one platform to another.
 |===
 
 ==== CoVE-T016 - Host generates malicious TVM attestation evidence
-Forging attestation evidence or attcks on TCB that lead to invalid attestation
+Forging attestation evidence or attacks on TCB that lead to invalid attestation
 evidence for a TVM. Downgrading TEE TCB elements (RDSM, TSM) to older
 versions or loading invalid TEE TCB elements on the platform to enable
 secondary confidentiality, integrity attacks.
@@ -613,7 +613,7 @@ secondary confidentiality, integrity attacks.
 
 6+^| **Mitigations**
 6+a| The platform TCB (RoT, RDSM, TSM) must enforce the measured boot chain to
-     enforce measurment of all TCB elements, and implement a RTM (root of trust
+     enforce measurement of all TCB elements, and implement a RTM (root of trust
      for measurement) and RTR (root of trust for reporting) functions to record
      and report measurements of TCB elements as cryptographically-signed
      evidence of the static and dynamic state of the TCB. +
@@ -632,7 +632,7 @@ secondary confidentiality, integrity attacks.
      updatable at runtime without requiring platform resets. TVMs may opt-in
      if TCB updates are permitted. +
      The TEE TCB should not be affected by other TCB reporting chains. TEE TCB
-     is seperately reportable and recoverable.
+     is separately reportable and recoverable.
 |===
 
 ==== CoVE-T017 - Malicious creation of stale address translation cache entries
@@ -834,7 +834,7 @@ or on other TVMs or ordinary VM workloads.
 
 |===
 
-==== CoVE-T023 - Malicious host or TVM exflitrates data via shared memory
+==== CoVE-T023 - Malicious host or TVM exfiltrates data via shared memory
 
 .CoVE-T023
 [options="header"]
@@ -854,13 +854,13 @@ or on other TVMs or ordinary VM workloads.
      or TEE domain to leak data via shared memory regions.
 
 6+^| **Mitigations**
-6+a| The RDSM and TSM must enforce access-control permisions for shared memory
+6+a| The RDSM and TSM must enforce access-control permissions for shared memory
      between TVMs and non-TCB components using mechanisms such as Sv (MMU),
      PMP, Smmpt and optionally cryptography via a seperate key for shared
      memory with hosting software. +
      The TSM must prevent non-TCB code from setting up shared memory regions
      accessible in the G-stage structures without TVM consent. +
-     The TSM must enforce invalidatin of address-translation caches when a
+     The TSM must enforce invalidation of address-translation caches when a
      memory region is downgraded from confidential to shared or from shared to
      confidential.
 
