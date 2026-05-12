@@ -36,7 +36,7 @@ as allocated in <<table_cove_fid_namespaces>>.
 Other future specifications (e.g., CoVE-IO) may need to extend one of the three
 CoVE SBI extensions with domain specific functions. In order to support that
 requirement each one of the CoVE extensions SBI function IDs (`FID`) in the
-availabe 64K range is split into separate namespaces.
+available 64K range is split into separate namespaces.
 
 The main CoVE specification uses SBI's function identifiers (FIDs) from 0 to
 1023 (inclusive), and other specifications can extend the CoVE SBI by reserving
@@ -1126,7 +1126,7 @@ struct sbiret sbi_covh_promote_to_tvm(unsigned long fdt_addr,
                                       unsigned long entry_sepc,
                                       unsigned long tvm_identity_addr);
 -----
-This intrisic is used by the host to promote a VM to a TVM. It is primarily
+This intrinsic is used by the host to promote a VM to a TVM. It is primarily
 intended for CoVE deployment models that require single-step TVM creation
 (e.g., <<appendix_d>>). Deployment models that offer multi-step TVM creation
 (e.g., <<dep1>>) may, but are not required to, support this ABI as an additional
@@ -2270,7 +2270,7 @@ struct AttestationCapabilities {
     enum HashAlgorithm hash_algorithm;
 
     /*
-     * The supported attesation certificate formats.
+     * The supported attestation certificate formats.
      * This is a bitmap of ATTESTATION_CERTIFICATE_* flags.
      */
     uint32_t certificate_formats;
@@ -2384,9 +2384,9 @@ If the `sbi_covg_get_attcaps` enumerates attestation services provided by
 the TSM, then this intrinsic is used by a TVM to get an attestation evidence to
 report to a remote relying party.
 
-This intrisic returns an attestation certificate at the address passed as its
+This intrinsic returns an attestation certificate at the address passed as its
 fifth argument (`cert_addr_out`). The certificate is signed by the TSM
-attestation key, and includes the TVM attestation evidence. The TSM attestion
+attestation key, and includes the TVM attestation evidence. The TSM attestation
 key is also included in the reported TSM token.
 
 The caller passes the TVM public key address as the first argument
@@ -2395,7 +2395,7 @@ represents the TSM-certified TVM identity.
 
 The third argument (`challenge_data_addr`) points to the attestation challenge
 blob, typically a relying party generated nonce used for demonstrating the
-attestation evidence fresheness.
+attestation evidence freshness.
 
 The fourth argument (`cert_format`) is the caller's selected attestation
 certificate format. This must be one of the supported
@@ -2468,12 +2468,12 @@ struct sbiret sbi_covg_read_measurememt(unsigned long msmt_buf_addr_out,
                                              unsigned long msmt_buf_size,
                                              unsigned long msmt_index);
 -------
-This intrisic returns a TVM measurement register value for the `msmt_index`
+This intrinsic returns a TVM measurement register value for the `msmt_index`
 measurement register. TVMs can read both initial and runtime measurement
 register values back.
 
 `sbi_covg_read_measurement` returns the register value at `msmt_buf_addr_out`
-and `msmt_buf_size` must be large enough to accomodate for the hash function
+and `msmt_buf_size` must be large enough to accommodate for the hash function
 algorithm output length, as reported by `sbi_covg_get_attcaps`.
 
 `msm_index` must be one of the `sbi_covg_get_attcaps` reported measurement
@@ -2783,14 +2783,14 @@ reported one.
 intrinsic is used by a TVM to get an attestation evidence to
 report to a remote relying party. It returns an attestation certificate signed
 by the TSM attestation key, and includes the TVM attestation evidence. The TSM
-attestion key is also included in the reported TSM token.
+attestation key is also included in the reported TSM token.
 
 | <<sbi_covg_retrieve_secret, sbi_covg_retrieve_secret>>      | TVM reads a secret
 available after successful local attestation. TSM writes the secret to the
 buffer specified by the TVM.
 
 | <<sbi_covg_read_measurement, sbi_covg_read_measurement>>      | This
-intrisic returns a the TVM measurement register value for the `msmt_index`
+intrinsic returns a the TVM measurement register value for the `msmt_index`
 measurement register. TVMs can read both initial and runtime measurement
 register values back.
 
