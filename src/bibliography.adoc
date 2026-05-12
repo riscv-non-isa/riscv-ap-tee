@@ -82,3 +82,5 @@ https://datatracker.ietf.org/doc/rfc5752/
 * [[[TEEFAIL,27]]] TEE.fail: Breaking Trusted Execution Environments via DDR5 Memory Bus Interposition
 https://TEE.fail
 
+* [[[ROWHAMMER,28]]] Row Hammer
+https://en.wikipedia.org/wiki/Row_hammer
