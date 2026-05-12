@@ -113,7 +113,7 @@ improperly configured or unauthorized hardware, there should be a mechanism
 supported by hardware (and firmware) for verification.
 Assuming presence of the hardware root-of-trust for measurement and hardware
 root-of-trust for storage, the VM can be created with an encrypted disk and the
-key that is used to decrypt the disk can be sealed to the measurments of the
+key that is used to decrypt the disk can be sealed to the measurements of the
 platform.
 The creator of the VM using the specifications for the platform decides what
 values are required in order for the key to be released.
