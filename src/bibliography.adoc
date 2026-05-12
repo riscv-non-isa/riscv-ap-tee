@@ -79,4 +79,6 @@ https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf
 * [[[RFC5752,26]]] IETF RFC 5752 Multiple Signatures in Cryptographic Message Syntax (CMS)
 https://datatracker.ietf.org/doc/rfc5752/
 
-bibliography::[]
+* [[[TEEFAIL,27]]] TEE.fail: Breaking Trusted Execution Environments via DDR5 Memory Bus Interposition
+https://TEE.fail
+
