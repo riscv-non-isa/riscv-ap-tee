@@ -50,7 +50,7 @@ detail.
 === CoVE Memory Isolation
 Memory isolation for TVMs is orchestrated by the TSM-driver and the TSM in two
 phases: the conversion of memory to confidential memory and the assignment of
-confidential memory (alongwith the enforcement of properties on use) to TVMs.
+confidential memory (along with the enforcement of properties on use) to TVMs.
 To enforce isolation across Host and Confidential supervisor domains, CoVE
 requires isolation of physical memory (that supports paging when enabled).
 
@@ -134,9 +134,9 @@ property of the MPT and are discussed next:
 
 ==== Address Translation/Page Walk
 Figure 2 describes a reference model for memory protection table lookup where
-the physical address derived from the two-stage address translation and
+the host physical address derived from the two-stage address translation and
 protection mechanism is looked up via the MPT configured for the active
-supervisor domain to get the access permissions for the physical address. This
+supervisor domain to get the access permissions for the host physical address. This
 lookup should be performed for each implicit and explicit memory access and per
 the paging sizes/modes supported by the hart.
 
@@ -271,10 +271,10 @@ assigned to the TVM by the VMM.
 
 === TSM operation and properties
 
-The TSM implements COVH APIs that are invoked by the OS/VMM or by
-the TVMs, e.g., by the VMM to grant a TVM a confidential memory page and
-setup second-stage mapping, activate a TVM virtual hart on a physical hart
-etc. The TSM security routines are invoked by the OS/VMM via an ECALL with
+The TSM implements COVH APIs that are invoked by the OS/VMM, e.g., by the VMM to
+grant a TVM a confidential memory page and setup G-stage mapping, activate a
+TVM virtual hart on a physical hart etc.
+The TSM security routines are invoked by the OS/VMM via an ECALL with
 the service call specified via registers. These service calls trap to the
 TSM-driver. The TSM-driver switches hart state to the TSM context by
 loading the hart's TSM execution state from the THCS.tssa and then returns
@@ -288,7 +288,7 @@ medeleg).
 The TSM saves the TVM state and invokes the TSM-driver via an ECALL (TEERET
 with reason) to initiate the return of execution control to the OS/VMM if
 required. The TSM-driver restores the context for the OS/VMM via the
-per-hart control sub-structure THCS.hssa (See <<appendix_a>>). 
+per-hart control sub-structure THCS.hssa (See <<appendix_a>>).
 <<dep_conversion>> shows this canonical flow.
 
 Beyond the basic operation described above, the following different
@@ -510,10 +510,10 @@ address translation table (hgatp). The TSM must track memory assignment of
 TVMs (by the untrusted OS/VMM) to ensure memory assignment is
 non-overlapping, along with additional security requirements. The security
 requirements/invariants for enforcement of the memory
-access-control for memory assigned to the TVMs is described in 
+access-control for memory assigned to the TVMs is described in
 <<TVM memory management>>.
 
-=== TVM Execution
+=== TVM Memory Access
 
 As described above, TVMs can access both classes of memory: (1) confidential
 memory
@@ -526,7 +526,7 @@ confidential memory is using memory encryption (instead or in addition), the
 encryption keys used for confidential memory must be different from
 non-confidential memory.
 
-All TVM memory is mapped in the second-stage page tables controlled by the
+All TVM memory is mapped in the G-stage page tables controlled by the
 TSM explicitly. CoVE implementations that support dynamic conversions between
 confidential
 and non-confidential memory might delegate the allocation of memory for the
@@ -537,7 +537,7 @@ By default any memory mapped to a TVM is confidential. A TVM may then
 explicitly request that
 confidential memory be converted to non-confidential memory regions using
 services provided by the TSM. More
-information about TVM Execution and the lifecycle of a TVM is described in
+information about TVM execution and the lifecycle of a TVM is described in
 the <<TVM Lifecycle>> section of this document.
 
 === Debug and Performance Monitoring

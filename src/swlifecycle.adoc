@@ -6,7 +6,7 @@
 This section describes the TEEI operations for the lifecycle of a TVM
 including the OS/VMM interactions with the TSM.
 
-=== TVM build and initialization
+=== TVM Creation
 
 The host OS/VMM should be capable of hosting many TVMs on a CoVE-capable
 platform (limited only by the practical limits of the number of CPUs and
@@ -56,18 +56,20 @@ monitoring capabilities enabled etc.
 The VMM may assign memory to the TVM via a sequence of
 `sbi_covh_add_tvm_page_table_pages()` `sbi_covh_add_tvm_measured_pages()` and
 `sbi_covh_add_tvm_zero_pages()` - the former grants memory pages that are to
-contain second-stage paging structures entries that translate a TVM guest
-physical address to the system physical address, while the latter two are used
+contain G-stage paging structures entries that translate a TVM's guest
+physical address to the host physical address, while the latter two are used
 to hold TVM data and are referenced by the hgatp leaf page table entries. For
 pages added to the TVM, the VMM must invoke `sbi_covh_add_tvm_measured_pages()`
 which extends the initial measurement hash of the TVM. The hash will be used by
 the TSM to generate the attestation report (evidence) when requested by a
-challenger (relying party). Note that if the measurement steps are executed by
+challenger (relying party).
+The VMM must add pages to a TVM in ascending guest physical order.
+Note that if the measurement steps are executed by
 the VMM in an incorrect order the final measurements will be different and
 flagged during attestation. In the initial set of measured TVM pages, the VMM
 would typically provide the guest firmware, boot loader and boot kernel as well
 as memory needed for the boot stack, heap and memory tracking structures. During
-`sbi_covh_add_tvm_measured_pages()` & `sbi_covh_add_tvm_zero_pages()`, the
+`sbi_covh_add_tvm_measured_pages()` and `sbi_covh_add_tvm_zero_pages()`, the
 memory granted is tracked by the TSM to ensure that pages assigned to a TVM may
 not be assigned to a non-confidential VM or another TVM. The pages may be lazily
 added to the TVM subsequent to the TVM execution using the
@@ -108,7 +110,7 @@ specific TVM (identified by the unique identifier). This TEECALL traps into
 the TSM-driver which affects the context switch to the TSM. The TSM then
 manages the activation of the virtual hart on the calling physical hart. During
 this activation the TCB's firmware can enforce that
-stale TLB entries that govern guest physical to system physical page access
+stale TLB entries that govern guest physical to host physical page access
 have been evicted across all hart TLBs. There may also be TLB flushes for
 the virtual-harts due to VS-stage translation changes (guest virtual to
 guest physical) performed by the TVM OS - these are initiated by the TVM OS
@@ -126,7 +128,7 @@ isolation for confidential memory accessed by the TVM software - the
 following hardware enforcement is recommended to address the threat model
 described in <<Architecture Overview and Threat Model>>:
 
-* TVM instruction fetches and page walks (both VS/second-stage and
+* TVM instruction fetches and page walks (both VS/G-stage and
 G/VS-stage) are implicitly enforced to be in confidential memory. This
 requires that the TVM supervisor code should not locate VS-stage page
 tables in non-confidential memory. The TSM enforces that G-stage page
@@ -219,17 +221,17 @@ memory access-control for memory assigned to the TVMs. These rules are enforced
 by the TSM and the CPU MMU:
 
 . Contents of a TVM page assigned (initially measured or lazy-initialized)
-to the TVM is bound to the Guest physical address (GPA) assigned to the TVM
+to the TVM is bound to the guest physical address (GPA) assigned to the TVM
 during TVM operation.
 . A TVM page can only be assigned to a single TVM, and mapped via a single
 GPA unless aliases are allowed in which case, such aliases must be tracked
-by the TSM. Aliases in the virtual address space are under the purview of
+by the TSM. Aliases in the guest virtual address space are under the purview of
 the TVM OS.
 . VS-stage address translation - A TVM page mapping must be translated
 only via VS-stage translation structures which are contained in pages
 assigned to the same TVM.
 . G-stage address translation:
-  .. A TVM page guest physical address mapping must be translated only via
+  .. A TVM page's guest physical address mapping must be translated only via
 the TSM-managed G-stage translation structures for that TVM.
   .. G-stage structures must not be shared between TVMs, and must not
 refer to any other TVMs pages.
@@ -287,7 +289,7 @@ Any caching of the address translation information when the memory tracking for
 confidential memory is enabled must cache whether the address translation is for
 a TEE context or not. A miss in the cached address translation information is
 expected to cause a lookup of the address translation structure using the
-physical address (PA) and the resolved page size for TEE access evaluation -
+host physical address and the resolved page size for TEE access evaluation -
 which results in the TEE access information that is cached.
 
 In CoVE implementations with MTT, the MTT lookups are performed using the
@@ -439,7 +441,7 @@ This section refers to CoVE implementations supporting OS/VMM-initiated page
 assignment to a TVM.
 
 The VMM uses this operation to add a hgatp structure page to be used for mapping
-a guest physical address (GPA) to a physical address (PA). The inputs to this
+a guest physical address (GPA) to a host physical address (HPA). The inputs to this
 operation are the TVM identifier and the physical address(es) for the new
 page(s) to be used for the hgatp structure entries
 
@@ -471,13 +473,13 @@ TVM (initial) measurement.
 
 If the contents of the page are not specified, which is allowed
 post-finalization of the TVM, the TSM zero's the page during initialization. The
-guest physical address (GPA) to the selected page physical address (PA) is
+guest physical address (GPA) to the selected host physical address (HPA) is
 specified in the add operation by the VMM. The TSM verifies that a free guest
 page mapping must exist for this operation to succeed. Effectively, this
 operation sets up the properties of the HGATP L0 leaf entry for the PA.
 
-The inputs to this operation are: TVM identifier, physical address for the new
-page to be assigned to the TVM, source physical address for the source of the
+The inputs to this operation are: TVM identifier, host physical address for the new
+page to be assigned to the TVM, source host physical address for the source of the
 page contents to be loaded for the TVM (and measured by the TSM), and the GPA
 and page size to be used for the guest mapping to be added.
 
@@ -648,7 +650,7 @@ file it was using is available for OS/VMM use.
 
 While a TVM virtual hart is unbound, MSIs directed at the virtual hart shall
 trigger the notice interrupt registered in tvm_vhart_aia_init. Attempts by other
-TVM virtual harts to write the virtual hart's IMSIC in the guest physical
+TVM virtual harts to write the virtual hart's IMSIC in the TVM's guest physical
 address space (e.g., for the purposes of generating an IPI) shall generate a
 guest page fault exit on the virtual hart which initiated the write.
 

@@ -448,14 +448,14 @@ remove the confidential pages.
 This requires the host to make three separate ECALLs to the TSM:
 
 . `sbi_covh_tvm_invalidate_pages()`
-. `tee_host_tvm_initiate_fence()`
+. `sbi_covh_tvm_fence()`
 . `sbi_covh_tvm_remove_pages()`
 
 Upon completion of the invalidation of references to confidential memory, the
 host may reclaim the confidential pages that were previously mapped in the
-region using `tee_host_tsm_reclaim_pages()`. The host must then continue the
+region using `sbi_covh_reclaim_pages()`. The host must then continue the
 TVM execution and insert shared pages into the region using
-`tee_host_tvm_add_shared_pages()` on the page-fault when TVM tries to access
+`sbi_covh_add_tvm_shared_pages()` on the page-fault when TVM tries to access
 the region. If the region of address space is unpopulated, the page removal
 ECALLs are not needed and the host can insert shared pages into the region on
 the next page-fault.
@@ -987,7 +987,7 @@ struct sbiret sbi_covh_create_tvm(unsigned long tvm_create_params_addr,
                                       unsigned long tvm_create_params_len);
 -----
 Creates a confidential TVM using the specified parameters. The
-`tvm_create_params_addr` is the physical address of the buffer containing the
+`tvm_create_params_addr` is the host physical address of the buffer containing the
 `tvm_create_params` structure described below, and `tvm_create_params_len` is
 the size of the structure in bytes.
 
@@ -1004,12 +1004,12 @@ information about the parameters that should be used to populate
 ----
 struct tvm_create_params {
     /*
-     * The base physical address of the 16 KiB confidential memory region
+     * The host physical address of the 16 KiB confidential memory region
      * that should be used for the TVM's page directory. Must be 16 KiB-aligned.
      */
     unsigned long tvm_page_directory_addr;
     /*
-     * The base physical address of the confidential memory region to be used
+     * The host physical address of the confidential memory region to be used
      * to hold the TVM's state. Must be page-aligned and the number of
      * pages must be at least the value returned in tsm_info.vm_state_pages
      * returned by the call to sbi_covh_get_tsm_info().
@@ -1065,9 +1065,9 @@ Transitions the TVM specified by `tvm_guest_id` from the `TVM_INITIALIZING`
 state to a `TVM_RUNNABLE` state. Also, sets the entry point (`ENTRY_PC`) using
 `entry_sepc` and boot argument (`ENTRY_ARG`) using `entry_arg` for the boot
 vCPU. Both `entry_sepc` and `entry_arg` are included in the measurement
-of the TVM. `entry_sepc` is the address in TVM binary to start the boot vCPU
-from and `entry_arg` is the address of guest flattened device tree (FDT) and is
-passed as an argument to the boot vCPU in `a1` GPR.
+of the TVM. `entry_sepc` is the guest physical address to start the boot vCPU
+from and `entry_arg` is the guest physical address of guest flattened device
+tree (FDT) and is passed as an argument to the boot vCPU in `a1` GPR.
 
 `tvm_identity_addr` points to a 64-bytes buffer containing a host-defined TVM
 identity. This piece of data can be used to bind TVMs to a host-defined identity
@@ -1138,7 +1138,7 @@ The `tap_addr` is the 8-bytes aligned guest physical address of the
 `TVM attestation payload` used for local attestation.
 For VMs that do not require local attestation (only the remote attestation),
 `tap_addr` must be set to `0`.
-The `entry_sepc` is the address at which the vCPU execution will resume.
+The `entry_sepc` is the guest physical address at which the vCPU execution will resume.
 `tvm_identity_addr` is an optional, when set, it points to a 64-bytes buffer
 containing a host-defined TVM identity, see `sbi_covh_finalize_tvm()` for more
 details.
@@ -1220,7 +1220,7 @@ struct sbiret sbi_covh_add_tvm_memory_region(unsigned long tvm_guest_id,
                                                  unsigned long tvm_gpa_addr,
                                                  unsigned long region_len);
 -----
-Marks the range of TVM physical address space starting at `tvm_gpa_addr` as
+Marks the range of TVM's guest physical address space starting at `tvm_gpa_addr` as
 reserved for the mapping of confidential memory. The memory region length is
 specified by `region_len`.
 
@@ -1286,7 +1286,7 @@ struct sbiret sbi_covh_add_tvm_measured_pages(unsigned long tvm_guest_id,
 -----
 Copies `num_pages` pages from non-confidential memory at `source_address` to
 confidential memory at `dest_address`, then measures and maps the pages at
-`dest_address` at the TVM physical address space at `tvm_guest_gpa`. The mapping
+`dest_address` at the TVM's guest physical address space at `tvm_guest_gpa`. The mapping
 must lie within a region of confidential memory created with
 `sbi_covh_add_tvm_memory_region()`. The tsm_page_type parameter must be a legal
 value for enum type `tsm_page_type`.
@@ -1301,6 +1301,7 @@ mapping. The GPA of the page mapped is part of the measurement operation.
 The measurement process is a state machine that must be faithfully reproduced
 by the VMM otherwise, the attestation evidence verification by the relying party
 will fail and the TVM will not be considered trustworthy by the relying party.
+The caller must add pages to a TVM in ascending guest physical order.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -1576,7 +1577,7 @@ struct sbiret sbi_covh_tvm_invalidate_pages(unsigned long tvm_guest_id,
                                             unsigned long length);
 -----
 
-Invalidates the pages in the specified range of guest physical address space
+Invalidates the pages in the specified range of TVM's guest physical address space
 and thus marks the
 pages as blocked from any further TVM accesses.
 
@@ -1696,7 +1697,7 @@ The format and semantics of the `tvm_aia_params_addr` structure appears below.
 -------
 struct tvm_aia_params {
     /*
-     * The base address of the virtualized IMSIC in TVM physical address space.
+     * The base address of the virtualized IMSIC in TVM's guest physical address space.
      *
      * IMSIC addresses follow the below pattern:
      *
@@ -2029,7 +2030,7 @@ to EID, `a6` set to FID (see <<cove-fid>>), `a0`-`a5` set to ECALL args.
 struct sbiret sbi_covg_add_mmio_region(unsigned long tvm_gpa_addr,
                                        unsigned long region_len);
 -------
-Marks the specified range of TVM physical address space starting at
+Marks the specified range of TVM's guest physical address space starting at
 `tvm_gpa_addr` as used for emulated MMIO. Upon return, all accesses by the TVM
 within the range are trapped and may be emulated by the host.
 
@@ -2056,7 +2057,7 @@ resume of execution.
 struct sbiret sbi_covg_remove_mmio_region(unsigned long tvm_gpa_addr,
                                           unsigned long region_len);
 -------
-Removes the specified range of TVM physical address space starting at
+Removes the specified range of TVM's guest physical address space starting at
 `tvm_gpa_addr` from the emulated MMIO regions. Upon return, all accesses by the
 TVM within the range will result in a page fault.
 
@@ -2083,7 +2084,7 @@ resume of execution.
 struct sbiret sbi_covg_share_memory_region(unsigned long tvm_gpa_addr,
                                                 unsigned long region_len);
 -------
-Initiates the assignment-change of TVM physical address space starting at
+Initiates the assignment-change of TVM's guest physical address space starting at
 `tvm_gpa_addr` from confidential to non-confidential/shared memory. The
 requested range must lie within an existing region of confidential address
 space, and may or may not be populated. This ECALL results in an exit to the TSM
@@ -2133,7 +2134,7 @@ resume of execution.
 struct sbiret sbi_covg_unshare_memory_region(unsigned long tvm_gpa_addr,
                                              unsigned long region_len);
 -------
-Initiates the assignment-change of TVM physical address space starting at
+Initiates the assignment-change of TVM's guest physical address space starting at
 `tvm_gpa_addr` from
 shared to confidential. The requested range must lie within an existing region
 of non-confidential
@@ -2384,18 +2385,18 @@ If the `sbi_covg_get_attcaps` enumerates attestation services provided by
 the TSM, then this intrinsic is used by a TVM to get an attestation evidence to
 report to a remote relying party.
 
-This intrisic returns an attestation certificate at the address passed as its
-fifth argument (`cert_addr_out`). The certificate is signed by the TSM
+This intrisic returns an attestation certificate at the guest physical address
+passed as its fifth argument (`cert_addr_out`). The certificate is signed by the TSM
 attestation key, and includes the TVM attestation evidence. The TSM attestion
 key is also included in the reported TSM token.
 
-The caller passes the TVM public key address as the first argument
+The caller passes the TVM public key's guest physical address as the first argument
 (`pub_key_addr`). This key will be included in the generated certificate and
 represents the TSM-certified TVM identity.
 
-The third argument (`challenge_data_addr`) points to the attestation challenge
-blob, typically a relying party generated nonce used for demonstrating the
-attestation evidence fresheness.
+The third argument (`challenge_data_addr`) is a guest physical address of
+the attestation challenge blob, typically a relying party generated nonce used
+for demonstrating the attestation evidence fresheness.
 
 The fourth argument (`cert_format`) is the caller's selected attestation
 certificate format. This must be one of the supported
@@ -2553,7 +2554,7 @@ may not be entered after this point. The VMM may start reclaiming TVM
 memory after this point.
 
 | <<sbi_covh_add_tvm_memory_region, sbi_covh_add_tvm_memory_region>> | Adds a
-memory region to the TVM at the specified range of guest physical address space.
+memory region to the TVM at the specified range of TVM's guest physical address space.
 The memory range is confidential to the guest and may only be populated with
 confidential pages.
 
@@ -2568,7 +2569,7 @@ the
 given number of pages from non-confidential memory at `source_address` to
 confidential
 memory at `dest_address`, then measures and maps the pages at `dest_address` in
-the TVM physical
+the guest physical
 address space at `tvm_guest_gpa`. The mapping must lie within a region of
 confidential memory
 created with `sbi_covh_add_tvm_memory_region()`. This call must not be made
@@ -2588,6 +2589,7 @@ faithfully reproduce the state machine for the measurement process otherwise
 the attestation
 evidence verification by the relying party will fail and the TVM will not be
 considered trustworthy.
+The caller must add pages to a TVM in ascending guest physical order.
 
 | <<sbi_covh_add_tvm_zero_pages, sbi_covh_add_tvm_zero_pages>> | Add a
 zero page for an existing mapping for a TVM page (post initialization).
@@ -2595,7 +2597,7 @@ This operation adds a zero page into a mapping and keeps the mapping as
 pending, i.e., access from the TVM will fault until the TVM accepts that GPA.
 
 | <<sbi_covh_add_tvm_shared_pages, sbi_covh_add_tvm_shared_pages>> | Maps
-the given number of pages of non-confidential memory into the TVM's physical
+the given number of pages of non-confidential memory into the guest physical
 address space.
 The guest physical address must lie within a region of non-confidential memory
 previously
@@ -2618,8 +2620,8 @@ verifies if the operation is performed in the right state for that
 virtual hart.
 
 | <<sbi_covh_tvm_fence, sbi_covh_tvm_fence>> | Initiates a TLB invalidation
-sequence for all pages that have been invalidated in the given TVM's address
-space
+sequence for all pages that have been invalidated in the given guest physical
+address space
 since the previous call to `sbi_covh_tvm_fence()`. The TLB invalidation
 sequence is
 completed when all vCPUs in the TVM that were running before the call to
@@ -2628,7 +2630,7 @@ cause by sending an IPI to the physical CPUs on which the TVM's vCPUs are
 running.
 
 | <<sbi_covh_tvm_invalidate_pages, sbi_covh_tvm_invalidate_pages>> |
-Invalidates the pages in the specified range of guest physical address space
+Invalidates the pages in the specified range of TVM's guest physical address space
 and thus marks the
 pages as blocked from any further TVM accesses. Guest page faults taken by the
 TVM on invalidated
@@ -2731,13 +2733,13 @@ interrupt files. Must be called from the same physical CPU as
 |===
 
 | <<sbi_covg_add_mmio_region, sbi_covg_add_mmio_region>> |
-Marks the specified range of TVM physical address space starting at
+Marks the specified range of TVM's guest physical address space starting at
 `tvm_gpa_addr` as used for emulated
 MMIO. Upon return, all accesses by the TVM within the range are trapped and may
 be emulated by the host.
 
 | <<sbi_covg_remove_mmio_region, sbi_covg_remove_mmio_region>> |
-Removes the specified range of TVM physical address space starting at
+Removes the specified range of TVM's guest physical address space starting at
 `tvm_gpa_addr` from the emulated
 MMIO regions. Upon return, all accesses by the TVM within the range will result
 in a page fault.
