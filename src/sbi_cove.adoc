@@ -138,9 +138,148 @@ partitioning of confidential and non-confidential memory (for example
 execution of untrusted code, and thus do not need to implement above ABI.
 ====
 
+===== Memory states and transitions
+The memory management is described in terms of two parallel state machines that
+track the ownership and mapping of every physical memory range.
+
+* The *HPA* (host physical address) state machine tracks who owns a given
+  physical page on the platform.
+* The *GPA* (guest physical address) state machine tracks how a page slot in
+  a particular TVM's guest physical address space is currently used.
+
+The ecall specifications annotate every transition with a `*HPA transitions:*`
+and/or `*GPA transitions:*` line referring to the state names defined here.
+
+The HPA states are caller-observable types of physical pages; how the TSM
+internally encodes them is implementation-defined. GPA states are per-TVM:
+a GPA state transition for one TVM has no effect on the GPA space of another
+TVM, but it does constrain which HPA states may back that GPA.
+
+These state machines cover physical pages and GPA ranges manipulated through
+the CoVE host and guest interfaces. On platforms with dynamic conversion,
+assignable pages typically begin in `VMM`. On statically partitioned platforms,
+some assignable pages may instead begin already confidential and participate
+only in the `UNASSIGNED`, `TSM(gid)`, or `TVM(gid)` side of the model.
+
+*Notation.* `TSM(gid)`, `TVM(gid)` and `SHARED(gid)` denote per-TVM association,
+where `gid` is the TVM's `tvm_guest_id`. `INVALIDATING(prev)` and
+`INVALIDATED(prev)` are parameterized over the GPA state `prev` that the slot
+was in before invalidation was started; `tvm_validate_pages()` returns the
+slot to `prev`, while `tvm_remove_pages()` consumes an `INVALIDATED(prev)`
+slot.
+
+A confidential page associated with a TVM is bound to exactly one `tvm_guest_id`
+until the page is explicitly removed from that TVM or the TVM is destroyed.
+
+A HPA range used in CoVE interfaces is only ever accessible by up to a single
+VMM and up to a single TSM.
+
+====== HPA states
+
+* `VMM`           -- non-confidential memory, accessible only by VMM.
+* `CONVERTING`    -- in-flight conversion.
+* `UNASSIGNED`    -- confidential, not currently assigned to any TVM.
+* `TSM(gid)`      -- confidential, private to TSM and related to TVM `gid`
+                    (TVM control structure, page-table pool, vCPU state
+                    pages, ...).
+* `TVM(gid)`      -- confidential, mapped into TVM `gid`'s GPA.
+* `SHARED(gid)`   -- non-confidential, mapped into VMM's HPA and TVM `gid`'s GPA.
+* `ILLEGAL`       -- Not usable in the CoVE SBI.
+
+[plantuml]
+....
+@startuml
+hide empty description
+state "TSM(gid)" as TSM_GID
+state "TVM(gid)" as TVM_GID
+state "SHARED(gid)" as SHARED_GID
+state ILLEGAL
+VMM        --> CONVERTING : sbi_covh_convert_pages()
+CONVERTING --> UNASSIGNED : sbi_covh_global_fence() +\nsbi_covh_local_fence()
+UNASSIGNED --> VMM        : sbi_covh_reclaim_pages()
+UNASSIGNED --> TSM_GID    : sbi_covh_create_tvm(),\nsbi_covh_promote_to_tvm()\n,\nsbi_covh_add_tvm_page_table_pages(),\nsbi_covh_create_tvm_vcpu()
+UNASSIGNED --> TVM_GID    : sbi_covh_promote_to_tvm()\n,\nsbi_covh_add_tvm_measured_pages(),\nsbi_covh_add_tvm_zero_pages()
+VMM        --> SHARED_GID : sbi_covh_add_tvm_shared_pages()
+TVM_GID    --> UNASSIGNED : sbi_covh_destroy_tvm(),\nsbi_covh_tvm_remove_pages()
+TSM_GID    --> UNASSIGNED : sbi_covh_destroy_tvm()
+SHARED_GID --> VMM        : sbi_covh_destroy_tvm(),\nsbi_covh_tvm_remove_pages()
+VMM -[hidden]-> ILLEGAL
+@enduml
+....
+
+====== GPA states
+
+* `UNMAPPED`         -- the GPA is not part of any defined region.
+* `MMIO`             -- declared as an MMIO region by the guest;
+                        accesses forwarded to VMM.
+* `MAPPABLE`         -- confidential region declared by the host; no page mapped.
+* `MAPPED`           -- a confidential page is present at this GPA.
+* `SHAREABLE`        -- declared as shareable by the guest; no page mapped.
+* `SHARED`           -- a non-confidential shared page is mapped at this GPA.
+* `MAPPED_SHAREABLE` -- a confidential page is mapped at a GPA that the guest
+                        has declared as shareable.
+* `UNSHARED`         -- previously `SHARED`, the guest has declared the GPA
+                        as unshareable.
+* `INVALIDATING(x)`  -- invalidation started from previous state `x`
+* `INVALIDATED(x)`   -- invalidation completed by `tvm_fence`
+
+[plantuml]
+....
+@startuml
+hide empty description
+
+state "INVALIDATING(SHARED)" as INVALIDATING_SHARED
+state "INVALIDATING(MAPPED)" as INVALIDATING_MAPPED
+state "INVALIDATING(MAPPED_SHAREABLE)" as INVALIDATING_MAPPED_SHAREABLE
+state "INVALIDATING(UNSHARED)" as INVALIDATING_UNSHARED
+state "INVALIDATED(SHARED)" as INVALIDATED_SHARED
+state "INVALIDATED(MAPPED)" as INVALIDATED_MAPPED
+state "INVALIDATED(MAPPED_SHAREABLE)" as INVALIDATED_MAPPED_SHAREABLE
+state "INVALIDATED(UNSHARED)" as INVALIDATED_UNSHARED
+
+UNMAPPED         --> MMIO             : sbi_covg_add_mmio_region()
+MMIO             --> UNMAPPED         : sbi_covg_remove_mmio_region()
+
+UNMAPPED         --> MAPPABLE         : sbi_covh_add_tvm_memory_region()
+MAPPABLE         --> MAPPED           : sbi_covh_add_tvm_measured_pages(),\nsbi_covh_add_tvm_zero_pages()
+MAPPABLE         --> SHAREABLE        : sbi_covg_share_memory_region()
+MAPPED           --> MAPPED_SHAREABLE : sbi_covg_share_memory_region()
+SHAREABLE        --> SHARED           : sbi_covh_add_tvm_shared_pages()
+SHARED           --> UNSHARED         : sbi_covg_unshare_memory_region()
+SHAREABLE        --> MAPPABLE         : sbi_covg_unshare_memory_region()
+MAPPED_SHAREABLE --> MAPPED           : sbi_covg_unshare_memory_region()
+
+SHARED           --> INVALIDATING_SHARED           : sbi_covh_tvm_invalidate_pages()
+MAPPED           --> INVALIDATING_MAPPED           : sbi_covh_tvm_invalidate_pages()
+MAPPED_SHAREABLE --> INVALIDATING_MAPPED_SHAREABLE : sbi_covh_tvm_invalidate_pages()
+UNSHARED         --> INVALIDATING_UNSHARED         : sbi_covh_tvm_invalidate_pages()
+
+INVALIDATING_SHARED           --> INVALIDATED_SHARED           : sbi_covh_tvm_fence()
+INVALIDATING_MAPPED           --> INVALIDATED_MAPPED           : sbi_covh_tvm_fence()
+INVALIDATING_MAPPED_SHAREABLE --> INVALIDATED_MAPPED_SHAREABLE : sbi_covh_tvm_fence()
+INVALIDATING_UNSHARED         --> INVALIDATED_UNSHARED         : sbi_covh_tvm_fence()
+
+INVALIDATING_SHARED           --> SHARED           : sbi_covh_tvm_validate_pages()
+INVALIDATING_MAPPED           --> MAPPED           : sbi_covh_tvm_validate_pages()
+INVALIDATING_MAPPED_SHAREABLE --> MAPPED_SHAREABLE : sbi_covh_tvm_validate_pages()
+INVALIDATING_UNSHARED         --> UNSHARED         : sbi_covh_tvm_validate_pages()
+INVALIDATED_SHARED            --> SHARED           : sbi_covh_tvm_validate_pages()
+INVALIDATED_MAPPED            --> MAPPED           : sbi_covh_tvm_validate_pages()
+INVALIDATED_MAPPED_SHAREABLE  --> MAPPED_SHAREABLE : sbi_covh_tvm_validate_pages()
+INVALIDATED_UNSHARED          --> UNSHARED         : sbi_covh_tvm_validate_pages()
+
+INVALIDATED_MAPPED            --> MAPPABLE         : sbi_covh_tvm_remove_pages()
+INVALIDATED_UNSHARED          --> MAPPABLE         : sbi_covh_tvm_remove_pages()
+INVALIDATED_MAPPED_SHAREABLE  --> SHAREABLE        : sbi_covh_tvm_remove_pages()
+INVALIDATED_SHARED            --> SHAREABLE        : sbi_covh_tvm_remove_pages()
+@enduml
+....
+
 ===== Converting non-confidential memory to confidential memory
-Platform memory is non-confidential by default, and must be converted to
-confidential memory before use with TVMs. The conversion process is initiated by
+Pages that are currently in `VMM` must be converted to confidential memory
+before use with TVMs. On platforms with static partitioning, pages that already
+start confidential do not require this sequence and may not support the
+conversion or reclamation ECALLs. The conversion process is initiated by
 designating the host physical pages that are to be converted, and then issuing
 fence operations to ensure that all outstanding TLB entries to the
 non-confidential memory are flushed across all CPUs/harts on the platform. This
@@ -897,6 +1036,7 @@ page size is 4 KiB.
 
 The `base_page_address` must be page-aligned.
 
+*HPA transitions:* base_page_address: VMM -> CONVERTING
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -923,6 +1063,8 @@ Reclaims `num_pages` of confidential memory starting at `base_page_address`.
 The pages must not be currently assigned to an active TVM. The implied page
 size is 4 KiB.
 
+*HPA transitions:* base_page_address: UNASSIGNED -> VMM
+
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_tee_tsm_reclaim_pages_errors]
@@ -946,6 +1088,8 @@ Initiates a TLB invalidation sequence for all pages marked for conversion via
 calls to `sbi_covh_convert_pages()`. The TLB invalidation sequence is completed
 when `sbi_covh_local_fence()` has been invoked on all other CPUs. An error is
 returned if a TLB invalidation sequence is already in progress.
+
+*HPA transitions:* Upon completion of the whole sequence: CONVERTING -> UNASSIGNED
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -1000,6 +1144,7 @@ Callers of this API should first invoke `sbi_covh_get_tsm_info()` to obtain
 information about the parameters that should be used to populate
 `tvm_create_params`.
 
+
 [source, C]
 ----
 struct tvm_create_params {
@@ -1026,6 +1171,8 @@ success, the TVM will be in the `TVM_INITIALIZING` state, until a subsequent
 call to
 `sbi_covh_finalize_tvm()` is made to transition the TVM to a `TVM_RUNNABLE`
 state.
+
+*HPA transitions:* tvm_create_params_addr: UNASSIGNED -> TSM(tvm_guest_id)
 
 The list of possible TVM states appears below.
 
@@ -1166,6 +1313,10 @@ VM's data and the page tables. After this call, the OS/VMM must interact with
 this TVM via the TSM using the COVH ABI, i.e., resuming the TVM using the
 `sbi_covh_run_tvm_vcpu()` call.
 
+*HPA transitions:*
+pages referenced by hgatp leaves: UNASSIGNED -> TVM(tvm_guest_id);
+other pages: UNASSIGNED -> TSM(tvm_guest_id)
+
 If the call fails, the TSM returns the SBI error code in `sbiret.error` to the
 OS/VMM. The possible error codes are shown below.
 
@@ -1202,6 +1353,11 @@ succeeds.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
+*HPA transitions:*
+TVM(tvm_guest_id) -> UNASSIGNED;
+TSM(tvm_guest_id) -> UNASSIGNED;
+SHARED(tvm_guest_id) -> VMM
+
 [#table_sbi_covh_destroy_tvm_errors]
 .COVE Host Destroy TVM Errors
 [cols="2,3", width=90%, align="center", options="header"]
@@ -1230,6 +1386,8 @@ calling `sbi_covh_finalize_tvm()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
+*GPA transitions:* tvm_gpa_addr: UNMAPPED -> MAPPABLE
+
 [#table_sbi_covh_add_tvm_memory_region_errors]
 .COVE Host Add TVM Memory Region
 [cols="2,3", width=90%, align="center", options="header"]
@@ -1256,6 +1414,8 @@ TVM's page-table page-pool. The implied page size is 4 KiB.
 
 Page table pages may be added at any time, and a typical use case is in
 response to a TVM page fault.
+
+*HPA transitions:* UNASSIGNED -> TSM(tvm_guest_id)
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -1304,6 +1464,10 @@ will fail and the TVM will not be considered trustworthy by the relying party.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
+*HPA transitions:* source_address: VMM; dest_address: UNASSIGNED -> TVM(tvm_guest_id)
+
+*GPA transitions:* tvm_guest_gpa: MAPPABLE -> MAPPED
+
 [#table_sbi_covh_add_tvm_measured_pages_errors]
 .COVE Host Add TVM Measured Pages
 [cols="2,3", width=90%, align="center", options="header"]
@@ -1338,6 +1502,10 @@ Zero pages for non-present TVM-specified GPA ranges may be added only post TVM
 finalization, and are typically demand faulted on TVM access.
 
 This call may be made only after calling `sbi_covh_finalize_tvm()`.
+
+*HPA transitions:* base_page_address: UNASSIGNED -> TVM(tvm_guest_id)
+
+*GPA transitions:* tvm_base_page_address: MAPPABLE -> MAPPED
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -1375,6 +1543,10 @@ Shared pages can be added only after the TVM begins execution, and calls the
 TSM to define the location of shared memory regions. They are typically demand
 faulted on TVM access.
 
+*HPA transitions:* base_page_address: VMM -> SHARED(tvm_guest_id)
+
+*GPA transitions:* tvm_base_page_address: SHAREABLE -> SHARED
+
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_covh_add_tvm_shared_pages_errors]
@@ -1403,6 +1575,8 @@ Adds a vCPU with ID `vcpu_id` to the TVM specified by `tvm_guest_id`.
 region used to hold the TVM's vCPU state, and must be
 `tsm_info::tvm_state_pages` pages in length. This call must not be made after
 calling `sbi_covh_finalize_tvm()`.
+
+*HPA transitions:* tvm_state_page_addr: UNASSIGNED -> TSM(tvm_guest_id)
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -1555,6 +1729,8 @@ the physical CPUs on which the TVM's vCPUs are running. Note that the physical
 CPUs don't have to necessarily perform anything on those IPIs. An error is
 returned if a TLB invalidation sequence is already in progress for the TVM.
 
+*GPA transitions:* upon completion of the sequence: forall x. INVALIDATING(x) -> INVALIDATED(x)
+
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_covh_tvm_fence_errors]
@@ -1595,6 +1771,9 @@ to the host.
 The pages remain invalid until the mappings are validated (marked present),
 removed, or become part of a huge page by promotion/demotion operation.
 
+*GPA transitions:* gpa: SHARED -> INVALIDATING(SHARED) or MAPPED -> INVALIDATING(MAPPED)
+or MAPPED_SHAREABLE -> INVALIDATING(MAPPED_SHAREABLE) or UNSHARED -> INVALIDATING(UNSHARED)
+
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_covh_tvm_invalidate_pages_errors]
@@ -1627,6 +1806,8 @@ will mark the pages as present and restore the pages to their previous state.
 This ECALL may be used to revert an in-progress page removal or huge page
 promotion/demotion sequence.
 
+*GPA transitions:* gpa: forall x. INVALIDATING(x) -> x or INVALIDATED(x) -> x
+
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_covh_tvm_validate_pages_errors]
@@ -1653,8 +1834,13 @@ Removes mappings for invalidated pages in the specified range of guest physical
 address space. The range to be unmapped must already have been invalidated and
 fenced, and must lie within a removable region of the guest's physical address
 space. The TSM zeros out all page table entries (PTEs) within the specified
-range and returns the ownership of the pages to the host if previously owned by
-the TVM.
+range. Confidential pages removed from the TVM return to the confidential
+`UNASSIGNED` pool; invalidated shared pages return to `VMM`.
+
+*HPA transitions:* backing page for gpa: TVM(tvm_guest_id) -> UNASSIGNED or SHARED(tvm_guest_id) -> VMM
+
+*GPA transitions:* gpa: INVALIDATED(UNSHARED) -> MAPPABLE or INVALIDATED(MAPPED_SHAREABLE) -> SHAREABLE
+or INVALIDATED(MAPPED) -> MAPPABLE or INVALIDATED(SHARED) -> SHAREABLE
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -2037,6 +2223,8 @@ Both `tvm_gpa_addr` and `region_len` must be 4 KiB-aligned, and the region must
 not overlap with a previously defined region. This call will result in an exit
 to the host on success.
 
+*GPA transitions:* tvm_gpa_addr: UNMAPPED -> MMIO
+
 [#table_sbi_covg_add_mmio_region_errors]
 .COVE Guest Add MMIO Region
 [cols="2,3", width=90%, align="center", options="header"]
@@ -2064,6 +2252,8 @@ Both `tvm_gpa_addr` and `region_len` must be 4 KiB-aligned. The TSM must remove
 every MMIO region that overlaps with the requested range. This call will result
 in an exit to the host on success.
 
+*GPA transitions:* tvm_gpa_addr: MMIO -> UNMAPPED
+
 [#table_sbi_covg_remove_mmio_region_errors]
 .COVE Guest Remove MMIO Region
 [cols="2,3", width=90%, align="center", options="header"]
@@ -2089,7 +2279,10 @@ requested range must lie within an existing region of confidential address
 space, and may or may not be populated. This ECALL results in an exit to the TSM
 which enforces the security properties on the mapping and exits to the VMM
 host. The host then removes any confidential pages already populated in the
-region and inserts non-confidential pages on page-faults.
+region and inserts non-confidential pages on page-faults. For populated ranges,
+the host must invalidate the confidential mappings, complete `sbi_covh_tvm_fence()`,
+and then remove the pages with `sbi_covh_tvm_remove_pages()` before shared
+pages may be inserted.
 
 The calling TVM vCPU is considered blocked until the assignment-change is
 completed. Attempts to run it with `sbi_covh_run_tvm_vcpu()` will fail. Any
@@ -2109,6 +2302,8 @@ request share of multiple smaller memory regions, for example, at the 4 KiB page
 size granularity.
 
 Both `tvm_gpa_addr` and `region_len` must be 4 KiB-aligned.
+
+*GPA transitions:* tvm_gpa_addr: MAPPABLE -> SHAREABLE or MAPPED -> MAPPED_SHAREABLE
 
 The possible error codes returned in sbiret.error are:
 
@@ -2142,13 +2337,18 @@ to the TSM which
 enforces the security properties on the mapping and exits to the OS/VMM. The
 host then removes
 any non-confidential pages already populated in the region and inserts
-confidential pages on page-faults.
+confidential pages on page-faults. For populated ranges, the host must
+invalidate the shared mappings, complete `sbi_covh_tvm_fence()`, and then
+remove the pages with `sbi_covh_tvm_remove_pages()` before confidential pages
+may be inserted.
 
 The calling TVM vCPU is considered blocked until the assignment-change is
 completed. Attempts to run it
 with `sbi_covh_run_tvm_vcpu()` will fail. Any guest page faults taken by other
 TVM vCPUs in the
 invalidated pages continue to be reported to the host.
+
+*GPA transitions:* tvm_gpa_addr: SHARED -> UNSHARED, SHAREABLE -> MAPPABLE, MAPPED_SHAREABLE -> MAPPED
 
 Both `tvm_gpa_addr` and `region_len` must be 4 KiB-aligned.
 
@@ -2806,4 +3006,3 @@ state save and restore of the performance monitoring inhibit and trigger
 controls). The specification of this interface is TBD.
 
 |===
-
