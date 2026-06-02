@@ -241,46 +241,6 @@ is for example for untrusted IO.
 . Access to shared memory pages must be explicitly signaled by the TVM via
 the GPA and enforced for memory access for the TVM by the hardware.
 
-====  Information tracked per physical page
-
-For implementations that utilize MTT, the Extended Memory Tracking Table (EMTT)
-information managed by the TSM
-is used to track additional fields of metadata associated with physical
-addresses.
-The page size is implicit in the MTT and EMTT lookup - 4 KiB, 2 MiB, 1 GiB, 512 GiB.
-Actual page sizes supported are implementation-specified.
-
-|===
-h| Memory Type h| Confidential or Non-confidential (enforced via MTT)
-| Page-Type
-a| Reserved - page that may not be assigned to any TEE entity.
-
-If the Memory Type is Confidential, the following page types may be used:
-
-* Unassigned - page not assigned to any TEE (TSM or TVM)
-* TVM - page assigned to a TVM (mapped via G-stage page table)
-* TSM - page used by the TSM (for MTT and other control structures)
-| Page Owner  | If the Memory Type is Confidential and Page-Type is TVM,
-this value holds the identifier (e.g., PPN) for the TVM control page (4 KiB TEE-
-TSM-TVM page); else it is 0.
-| Page sub-type a| Following types apply if Memory Type is Confidential and
-Page-Type is TVM:
-
-* HGATP - pages used for HGATP structures
-* Data - pages used for TVM content
-
-Following types apply if Memory Type is Confidential and Page-Type is TSM:
-
-* MTT - pages used for MTT structures
-* TVMC - pages used for TVM control structure(s) for global control
-* VHCS - pages used for TVM VHCS (virtual hart control structures)
-| Page TLB version | TLB version in which the page mapping was invalidated to
-allow for VMM memory management. If the page is Unassigned, the TLB version is
-per the global TLB management. If the page is assigned to a TVM, it is versioned
-per the TVM-local TLB management.
-| Additional meta-data | Locking state
-|===
-
 ==== Page walk and Translation caching considerations
 
 Any caching of the address translation information when the memory tracking for
@@ -754,4 +714,3 @@ RAS-induced access violations on a TVM lead to TSM-enforced TVM shutdown and are
 reported to the OS/VMM for further analysis (without allowing any TVM access).
 Similarly, RAS-interrupts (both high and low priority) are forwarded by the TSM
 to the OS/VMM for handling.
-
