@@ -9,7 +9,7 @@ limited capabilities due to power or silicon constrains.
 It augments a feature-rich architecture with flexible ABI and dynamic resource
 management. We defined a simplified implementation that facilitates safety and
 security verification.
-Typical examples of these systems include high-end embedded or edge systems
+Typical examples of these systems include edge and high-end embedded systems
 operating on less complex hardware than cloud-grade servers, and high-assurance
 platforms where reduced architectural complexity simplifies formal verification
 of properties such as correctness and isolation.
@@ -47,11 +47,11 @@ and isolation of TVM execution. The TSM should perform this partitioning early d
 platform boot to gain the following advantages:
 
 . simplified formal reasoning about memory ownership,
-. attestation that covers static system configuration (e.g., values of PMP
-registers),
 . reduced attack surface between OS/VMM and the TSM, achieved through
 preventing the OS/VMM from controlling the allocation of physical
 pages to TVMs and by a narrower ABI.
+. attestation that covers static system configuration (e.g., values of some
+M-mode registers, like PMP registers),
 
 [NOTE]
 ====
@@ -67,9 +67,9 @@ reclaim or use memory over-provisioned to the confidential supervisor domain.
 === TVM creation
 To reduce the complexity of the TSM implementation and its ABI, in this
 deployment model the TSM should create a TVM as a result of a single operation
-triggered with the sbi_covh_promote_to_tvm() call. Specifically, OS/VMM should
+triggered with the `sbi_covh_promote_to_tvm()` call. Specifically, OS/VMM should
 constructs a regular VM in non-confidential memory and requests the TSM to
-promote it to a TVM. To do so, the TSM must copy the VM's data, page tables, and
+promote it to a TVM. To do so, the TSM must create the VM's data, page tables, and
 the boot vCPU state into confidential memory. When the request succeeds, OS/VMM
 marks the VM as a TVM, so that it can then properly resume its execution via the
 TSM.
@@ -82,9 +82,8 @@ the contents of VM's runtime state are predictable, allowing for reliable
 computation of reference integrity measurements. However, certain use cases
 may require promotion after that point and might even exclude some dirty VM pages
 (like those containing custom boot firmware or provisioning code) from the TVM.
-However, if your use case requires promotion after that point, then you must
-exclude dirty VM pages by modifing the FDT to mark selected pages as
-zero pages, and the TSM will clear these pages during promotion.
+However, if a use case requires promotion after that point, then dirty VM pages
+must be excluded by marking selected pages as zero pages.
 ====
 
 === Further Recommendations
