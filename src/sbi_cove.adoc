@@ -300,6 +300,8 @@ interrupt ticking.
                                 to check which interrupts are enabled. This is
                                 useful in waking up a guest's vcpu when it is
                                 sleeping due to a `WFI` instruction.
+| hgatp      |  R    |  W     | Host reflects the address of the page directory
+                                to the TSM during the single-step TVM creation.
 | *GPRs*     |       |        |
 | a0         |  RW   |  RW    | Used for both passing argument and returning
                                 the result for ECALLs forwarded to the host.
@@ -1125,8 +1127,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 === Function: COVE Host Promote to TVM (FID #7)
 [source, C]
 -----
-struct sbiret sbi_covh_promote_to_tvm(unsigned long hgatp,
-                                      unsigned long vcpu_count,
+struct sbiret sbi_covh_promote_to_tvm(unsigned long vcpu_count,
                                       unsigned long entry_sepc,
                                       unsigned long entry_arg,
                                       unsigned long tvm_identity_addr,
@@ -1138,11 +1139,11 @@ require single-step TVM creation (e.g., <<appendix_d>>). Deployment models that
 offer multi-step TVM creation (e.g., <<dep1>>) may, but are not required to,
 support this ABI as an additional mechanism for creating TVMs.
 
-The `hgatp` encodes the physical page number of the VM's page directory and the
-address-translation scheme for guest physical addresses, following the `hgatp`
-CSR encoding.
-The G-stage page tables, rooted at the page directory identified by `hgatp`, and
-data pages must be fully initialized prior to this call.
+Prior to this call, the OS/VMM must set up in non-confidential memory the
+G-stage page tables, rooted at the page directory identified by `hgatp` argument
+passed via NACL shared memory, and data pages. The `hgatp` must encode the
+physical page number of the VM's page directory and the address-translation
+scheme for guest physical addresses, following the `hgatp` CSR encoding.
 
 The `vcpu_count` specifies the number of vCPUs assigned to the TVM. This value
 must be greater than zero and must not exceed `tsm_info.tvm_max_vcpus`.
