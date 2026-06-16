@@ -1806,53 +1806,6 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
-[#sbi_covi_convert_tvm_aia_imsic]
-=== Function: COVE Interrupt Convert AIA IMSIC (FID #2)
-[source, C]
--------
-struct sbiret sbi_covi_convert_aia_imsic(unsigned long imsic_page_addr);
--------
-
-Starts the process of converting the non-confidential guest interrupt file at
-`imsic_page_addr` for use with a TVM. This must be followed by calls to
-`sbi_covh_global_fence()` and `sbi_covh_local_fence()` before the interrupt file
-can be assigned to a TVM.
-
-The possible error codes returned in `sbiret.error` are shown below.
-
-[#table_sbi_tee_aia_tvm_convert_imsic_errors]
-.COVE Interrupt Convert AIA IMSIC
-[cols="2,3", width=90%, align="center", options="header"]
-|===
-| Error code              | Description
-| SBI_SUCCESS             | The operation completed successfully.
-| SBI_ERR_INVALID_ADDRESS | `imsic_page_addr` was invalid.
-| SBI_ERR_FAILED          | The operation failed for unknown reasons.
-|===
-
-[#sbi_covi_reclaim_tvm_aia_imsic]
-=== Function: COVE Interrupt Reclaim TVM AIA IMSIC (FID #3)
-[source, C]
--------
-struct sbiret sbi_covi_reclaim_tvm_aia_imsic(unsigned long imsic_page_addr);
--------
-
-Reclaims the confidential TVM interrupt file at `imsic_page_addr`. The interrupt
-file must not currently be assigned to a TVM.
-
-The possible error codes returned in `sbiret.error` are shown below.
-
-[#table_sbi_tee_reclaim_tvm_aia_imsic_errors]
-.COVE Interrupt Reclaim TVM AIA IMSIC
-[cols="2,3", width=90%, align="center", options="header"]
-|===
-| Error code              | Description
-| SBI_SUCCESS             | The operation completed successfully.
-| SBI_ERR_INVALID_ADDRESS | `imsic_page_addr` was invalid.
-| SBI_ERR_INVALID_PARAM   | The memory is still assigned to a TVM.
-| SBI_ERR_FAILED          | The operation failed for unknown reasons.
-|===
-
 [#sbi_covi_bind_aia_imsic]
 === Function: COVE Interrupt Bind AIA IMSIC (FID #4)
 [source, C]
@@ -1922,7 +1875,7 @@ struct sbiret sbi_covi_unbind_aia_imsic_end(unsigned long tvm_guest_id,
 Completes the unbinding process for the specified vCPU from its guest interrupt
 files after a TLB flush sequence for the TVM has been completed. The interrupt
 state is saved to the vCPU's software interrupt file and the guest interrupt
-files are free to be reclaimed via `sbi_covi_reclaim_tvm_aia_imsic()` or bound
+files are free to be reclaimed via `sbi_covh_reclaim_pages()` or bound
 to another vCPU via `sbi_covi_unbind_aia_imsic_begin()`.
 Must be called on the physical CPU to which the vCPU is bound. Upon success,
 the vCPU is free to be bound to another physical CPU.
@@ -2649,12 +2602,6 @@ intrinsic is supported by the TSM to configure AIA virtualization for the TVM
 
 | <<sbi_covi_set_tvm_aia_cpu_imsic_addr, sbi_covi_set_tvm_aia_cpu_imsic_addr>> |
 Set TVM CPU AIA address
-
-| <<sbi_covi_convert_tvm_aia_imsic, sbi_covi_convert_tvm_aia_imsic>> | Convert
-TVM GPA AIA address to confidential
-
-| <<sbi_covi_reclaim_tvm_aia_imsic, sbi_covi_reclaim_tvm_aia_imsic>> |
-Reclaim TVM GPA AIA address from confidential
 
 | <<sbi_covi_bind_aia_imsic, sbi_covi_bind_aia_imsic>> |
 Binds a TVM vCPU to the current physical CPU using the confidential guest
