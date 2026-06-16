@@ -193,10 +193,10 @@ state ILLEGAL
 VMM        --> CONVERTING : sbi_covh_convert_pages()
 CONVERTING --> UNASSIGNED : sbi_covh_global_fence() +\nsbi_covh_local_fence()
 UNASSIGNED --> VMM        : sbi_covh_reclaim_pages()
-UNASSIGNED --> TSM_GID    : sbi_covh_create_tvm(),\nsbi_covh_promote_to_tvm()\n,\nsbi_covh_add_tvm_page_table_pages(),\nsbi_covh_create_tvm_vcpu()
-UNASSIGNED --> TVM_GID    : sbi_covh_promote_to_tvm(),\nsbi_covh_add_tvm_measured_pages(),\nsbi_covh_add_tvm_zero_pages()
+UNASSIGNED --> TSM_GID    : sbi_covh_create_tvm(),\nsbi_covh_promote_to_tvm() -- non-hgatp,\nsbi_covh_add_tvm_page_table_pages(),\nsbi_covh_create_tvm_vcpu()
+UNASSIGNED --> TVM_GID    : sbi_covh_promote_to_tvm() -- hgatp,\nsbi_covh_add_tvm_measured_pages(),\nsbi_covh_add_tvm_zero_pages()
 VMM        --> MUTUAL_GID : sbi_covh_add_tvm_shared_pages()
-TVM_GID    --> UNASSIGNED : sbi_covh_destroy_tvm(),\nsbi_covh_remove_tvm_shared_pages(),\nsbi_covg_share_memory_region()
+TVM_GID    --> UNASSIGNED : sbi_covh_destroy_tvm(),\nsbi_covg_share_memory_region()
 TSM_GID    --> UNASSIGNED : sbi_covh_destroy_tvm()
 MUTUAL_GID --> VMM        : sbi_covh_destroy_tvm(),\nsbi_covh_remove_tvm_shared_pages()
 VMM -[hidden]-> ILLEGAL
