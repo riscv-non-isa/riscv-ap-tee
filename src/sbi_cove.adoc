@@ -1133,7 +1133,7 @@ struct sbiret sbi_covh_promote_to_tvm(unsigned long vcpu_count,
                                       unsigned long tvm_identity_addr,
                                       unsigned long tap_addr);
 -----
-This function is used by the OS/VMM to promote a non-confidential VM to a TVM in
+This function is used by the OS/VMM to create a TVM in
 a single operation. It is primarily intended for CoVE deployment models that
 require single-step TVM creation (e.g., <<appendix_d>>). Deployment models that
 offer multi-step TVM creation (e.g., <<dep1>>) may, but are not required to,
@@ -1162,7 +1162,7 @@ See `sbi_covh_finalize_tvm()` for the semantics of the TVM identity.
 Payload (TAP), used for local attestation. For TVMs that require only remote
 attestation, `tap_addr` must be set to `0`.
 
-To promote the VM, the TSM performs the following operations.
+To promote to a TVM, the TSM performs the following operations.
 
 The TSM recreates the VM's page tables and data pages in confidential
 memory, following the page table configuration defined by `hgatp`. For each
