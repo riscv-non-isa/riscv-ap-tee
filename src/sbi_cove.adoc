@@ -1162,9 +1162,9 @@ See `sbi_covh_finalize_tvm()` for the semantics of the TVM identity.
 Payload (TAP), used for local attestation. For TVMs that require only remote
 attestation, `tap_addr` must be set to `0`.
 
-To promote the VM, the TSM performs the following steps.
+To promote the VM, the TSM performs the following operations.
 
-First, the TSM recreates the VM's page tables and data pages in confidential
+The TSM recreates the VM's page tables and data pages in confidential
 memory, following the page table configuration defined by `hgatp`. For each
 leaf page table entry (PTE), the TSM decodes the page type from bits 8–9
 (the RSW field) as follows:
@@ -1181,11 +1181,11 @@ leaf page table entry (PTE), the TSM decodes the page type from bits 8–9
             Zero pages are not measured.
 |===
 
-Next, the TSM creates `vcpu_count` vCPUs. All vCPUs are initialized to
-architectural reset state. The boot vCPU's `sepc` is set to `entry_sepc`, `a0`
-to the boot hart's identifier, and `a1` to `entry_arg`.
+The TSM creates `vcpu_count` vCPUs. All vCPUs are initialized to
+architectural reset state. The boot vCPU's `[m|s]epc` is set to `entry_sepc`,
+`a0` to the boot hart's identifier (0), and `a1` to `entry_arg`.
 
-Next, the TSM calculates the TVM integrity measurements over the TVM's
+The TSM calculates the TVM integrity measurements over the TVM's
 confidential memory image, including all measured pages and vCPU initial state.
 Both `entry_sepc` and `entry_arg` are included in the measurement. The
 measurement of data pages should already take place in step 1 to avoid
@@ -1194,15 +1194,15 @@ unnecessary memory reads during promotion.
 If `tap_addr` is non-zero, the TSM uses the TVM measurements to authenticate and
 authorize TVM execution as part of the local attestation procedure.
 
-Finally, the TSM sets the TVM state to `TVM_RUNNABLE` and returns a unique TVM
-identifier (`tvm_guest_id`) in `sbiret.value`.
+If the call succeeds, the TSM sets the TVM state to `TVM_RUNNABLE` and returns a
+unique TVM identifier (`tvm_guest_id`) in `sbiret.value`.
 
+[NOTE]
+====
 Note that a TVM created via this call does not require a subsequent call to
-`sbi_covh_finalize_tvm()`.
-Upon successful return, the OS/VMM should release the non-confidential memory
-that contained the VM's data and page tables. Subsequently, the OS/VMM must
-interact with the TVM exclusively via the COVH ABI, resuming vCPU execution via
-`sbi_covh_run_tvm_vcpu()`. The boot vCPU must be run before any other vCPU.
+`sbi_covh_finalize_tvm()` and the OS/VMM must interact with the TVM exclusively
+via the COVH ABI, resuming vCPUs execution via `sbi_covh_run_tvm_vcpu()`.
+====
 
 If the call fails, the TSM returns an error code in `sbiret.error`. The possible
 error codes are shown below.
@@ -1441,6 +1441,8 @@ Adds a vCPU with ID `vcpu_id` to the TVM specified by `tvm_guest_id`.
 region used to hold the TVM's vCPU state, and must be
 `tsm_info::tvm_state_pages` pages in length. This call must not be made after
 calling `sbi_covh_finalize_tvm()`.
+
+The vCPU with ID 0 is designated as the boot vCPU.
 
 The possible error codes returned in `sbiret.error` are shown below.
 

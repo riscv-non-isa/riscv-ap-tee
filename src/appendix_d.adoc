@@ -6,7 +6,7 @@
 This deployment model targets systems whose design is constrained by real-time
 requirements, formal verification objectives, or must operate on hardware with
 limited capabilities due to power or silicon constrains.
-It augments a feature-rich architecture with flexible ABI and dynamic resource
+It augments a feature-rich architecture, which offers flexible ABI and dynamic resource
 management. We defined a simplified implementation that facilitates safety and
 security verification.
 Typical examples of these systems include edge and high-end embedded systems
@@ -44,12 +44,10 @@ the TSM, e.g., PMP.
 The deployment model should employ a static partitioning of memory into confidential
 and non-confidential regions to simplify formal reasoning about the correctness
 and isolation of TVM execution. The TSM should perform this partitioning early during
-platform boot to gain the following advantages:
+platform initialzation to gain the following advantages:
 
 . simplified formal reasoning about memory ownership,
-. reduced attack surface between OS/VMM and the TSM, achieved through
-preventing the OS/VMM from controlling the allocation of physical
-pages to TVMs and by a narrower ABI.
+. reduced attack surface between OS/VMM and the TSM, achieved through a narrower ABI.
 . attestation that covers static system configuration (e.g., values of some
 M-mode registers, like PMP registers),
 
@@ -73,18 +71,6 @@ promote it to a TVM. To do so, the TSM must create the VM's data, page tables, a
 the boot vCPU state into confidential memory. When the request succeeds, OS/VMM
 marks the VM as a TVM, so that it can then properly resume its execution via the
 TSM.
-
-[NOTE]
-====
-The promotion mechanism enables use cases in which a running VM gets
-promoted to a TVM. To support attestation, such promotion must occur when
-the contents of VM's runtime state are predictable, allowing for reliable
-computation of reference integrity measurements. However, certain use cases
-may require promotion after that point and might even exclude some dirty VM pages
-(like those containing custom boot firmware or provisioning code) from the TVM.
-However, if a use case requires promotion after that point, then dirty VM pages
-must be excluded by marking selected pages as zero pages.
-====
 
 === Further Recommendations
 Embedded systems with real-time requirements must guarantee a fixed upper bound

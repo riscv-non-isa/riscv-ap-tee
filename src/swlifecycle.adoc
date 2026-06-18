@@ -96,14 +96,14 @@ interacting with the TVM through the TSM as described in the next sections.
 The mechanism by which the TSM recreates the VM state in confidential memory is
 implementation-specific. In CoVE implementations that support dynamic conversion
 between confidential and non-confidential memory, the TSM should perform page
-conversion while traversing G-stage page-table mappings. Conversely, CoVE
+conversion. Conversely, CoVE
 implementations that support only static memory partitioning, or that seek to
 reduce the attack surface by preventing the VMM/OS from selecting the physical
 locations of TVM's pages, must instead assign the TSM authority to allocate
 physical pages within confidential memory. Such designs incur greater TSM
 implementation complexity, as the TSM must provide its own page-allocation
 mechanism, and may incur additional performance overhead, as the TSM must copy
-VM data from non-confidential pages into confidential pages during promotion.
+VM data from non-confidential pages into confidential pages.
 
 === TVM execution
 
