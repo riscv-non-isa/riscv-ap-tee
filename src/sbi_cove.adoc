@@ -2438,7 +2438,7 @@ creation via `sbi_covh_promote_to_tvm()`. Only the TVMs that were correctly
 authenticated and authorized during local attestation can receive the secret
 embedded in TAP.
 
-`buf_addr` is the 4 KiB-aligned address in the TVM address space to which the
+`buf_addr` is the 8B-aligned address in the TVM address space to which the
 TSM will write the secret.
 `buf_size` is the length of the buffer. The buffer cannot be larger than the
 4 KiB page size.
