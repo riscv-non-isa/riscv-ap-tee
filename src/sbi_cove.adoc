@@ -740,8 +740,7 @@ enum tvm_state {
 === Function: COVE Host Get TSM Info (FID #0)
 [source, C]
 -----
-struct sbiret sbi_covh_get_tsm_info(unsigned long tsm_info_address,
-                                    unsigned long tsm_info_len);
+struct sbiret sbi_covh_get_tsm_info(unsigned long tsm_info_address);
 -----
 Reads the current TSM state, its configuration, and supported features. The
 information returned by the call is intended to be used by the VMM to configure
@@ -749,15 +748,12 @@ parameters for other TVM-related calls.
 
 `tsm_info_address` must be the 4B-aligned physical memory address to which the
 TSM will write the content of the `tsm_info` struct.
-`tsm_info_len` should be the size of the `tsm_info` struct below.
 The entire buffer must reside in a physical memory region that the OS/VMM and
 TSM can access.
 
 `tsm_info.tsm_capabilities` defines features supported by both the TSM and hardware.
 The OS/VMM can verify that the TSM and hardware support capability `i` by
 checking that the bit `i` is set.
-
-*Returns* the number of bytes written to `tsm_info_address` on success.
 
 [source, C]
 ------
@@ -805,10 +801,14 @@ struct tsm_info {
     uint64_t tsm_capabilities;
     /*
      * The number of 4 KiB pages which must be donated to the TSM for storing TVM
-     * state in sbi_covh_create_tvm_vcpu(). `0` if the TSM does not support the
-     * dynamic memory allocation capability.
+     * state in sbi_covh_create_tvm() can be computed as
+     * (tvm_state_base_bytes + tvm_state_extra_bytes_per_vcpu * vcpu_count
+     *  + 4095) / 4096.
+     * `0` if the TSM does not support the dynamic memory allocation capability
+     * or if it uses reserved memory for TVM state.
      */
-    unsigned long tvm_state_pages;
+    unsigned long tvm_state_base_bytes;
+    unsigned long tvm_state_extra_bytes_per_vcpu;
     /*
      * The maximum number of vCPUs a TVM can support.
      */
@@ -816,7 +816,7 @@ struct tsm_info {
     /*
      * The number of 4 KiB pages which must be donated to the TSM when creating
      * a new vCPU. `0` if the TSM does not support the dynamic memory allocation
-     * capability.
+     * capability or if the TSM uses `tvm_state_addr` for vCPU state.
      */
     unsigned long tvm_vcpu_state_pages;
 };
@@ -861,8 +861,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
-| SBI_ERR_INVALID_ADDRESS | `tsm_info_address` was invalid.
-| SBI_ERR_INVALID_PARAM   | `tsm_info_len` was insufficient.
+| SBI_ERR_INVALID_ADDRESS | The whole `struct tsm_info` couldn't be written to `tsm_info_address`.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
@@ -983,40 +982,30 @@ The possible error codes returned in `sbiret.error` are shown below.
 === Function: COVE Host Create TVM (FID #5)
 [source, C]
 -----
-struct sbiret sbi_covh_create_tvm(unsigned long tvm_create_params_addr,
-                                      unsigned long tvm_create_params_len);
+struct sbiret sbi_covh_create_tvm(unsigned long tvm_page_directory_addr,
+                                  unsigned long tvm_state_addr,
+                                  unsigned long vcpu_count);
 -----
-Creates a confidential TVM using the specified parameters. The
-`tvm_create_params_addr` is the physical address of the buffer containing the
-`tvm_create_params` structure described below, and `tvm_create_params_len` is
-the size of the structure in bytes.
+Creates a confidential TVM using the specified parameters.
+
+`tvm_page_directory_addr` is the base physical address of the 16 KiB
+confidential memory region that will be used for the TVM's page directory.
+Must be 16 KiB-aligned.
+
+`tvm_state_addr` is ignored if `tsm_info.tvm_state_base_bytes` and
+`tsm_info.tvm_state_extra_bytes_per_vcpu` are both `0`, otherwise
+`tvm_state_addr` is the base physical address of the confidential memory region
+to be used to hold the TVM's state, must be page-aligned and the number of
+pages must be at least the value computed as
+`(tsm_info.tvm_state_base_bytes + tsm_info.tvm_state_extra_bytes_per_vcpu
+* vcpu_count + 4095) / 4096`.
+
+`vcpu_count` is the minimal number of vCPUs that the TVM must support.
 
 TVM creation (static) process where a set of TEE pages are assigned for a TVM
 to hold a TVM's global state. This routine also configures the global
 configuration that applies to the TVM and affects all TVM virtual hart settings.
 For example, features enabled for this TVM, perfmon enabled, debug enabled etc.
-
-Callers of this API should first invoke `sbi_covh_get_tsm_info()` to obtain
-information about the parameters that should be used to populate
-`tvm_create_params`.
-
-[source, C]
-----
-struct tvm_create_params {
-    /*
-     * The base physical address of the 16 KiB confidential memory region
-     * that should be used for the TVM's page directory. Must be 16 KiB-aligned.
-     */
-    unsigned long tvm_page_directory_addr;
-    /*
-     * The base physical address of the confidential memory region to be used
-     * to hold the TVM's state. Must be page-aligned and the number of
-     * pages must be at least the value returned in tsm_info.vm_state_pages
-     * returned by the call to sbi_covh_get_tsm_info().
-     */
-    unsigned long tvm_state_addr;
-};
-----
 
 *Returns* the *`tvm_guest_id`* in sbiret.value on success. The *`tvm_guest_id`*
 can be used
@@ -1047,8 +1036,8 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
-| SBI_ERR_INVALID_ADDRESS | `tvm_create_params_addr` was invalid.
-| SBI_ERR_INVALID_PARAM   | `tvm_create_params_len` was invalid.
+| SBI_ERR_INVALID_ADDRESS | `tvm_page_directory_addr` or `tvm_state_addr` was invalid.
+| SBI_ERR_INVALID_PARAM   | `vcpu_count` was not supported.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
@@ -1398,11 +1387,14 @@ struct sbiret sbi_covh_create_tvm_vcpu(unsigned long tvm_guest_id,
                                            unsigned long tvm_vcpu_id,
                                            unsigned long tvm_state_page_addr);
 -----
-Adds a vCPU with ID `vcpu_id` to the TVM specified by `tvm_guest_id`.
-`tvm_state_page_addr` must be page-aligned and point to a confidential memory
-region used to hold the TVM's vCPU state, and must be
-`tsm_info::tvm_state_pages` pages in length. This call must not be made after
-calling `sbi_covh_finalize_tvm()`.
+Adds a vCPU with ID `tvm_vcpu_id` to the TVM specified by `tvm_guest_id`.
+
+The `tvm_state_page_addr` is ignored if `tsm_info::tvm_vcpu_state_pages` is
+`0`, otherwise `tvm_state_page_addr` must be page-aligned and point to a
+confidential memory region used to hold the TVM's vCPU state, and must be
+`tsm_info::tvm_vcpu_state_pages` pages in length.
+
+This call must not be made after calling `sbi_covh_finalize_tvm()`.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -1412,7 +1404,7 @@ The possible error codes returned in `sbiret.error` are shown below.
 |===
 | Error code            | Description
 | SBI_SUCCESS           | The operation completed successfully.
-| SBI_ERR_INVALID_ADDRESS | `tvm_stage_page_address` was invalid.
+| SBI_ERR_INVALID_ADDRESS | `tvm_state_page_addr` was invalid.
 | SBI_ERR_INVALID_PARAM | `tvm_guest_id` or `tvm_vcpu_id` were invalid,
                           or the TVM wasn't in `TVM_INITIALIZING` state.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
