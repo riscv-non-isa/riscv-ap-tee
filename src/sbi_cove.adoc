@@ -1876,7 +1876,7 @@ Completes the unbinding process for the specified vCPU from its guest interrupt
 files after a TLB flush sequence for the TVM has been completed. The interrupt
 state is saved to the vCPU's software interrupt file and the guest interrupt
 files are free to be reclaimed via `sbi_covh_reclaim_pages()` or bound
-to another vCPU via `sbi_covi_unbind_aia_imsic_begin()`.
+to another vCPU via `sbi_covi_bind_aia_imsic()`.
 Must be called on the physical CPU to which the vCPU is bound. Upon success,
 the vCPU is free to be bound to another physical CPU.
 
