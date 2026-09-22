@@ -53,6 +53,16 @@ fields that are immutable for the lifetime of the TVM, e.g., configuration of
 which RISC-V CPU extensions the TVM is allowed to use, debug and performance
 monitoring capabilities enabled etc.
 
+All SBI ECALLs are initially disabled. While the TVM is in
+`TVM_INITIALIZING`, the VMM configures individual SBI EID/FID pairs with
+<<sbi_covh_set_tvm_sbi_policy>>. Each pair may be handled by the TSM,
+forwarded to the VMM, or disabled, subject to the routing restrictions in
+<<tvm-sbi-policy>>. This policy applies to all of the TVM's vCPUs.
+The `COVE_TVM_SBI_TSM_LOCAL` handler mode requires TSM processing without
+communicating with the VMM; `COVE_TVM_SBI_TSM` permits host communication
+explicitly required by the function's specification. Either TSM mode can
+satisfy the mandatory SBI Base requirements at finalization.
+
 The VMM may assign memory to the TVM via a sequence of
 `sbi_covh_add_tvm_page_table_pages()` `sbi_covh_add_tvm_measured_pages()` and
 `sbi_covh_add_tvm_zero_pages()` - the former grants memory pages that are to
@@ -79,6 +89,11 @@ executing the TVM virtual harts, the VMM must finalize the initial
 measurement of the TVM via `sbi_covh_finalize_tvm()`. The TSM prevents any
 TVM virtual harts from being entered until the TVM initialization is
 finalized.
+Finalization requires explicit TSM policy entries for all mandatory SBI Base
+functions. If any are missing or disabled, it fails with
+`SBI_ERR_INVALID_PARAM` and leaves the TVM initializing so the VMM can correct
+the policy. Successful finalization includes the effective enabled SBI policy
+in the initial measurement and makes the policy immutable.
 
 ==== Single-step TVM Creation
 
@@ -93,6 +108,10 @@ creates a new TVM from the reflected VM state (VM data, page table configuration
 , vCPU state). After promotion, the OS/VMM releases the previously allocated VM
 resources and begins interacting with the TVM through the TSM as described in
 the next sections.
+
+The staged-creation SBI policy interface does not change single-step promotion
+behavior. The `sbi_covh_set_tvm_sbi_policy()` setter rejects promoted TVMs
+because they are already in `TVM_RUNNABLE`.
 
 [NOTE]
 ====

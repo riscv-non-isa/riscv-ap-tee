@@ -61,6 +61,8 @@ TSM module (enforced via `medeleg` configuration). The TSM then may provide
 intrinsics via the COVG (CoVE-Guest ABI) to the TVM to provide attestation
 and other trusted services. The TSM may allow the TEE (application or VM)
 to request host (untrusted) services via the COVH (CoVE host-ABI).
+For TVMs created through staged creation, the TSM dispatches SBI ECALLs
+according to the per-TVM policy described in <<tvm-sbi-policy>>.
 
 ==== Operational model for the CoVE Host Extension
 Executing confidential workloads in a CoVE-enabled system requires a sequence of
@@ -74,6 +76,7 @@ non-TCB hosting entity like the OS/VMM (host) in conjunction with the TSM.
 . Defining TVM confidential memory regions.
 . Mapping TVM code and data payload to confidential-memory regions.
 . Creating TVM vCPUs.
+. Configuring the TVM SBI ECALL policy.
 . Finalizing TVM creation.
 . Scheduling TVM execution.
 . Management of TVM secure interrupts.
@@ -343,6 +346,55 @@ state was presented to the TSM at the time of promotion. The vCPUs initial
 states are part of the TVM's measurement.
 ====
 
+[#tvm-sbi-policy]
+===== TVM SBI ECALL policy
+
+For a TVM created by `sbi_covh_create_tvm()`, all SBI ECALLs are initially
+disabled. While the TVM is in `TVM_INITIALIZING`, the VMM uses
+<<sbi_covh_set_tvm_sbi_policy>> to configure each SBI extension ID (EID) and
+function ID (FID) pair as disabled, handled by the TSM, or forwarded to the
+VMM. The policy applies to all vCPUs of the TVM, including those created after
+the policy entry is configured. Unspecified pairs remain disabled. There are
+no wildcard or extension-wide rules.
+
+The TSM must check the effective policy before invoking a handler or exposing
+ECALL arguments to the VMM:
+
+* `COVE_TVM_SBI_DISABLED`: The TSM returns `SBI_ERR_NOT_SUPPORTED` to the TVM
+  without forwarding the ECALL or publishing its arguments to the VMM,
+  including through NACL shared memory.
+* `COVE_TVM_SBI_TSM`: The TSM invokes the trusted handler. An unsupported
+  call returns `SBI_ERR_NOT_SUPPORTED` to the TVM and must not fall back to
+  forwarding to the VMM. Host exits explicitly required by the individual
+  handler's specification still occur after TSM processing.
+* `COVE_TVM_SBI_VMM`: The TSM forwards the ECALL through the existing NACL
+  register-sharing and ECALL-exit protocol described in
+  <<sbi_covh_run_tvm_vcpu>>. Selecting this handler does not guarantee that
+  the VMM implements the selected function.
+* `COVE_TVM_SBI_TSM_LOCAL`: The TSM invokes a trusted handler that must service
+  the ECALL without communicating with the VMM. It must not forward the ECALL,
+  request host assistance, or expose the call's arguments, results, or other
+  call-derived information to the VMM, including through NACL or other shared
+  memory. Host exits required by a function's specification are not permitted
+  in this mode. If an invocation cannot be completed under this restriction,
+  the TSM returns `SBI_ERR_NOT_SUPPORTED` to the TVM without partial effects
+  or host communication. It must not fall back to another handler mode.
+
+SBI Base and COVG functions may use either TSM handler mode or be disabled,
+subject to the selected mode's restrictions, but must not be routed directly
+to the VMM. Host-only COVH and COVI functions must not be
+enabled for TVM invocation. Legacy SBI calls remain disabled.
+
+The TSM must answer SBI Base extension probes from the effective policy:
+an extension is reported as available (a nonzero probe result) if and only if
+it has at least one enabled function, whether TSM-handled or VMM-forwarded.
+Otherwise, the probe result is zero. Availability of an extension does not
+imply that every function in that extension is enabled.
+
+This policy configuration applies only to staged creation. It does not change
+single-step promotion behavior. A TVM created by `sbi_covh_promote_to_tvm()`
+is already runnable and therefore cannot use the setter.
+
 ===== Finalization of TVM creation
 The OS/VMM that finishes the assembly of a TVM, i.e., assignment of memory and
 vCPU resources to a TVM, transitions the guest into a `TVM_RUNNABLE` state by
@@ -351,6 +403,10 @@ The host must set up TVM Boot vCPU execution parameters like the
 entrypoint (`ENTRY_PC`) and boot argument (`ENTRY_ARG`) using arguments to
 `sbi_covh_finalize_tvm()`. Note that some COVH calls are no longer permissible
 after this transition.
+Before finalization, the VMM must explicitly configure every mandatory SBI
+Base function for TSM handling. Finalization validates these entries, measures
+the effective SBI policy, and makes it immutable, as specified in
+<<sbi_covh_finalize_tvm>>.
 
 [NOTE]
 ====
@@ -503,6 +559,7 @@ TSM -> TSM: Update status for converted confidential page regions
 
 Host -> TSM: create TVM
 TSM -> TSM: set TVM state to "TVM_INITIALIZING"
+TSM -> TSM: Initialize SBI policy with all ECALLs disabled
 TSM -> Host: TVM "guest_id"
 
 Host -> TSM: Assign converted confidential memory for TVM page-table pool
@@ -524,7 +581,12 @@ end
 Host -> TSM: Set TVM entry-point and other config. register state for boot vcpu
 TSM -> TSM: Extend TVM measurements with entry point and config state
 
+loop [For each SBI EID/FID pair to enable]
+Host -> TSM: Set TVM SBI policy entry (including mandatory Base functions)
+end
+
 Host -> TSM: Finalize TVM to be able to execute vcpus
+TSM -> TSM: Validate mandatory SBI Base entries and measure effective SBI policy
 TSM -> TSM: Finalize TVM measurements and make TVM state "TVM_RUNNABLE"
 
 Host -> TSM: Run TVM using boot vcpu
@@ -625,6 +687,12 @@ note over TSM
   external interrupt or exception
 end note
 TSM -> TSM: Examine fault and if the cause can be handled locally
+note over TSM
+  For staged TVMs, check the SBI policy before dispatching ECALLs.
+  Disabled calls return NOT_SUPPORTED locally. TSM handlers do not
+  fall back to the host. Only non-local TSM handlers may perform
+  specified host exits.
+end note
 
 alt TVM trap that can be handled by the TSM (case 1)
 
@@ -1027,6 +1095,9 @@ call to
 `sbi_covh_finalize_tvm()` is made to transition the TVM to a `TVM_RUNNABLE`
 state.
 
+All SBI ECALLs are initially disabled for this TVM. The VMM must configure
+the policy using <<sbi_covh_set_tvm_sbi_policy>> before finalization.
+
 The list of possible TVM states appears below.
 
 [#table_sbi_tvm_states]
@@ -1104,6 +1175,31 @@ measurement is committed
 via this operation. No additional measured pages may be added after this
 operation is successfully completed.
 
+Before committing the initial measurement or making the TVM runnable, the TSM
+must verify that every mandatory function of the SBI Base extension (EID
+`0x10`), as defined by the SBI specification <<SBI>>, has an explicit
+`COVE_TVM_SBI_TSM` or `COVE_TVM_SBI_TSM_LOCAL` policy entry. If any mandatory
+function lacks an entry with either handler, finalization returns
+`SBI_ERR_INVALID_PARAM`, leaves the TVM in
+`TVM_INITIALIZING`, and does not commit the initial measurement. The VMM may
+correct the policy and retry finalization.
+
+At finalization, the TSM must include the effective enabled SBI policy entries
+in the TVM's initial measurement using the existing implementation-specific
+measurement mechanism. Each measured entry consists of `(EID, FID, handler)`.
+Entries must be ordered by ascending numerical EID, then by ascending numerical
+FID, including applicable CoVE domain-selector bits. Disabled and unspecified
+pairs are omitted. The measurement must use a deterministic encoding of these
+entries, so that equivalent final policies contribute identically to the
+measurement regardless of setter order, overwritten entries, or explicit
+disabling of pairs. With all other measured inputs unchanged, equivalent final
+policies must produce identical initial measurements.
+The measured handler value distinguishes `COVE_TVM_SBI_TSM_LOCAL` from
+`COVE_TVM_SBI_TSM`, even when both use the same trusted implementation.
+
+On successful finalization, the SBI policy becomes immutable for the lifetime
+of the TVM. Subsequent calls to `sbi_covh_set_tvm_sbi_policy()` are rejected.
+
 The possible error codes returned in `sbiret.error` are shown below.
 
 [#table_sbi_covh_finalize_tvm_errors]
@@ -1113,7 +1209,10 @@ The possible error codes returned in `sbiret.error` are shown below.
 | Error code            | Description
 | SBI_SUCCESS           | The operation completed successfully.
 | SBI_ERR_INVALID_PARAM | `tvm_guest_id` or `tvm_identity_addr` was invalid, or
-                          the TVM wasn't in the `TVM_INITIALIZING` state.
+                          the TVM wasn't in the `TVM_INITIALIZING` state, or
+                          a mandatory SBI Base function lacked an explicit
+                          `COVE_TVM_SBI_TSM` or `COVE_TVM_SBI_TSM_LOCAL`
+                          policy entry.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
 
@@ -1460,6 +1559,18 @@ exit was caused by an exception. The remaining bits are specific information
 about the interrupt or exception, and the specific reason can be determined
 using the enumeration detailed below.
 
+For a TVM created through staged creation, an ECALL produces a
+`VIRTUAL_SUPERVISOR_ENV_CALL` exit only when its policy entry selects
+`COVE_TVM_SBI_VMM`, or when its `COVE_TVM_SBI_TSM` handler explicitly requires
+such an exit. The TSM sets `scause` to this exception code and publishes the
+ECALL's EID in `a7`, FID in `a6`, and arguments in `a0`-`a5` through NACL shared
+memory, subject to the register-sharing rules above. On resume, the TSM reads
+the host's results from NACL shared memory as required by the call. Disabled
+ECALLs and TSM-handled calls returning `SBI_ERR_NOT_SUPPORTED` do not produce
+an ECALL exit or publish their arguments to the VMM. Calls configured as
+`COVE_TVM_SBI_TSM_LOCAL` must never produce an ECALL exit or communicate
+call-derived information to the VMM, regardless of their result.
+
 [source, C]
 -------
 enum tvm_interrupt_exit {
@@ -1495,7 +1606,7 @@ enum Exception {
     USER_ENVCALL = 8,
     SUPERVISOR_ENVCALL = 9,
     /*
-     * The TVM made an ECALL request directed at the host. i
+     * The TVM made an ECALL request forwarded to the host.
      * The host should examine GPRs A0-A7
      * in the NACL shared memory area to process the ECALL.
     */
@@ -1667,6 +1778,89 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `length` were invalid.
 | SBI_ERR_INVALID_ADDRESS | `gpa` was invalid.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
+|===
+
+[#sbi_covh_set_tvm_sbi_policy]
+=== Function: COVE Host Set TVM SBI Policy (FID #20)
+[source, C, options="unbreakable"]
+-----
+struct sbiret sbi_covh_set_tvm_sbi_policy(unsigned long tvm_guest_id,
+                                        unsigned long extension_id,
+                                        unsigned long function_id,
+                                        unsigned long handler);
+-----
+
+Sets the handler for the exact SBI EID/FID pair identified by `extension_id`
+and `function_id` for the TVM identified by `tvm_guest_id`. The TVM must be in
+`TVM_INITIALIZING`. This function therefore rejects finalized TVMs and TVMs
+created by single-step promotion, which are already runnable.
+
+The supported handler values are:
+
+[#table_tvm_sbi_policy_handlers]
+.TVM SBI Policy Handlers
+[cols="4,1,4", width=100%, align="center", options="header"]
+|===
+| Name                  | Value | Description
+| COVE_TVM_SBI_DISABLED | 0     | Return `SBI_ERR_NOT_SUPPORTED` to the TVM.
+| COVE_TVM_SBI_TSM      | 1     | Invoke the trusted TSM handler, permitting
+                                specified host communication.
+| COVE_TVM_SBI_VMM      | 2     | Forward the ECALL to the VMM.
+| COVE_TVM_SBI_TSM_LOCAL | 3    | Invoke a trusted TSM handler without VMM
+                                communication.
+|===
+
+All other `handler` values are invalid. The dispatch behavior and routing
+restrictions are specified in <<tvm-sbi-policy>>.
+
+`extension_id` and `function_id` must be valid SBI identifier encodings under
+the SBI calling convention <<SBI>>. For CoVE functions, `function_id` includes
+the applicable domain-selector bits in the <<cove-fid,CoVE FID format>>;
+reserved bits must be zero. Matching uses the full EID/FID pair, including those domain-selector
+bits. For COVG, this is the FID after the RDSM has specified the callee's
+Supervisor Domain Identifier. There are no wildcard or extension-wide
+settings. An identifier with a valid encoding need not identify a function
+implemented by the TSM or VMM to be configured as disabled or VMM-forwarded,
+subject to the routing restrictions.
+
+Each successful call replaces the pair's previous setting for all vCPUs of
+the TVM. Setting `COVE_TVM_SBI_DISABLED` for an unspecified pair succeeds
+without changing the policy. Setting it for an enabled pair disables that
+pair. A failed call must leave the entire policy unchanged.
+
+Requests to route SBI Base or COVG functions directly to the VMM, or to enable
+host-only COVH/COVI functions or legacy SBI calls, return `SBI_ERR_DENIED`.
+Selecting `COVE_TVM_SBI_TSM_LOCAL` for a function whose specification requires
+host communication returns `SBI_ERR_DENIED`. For example, COVG functions that
+require a host exit to register MMIO or share memory cannot use this mode.
+Selecting either TSM handler mode for an otherwise permitted pair for which
+the TSM has no handler supporting the selected mode returns
+`SBI_ERR_NOT_SUPPORTED`; the TSM must not substitute another handler mode.
+Disabling these pairs is permitted for valid identifiers.
+
+The setter does not extend the initial measurement. The effective enabled
+policy is measured at finalization as specified in <<sbi_covh_finalize_tvm>>.
+
+*Returns* zero in `sbiret.value` on success.
+
+The possible error codes returned in `sbiret.error` are shown below.
+
+[#table_sbi_covh_set_tvm_sbi_policy_errors]
+.COVE Host Set TVM SBI Policy Errors
+[cols="2,3", width=90%, align="center", options="header,unbreakable"]
+|===
+| Error code            | Description
+| SBI_SUCCESS           | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM | `tvm_guest_id`, `extension_id`, `function_id`, or
+                          `handler` was invalid, or the TVM wasn't in
+                          `TVM_INITIALIZING`.
+| SBI_ERR_DENIED        | The requested routing is forbidden, including local
+                          TSM handling of a function that requires host
+                          communication.
+| SBI_ERR_NOT_SUPPORTED | The requested TSM handler is unavailable for an
+                          otherwise permitted pair.
+| SBI_ERR_OUT_OF_MEMORY | Insufficient memory to update the policy.
+| SBI_ERR_FAILED        | The operation failed for other reasons.
 |===
 
 == COVE Interrupt Extension (EID #0x434F5649 "COVI")
@@ -2018,9 +2212,16 @@ The COVE Guest extension supplements the COVE Host extension, and allows TVMs
 to communicate with the TSM for the supervisor domain the guest was instantiated
 within.
 A typical use case for this extension is to relay information to the host.
-COVE-Guest calls cause a trap to the TSM. TSM should do any processing required
-and then must forward the ECALL to the host with `scause` set to ECALL, `a7` set
-to EID, `a6` set to FID (see <<cove-fid>>), `a0`-`a5` set to ECALL args.
+COVE-Guest calls cause a trap to the TSM. For TVMs created through staged
+creation, the TSM first checks the policy in <<tvm-sbi-policy>>; the function
+must be configured as `COVE_TVM_SBI_TSM` or `COVE_TVM_SBI_TSM_LOCAL` to be
+invoked. Functions requiring host communication cannot use
+`COVE_TVM_SBI_TSM_LOCAL`. The individual function descriptions below apply
+when the function is enabled. The TSM must perform
+the required processing and forward the ECALL to the host only when the
+individual function's specification requires it. Such forwarding sets `scause`
+to `VIRTUAL_SUPERVISOR_ENV_CALL`, with `a7` set to EID, `a6` set to FID (see
+<<cove-fid>>), and `a0`-`a5` set to ECALL arguments in NACL shared memory.
 
 [#sbi_covg_add_mmio_region]
 === Function: COVE Guest Add MMIO Region (FID #0)
@@ -2541,6 +2742,13 @@ etc.
 the VMM to finalize the measurement of a TVM (initial). The TSM enforces that
 the TVM virtual harts cannot be entered unless the TVM measurement is committed
 via this operation.
+
+| <<sbi_covh_set_tvm_sbi_policy, sbi_covh_set_tvm_sbi_policy>> | Configures an
+exact SBI EID/FID pair as disabled, TSM-handled (with or without permission
+for specified host communication), or VMM-forwarded for all TVM vCPUs during
+staged creation. All pairs are initially disabled. Finalization
+requires explicit TSM entries for mandatory SBI Base functions, measures the
+effective policy, and makes it immutable.
 
 | <<sbi_covh_promote_to_tvm, sbi_covh_promote_to_tvm>>  | Creates a TVM in
 a single-step taking the state of an existing VM and recreating it in

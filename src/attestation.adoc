@@ -95,8 +95,22 @@ measurements and a runtime one.
 TVM initial measurements are generated from the CoVE workload TCB elements
 involved in the TVM construction. Any TCB element that directly or indirectly
 supports a TVM must be measured into the TVM initial measurement registers. Once
-a TVM is finalized, i.e., after the `sbi_tee_host_finalize_tvm()` TH-ABI is
+a TVM is finalized, i.e., after the `sbi_covh_finalize_tvm()` COVH-ABI is
 called, the TVM initial measurements must no longer be extended.
+
+For staged TVM creation, the measured TVM configuration includes the effective
+SBI ECALL policy configured through <<sbi_covh_set_tvm_sbi_policy>>. At
+finalization, the TSM measures the enabled `(EID, FID, handler)` entries in
+ascending EID/FID order, including applicable CoVE domain-selector bits, using
+the implementation-specific measurement mechanism described below. Disabled
+and unspecified pairs are omitted. Equivalent final policies must contribute
+identically to the measurement regardless of setter order, overwritten
+entries, or explicit disabling of pairs, as specified in
+<<sbi_covh_finalize_tvm>>. This policy is immutable after finalization; these
+requirements do not change single-step promotion behavior.
+The measured handler value distinguishes TSM handling that permits specified
+host communication (`COVE_TVM_SBI_TSM`) from TSM handling that prohibits it
+(`COVE_TVM_SBI_TSM_LOCAL`).
 
 Each TVM's initial measurements are stored in dedicated measurement registers
 and a CoVE implementation must provide at least 1 and at most 8 of them. The
@@ -148,7 +162,8 @@ CoVE implementation may look like the following table:
 
      | 5
      | TVM Configuration
-    <| TVM Entry Point, Initial Arguments, and the vCPU state
+    <| TVM Entry Point, Initial Arguments, vCPU state, and SBI ECALL policy
+       (for staged creation)
      | TSM
 |===
 
