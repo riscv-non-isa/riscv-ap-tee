@@ -395,6 +395,105 @@ This policy configuration applies only to staged creation. It does not change
 single-step promotion behavior. A TVM created by `sbi_covh_promote_to_tvm()`
 is already runnable and therefore cannot use the setter.
 
+[#tvm-isa-config]
+===== TVM ISA configuration
+
+When `COVE_TSM_CAP_TVM_ISA_CONFIG` is advertised, the TSM provides TVM-wide
+configuration of architectural CSR policy fields through
+<<sbi_covh_get_tvm_isa_config>>, <<sbi_covh_set_tvm_isa_config>>, and
+<<sbi_covh_get_tvm_isa_config_writable_mask>>. ISA
+extensions are configurable through this interface only where architectural
+CSR fields control their availability. This interface does not provide
+arbitrary CSR access or an extension-name registry.
+
+At `sbi_covh_create_tvm()`, the TSM captures its default configuration,
+supported architectural policy fields and writable masks for the TVM.
+The supported fields and writable masks remain fixed for the TVM's lifetime.
+The effective configuration initially contains those defaults, including
+fixed settings that the host cannot change. Queries return the effective
+configuration or writable masks before and after finalization.
+Setters are allowed only in `TVM_INITIALIZING`, and apply to every existing
+and subsequently created vCPU of that TVM.
+
+The configuration must contain only architectural policy fields whose
+behavior the TSM can safely enforce for the TVM. Address fields and live
+guest state are excluded. The TSM must reject changes that would compromise
+CoVE isolation. A reported field may have a fixed setting or support only
+some architectural encodings. The writable mask identifies bits that the
+host may change during initialization and contains only supported policy
+bits. It does not guarantee that every field encoding or combination is
+supported; callers must check the result of each setter.
+All supported policy fields, including fixed settings, are included in the
+initial measurement regardless of whether the host changes them.
+
+The initial CSR coverage is:
+
+[#table_tvm_isa_config_csrs]
+.TVM ISA Configuration CSR Fields
+[cols="2,1,4", width=100%, options="header,unbreakable"]
+|===
+| CSR | Number | Eligible architectural policy fields
+| hstatus | `0x600` | `VTW`, `VTVM`, and `VTSR`, with their architectural
+virtual-instruction trapping semantics.
+| henvcfg | `0x60A` | Architectural extension and environment controls, such
+as `CBZE`, `CBCFE`, and `CBIE`, subject to TSM support and isolation policy.
+| henvcfgh (RV32 only) | `0x61A` | The architectural high half of `henvcfg`,
+including controls such as `STCE` where supported.
+|===
+
+The table identifies eligible fields, not a requirement to support all of
+them. Future architectural CSR policy fields can use the same functions;
+their CSR numbers and field definitions come from the applicable ISA
+specifications. The underlying hardware may implement fields that the TSM
+does not support through this interface.
+
+CSR numbers are architectural 12-bit numbers, not NACL shared-memory indexes.
+Masks and values are XLEN-wide, where XLEN is the COVH caller's register width.
+On RV32, high-half controls use their architectural high-half CSR number and
+bit positions within that 32-bit CSR. On RV64, those controls use the
+full-width CSR; high-half CSR numbers are unsupported. This interface does
+not change the TVM's execution width.
+
+The TSM validates individual field encodings when a setter is called and
+validates dependencies across fields and other TVM configuration at
+finalization. It must reject unsupported settings rather than silently
+coercing WARL values or modifying other fields to satisfy dependencies.
+The configured behavior must be preserved on vCPU entry and resume and across
+scheduling on different physical harts. The TSM must not execute a vCPU on a
+hart on which it cannot enforce that behavior. These settings must not bypass
+the TVM's SBI policy or any existing CoVE isolation requirement.
+
+For example, `hstatus.VTW=1` uses the architectural WFI trapping rule
+<<PRIVISA>>:
+when `mstatus.TW=0`, a WFI executed in VS-mode that does not complete within
+an implementation-specific bounded time raises a virtual-instruction
+exception. It may complete before that bound, and the implementation may
+trap immediately. `VTW=0` removes this trapping condition, but does not
+guarantee that WFI waits or that no other architectural trapping condition
+applies. A resulting virtual-instruction exit uses the existing
+`VIRTUAL_INSTRUCTION` exit and NACL protocol in <<sbi_covh_run_tvm_vcpu>>.
+
+WFI traps originating in VU-mode are handled by the TSM. When
+`mstatus.TW=0`, executing WFI in VU-mode raises a virtual-instruction
+exception regardless of `hstatus.VTW`. The TSM must translate this trap
+into an illegal-instruction exception injected into the TVM's VS-mode.
+If VU-mode WFI instead raises an illegal-instruction exception, the TSM
+must likewise deliver it to the TVM's VS-mode. In either case, the TSM must
+not report the WFI trap as a VMM exit or publish its trap state to the VMM
+through NACL shared memory.
+
+The injected exception has `vscause=2` and `vsepc` pointing to the faulting
+WFI; the TSM must not advance past the instruction. The TSM must establish
+the remaining VS-mode trap state and transfer control to the guest's trap
+handler according to the architectural trap-entry rules. This lets the
+guest OS handle the VU-mode illegal instruction independently of the
+VS-mode WFI trapping policy selected through `VTW`.
+
+This configuration interface applies to staged creation. It does not change
+single-step promotion behavior or its measurement rules. Promoted TVMs are
+already runnable and cannot use the setter; queries for promoted TVMs are
+not supported by this interface.
+
 ===== Finalization of TVM creation
 The OS/VMM that finishes the assembly of a TVM, i.e., assignment of memory and
 vCPU resources to a TVM, transitions the guest into a `TVM_RUNNABLE` state by
@@ -405,8 +504,11 @@ entrypoint (`ENTRY_PC`) and boot argument (`ENTRY_ARG`) using arguments to
 after this transition.
 Before finalization, the VMM must explicitly configure every mandatory SBI
 Base function for TSM handling. Finalization validates these entries, measures
-the effective SBI policy, and makes it immutable, as specified in
-<<sbi_covh_finalize_tvm>>.
+the effective SBI policy, and makes it immutable. When ISA configuration is
+supported, finalization also validates the complete effective CSR configuration
+and its dependencies, measures it including defaults and fixed fields,
+and freezes it, as specified in <<sbi_covh_finalize_tvm>>. Validation failure
+leaves the TVM initializing and its initial measurement uncommitted.
 
 [NOTE]
 ====
@@ -457,6 +559,12 @@ decoding using the `htinst` CSR from the NACL shared memory region.
 The host can handle exits caused by virtual instruction by examining and
 decoding the contents of the
 NACL shared memory region.
+
+Virtual-instruction traps caused by configured CSR controls, including
+VS-mode WFI traps under `hstatus.VTW`, use this same protocol. VU-mode WFI
+traps are instead injected into the TVM's VS-mode as illegal-instruction
+exceptions and must not be reported to the VMM. See <<tvm-isa-config>> for
+the WFI trapping and injection rules.
 
 ===== Management of secure interrupts
 The host can use the TEE Interrupt Extension (EXT_COVI) to manage secure TVM
@@ -560,6 +668,7 @@ TSM -> TSM: Update status for converted confidential page regions
 Host -> TSM: create TVM
 TSM -> TSM: set TVM state to "TVM_INITIALIZING"
 TSM -> TSM: Initialize SBI policy with all ECALLs disabled
+TSM -> TSM: Capture ISA configuration defaults and masks, if supported
 TSM -> Host: TVM "guest_id"
 
 Host -> TSM: Assign converted confidential memory for TVM page-table pool
@@ -578,15 +687,30 @@ end note
 TSM -> TSM: Add vcpu to TVM using confidential memory
 end
 
-Host -> TSM: Set TVM entry-point and other config. register state for boot vcpu
-TSM -> TSM: Extend TVM measurements with entry point and config state
-
 loop [For each SBI EID/FID pair to enable]
 Host -> TSM: Set TVM SBI policy entry (including mandatory Base functions)
 end
 
-Host -> TSM: Finalize TVM to be able to execute vcpus
-TSM -> TSM: Validate mandatory SBI Base entries and measure effective SBI policy
+opt [ISA configuration supported]
+Host -> TSM: Query effective ISA configuration and writable masks
+Host -> TSM: Set requested CSR policy fields for all TVM vcpus
+end
+
+Host -> TSM: Finalize TVM with boot vcpu entry point and argument
+TSM -> TSM: Validate mandatory SBI Base entries
+opt [ISA configuration supported]
+TSM -> TSM: Validate complete ISA configuration and dependencies
+end
+note right of TSM
+  On validation failure, return an error without
+  committing measurements or making the TVM runnable.
+  The following steps occur only on success.
+end note
+TSM -> TSM: Measure entry point, argument, and effective SBI policy
+opt [ISA configuration supported]
+TSM -> TSM: Measure distinct ISA configuration record and freeze configuration
+end
+TSM -> TSM: Freeze SBI policy
 TSM -> TSM: Finalize TVM measurements and make TVM state "TVM_RUNNABLE"
 
 Host -> TSM: Run TVM using boot vcpu
@@ -845,6 +969,7 @@ enum tsm_state : uint32_t {
 #define COVE_TSM_CAP_AIA                 0x3
 #define COVE_TSM_CAP_MRIF                0x4
 #define COVE_TSM_CAP_MEMORY_ALLOCATION   0x5
+#define COVE_TSM_CAP_TVM_ISA_CONFIG      0x6
 
 struct tsm_info {
     /*
@@ -908,7 +1033,9 @@ struct tsm_info {
 | 4     | COVE_TSM_CAP_MRIF                  | `1`                | TSM supports MRIF.
 | 5     | COVE_TSM_CAP_MEMORY_ALLOCATION     | `0`                | TSM supports static memory allocation.
 | 5     | COVE_TSM_CAP_MEMORY_ALLOCATION     | `1`                | TSM supports dynamic memory allocation.
-| 6..63 | RESERVED     |                 |
+| 6     | COVE_TSM_CAP_TVM_ISA_CONFIG        | `0`                | TSM does not support the TVM ISA configuration interfaces.
+| 6     | COVE_TSM_CAP_TVM_ISA_CONFIG        | `1`                | TSM supports staged TVM ISA configuration queries and updates (COVH FIDs 21, 22, and 23), validation, measurement, and freezing as specified in <<tvm-isa-config>>.
+| 7..63 | RESERVED     |                 |
 |===
 
 [#table_sbi_covh_get_tsm_implementation_ids]
@@ -1098,6 +1225,11 @@ state.
 All SBI ECALLs are initially disabled for this TVM. The VMM must configure
 the policy using <<sbi_covh_set_tvm_sbi_policy>> before finalization.
 
+If `COVE_TSM_CAP_TVM_ISA_CONFIG` is advertised, creation also captures the
+TSM-defined ISA configuration defaults and masks described in
+<<tvm-isa-config>>. These defaults are queryable immediately, before any vCPU
+has been created, and may be updated while the TVM is initializing.
+
 The list of possible TVM states appears below.
 
 [#table_sbi_tvm_states]
@@ -1184,6 +1316,15 @@ function lacks an entry with either handler, finalization returns
 `TVM_INITIALIZING`, and does not commit the initial measurement. The VMM may
 correct the policy and retry finalization.
 
+If `COVE_TSM_CAP_TVM_ISA_CONFIG` is advertised, the TSM must also validate the
+complete effective ISA configuration, including dependencies across CSR
+fields and with other TVM configuration, before committing any finalization
+measurements. An invalid combination returns `SBI_ERR_INVALID_PARAM`, leaves
+the TVM in `TVM_INITIALIZING`, and leaves the initial measurement uncommitted.
+The TSM must not coerce settings to make the combination valid. The VMM may
+correct the configuration and retry; a failed attempt must not contribute
+any finalization records to the initial measurement.
+
 At finalization, the TSM must include the effective enabled SBI policy entries
 in the TVM's initial measurement using the existing implementation-specific
 measurement mechanism. Each measured entry consists of `(EID, FID, handler)`.
@@ -1197,8 +1338,33 @@ policies must produce identical initial measurements.
 The measured handler value distinguishes `COVE_TVM_SBI_TSM_LOCAL` from
 `COVE_TVM_SBI_TSM`, even when both use the same trusted implementation.
 
+[#tvm-isa-config-measurement,ISA configuration measurement]
+When ISA configuration is supported, the TSM must also include the complete
+effective ISA configuration in the initial measurement using the existing
+implementation-specific measurement mechanism. It must use a distinct ISA
+configuration record, distinguishable from SBI policy, page, and other
+measurement records. This record contains XLEN and one entry
+`(CSR number, field mask, effective value)` for every CSR with supported
+policy fields, in ascending numerical CSR order. The field mask identifies
+all supported policy fields for that CSR; bits outside it are zero in the
+effective value. All supported fields must be included, including defaults
+that were never written and fixed fields that cannot be changed. RV32
+high-half CSRs are separate entries using their architectural numbers.
+
+The record encoding must be deterministic and unambiguous, including its type,
+entry boundaries, integer widths, and byte order. These encoding details are
+implementation-specific. Equivalent final configurations must contribute
+identically under the same measurement mechanism regardless of setter order,
+overwritten values, or redundant writes. In particular, leaving defaults
+unchanged and explicitly writing those same defaults produce identical
+records. Changing an effective policy control changes the record. With all
+other measured inputs unchanged, equivalent final configurations must produce
+identical initial measurements. Setters and queries do not extend measurements.
+
 On successful finalization, the SBI policy becomes immutable for the lifetime
 of the TVM. Subsequent calls to `sbi_covh_set_tvm_sbi_policy()` are rejected.
+The effective ISA configuration is likewise frozen for the TVM's lifetime;
+queries remain available, but `sbi_covh_set_tvm_isa_config()` is rejected.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -1212,7 +1378,8 @@ The possible error codes returned in `sbiret.error` are shown below.
                           the TVM wasn't in the `TVM_INITIALIZING` state, or
                           a mandatory SBI Base function lacked an explicit
                           `COVE_TVM_SBI_TSM` or `COVE_TVM_SBI_TSM_LOCAL`
-                          policy entry.
+                          policy entry, or the effective ISA configuration
+                          had invalid dependencies or combinations.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
 
@@ -1502,6 +1669,9 @@ Adds a vCPU with ID `vcpu_id` to the TVM specified by `tvm_guest_id`.
 region used to hold the TVM's vCPU state, and must be
 `tsm_info::tvm_state_pages` pages in length. This call must not be made after
 calling `sbi_covh_finalize_tvm()`.
+
+The new vCPU inherits the TVM-wide effective ISA configuration, including any
+changes made before its creation, as specified in <<tvm-isa-config>>.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -1861,6 +2031,141 @@ The possible error codes returned in `sbiret.error` are shown below.
                           otherwise permitted pair.
 | SBI_ERR_OUT_OF_MEMORY | Insufficient memory to update the policy.
 | SBI_ERR_FAILED        | The operation failed for other reasons.
+|===
+
+[#sbi_covh_get_tvm_isa_config]
+=== Function: COVE Host Get TVM ISA Configuration (FID #21)
+[source, C, options="unbreakable"]
+-----
+struct sbiret sbi_covh_get_tvm_isa_config(unsigned long tvm_guest_id,
+                                        unsigned long csr_id);
+-----
+
+Queries the TVM-wide configuration for `csr_id`, as defined in
+<<tvm-isa-config>>. The TVM must have been created by `sbi_covh_create_tvm()`
+and be in `TVM_INITIALIZING` or `TVM_RUNNABLE`. This function requires
+`COVE_TSM_CAP_TVM_ISA_CONFIG`. `csr_id` must contain a 12-bit architectural
+CSR number with all higher bits zero.
+
+The returned value is an XLEN-wide bit pattern containing the effective
+configuration, including fixed settings, with bits outside the supported
+policy fields zero. Before any updates it contains the captured default.
+This is configuration state, not a live read of a physical hart's CSR.
+A CSR with no supported policy fields is unsupported. A successful query
+does not imply that the host can change every reported field or select
+every architectural encoding. Use <<sbi_covh_get_tvm_isa_config_writable_mask>>
+to query which bits may be changed during initialization.
+
+*Returns* the effective configuration in `sbiret.value` on success.
+
+[#table_sbi_covh_get_tvm_isa_config_errors]
+.COVE Host Get TVM ISA Configuration Errors
+[cols="2,3", width=90%, options="header,unbreakable"]
+|===
+| Error code | Description
+| SBI_SUCCESS | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM | Invalid `tvm_guest_id`, CSR number encoding,
+or TVM lifecycle state.
+| SBI_ERR_NOT_SUPPORTED | The interface or CSR is unsupported, or the TVM
+was created by single-step promotion.
+|===
+
+[#sbi_covh_set_tvm_isa_config]
+=== Function: COVE Host Set TVM ISA Configuration (FID #22)
+[source, C, options="unbreakable"]
+-----
+struct sbiret sbi_covh_set_tvm_isa_config(unsigned long tvm_guest_id,
+                                        unsigned long csr_id,
+                                        unsigned long mask,
+                                        unsigned long value);
+-----
+
+Updates selected configuration bits for all vCPUs of the specified TVM.
+This function requires `COVE_TSM_CAP_TVM_ISA_CONFIG`. The TVM must be in
+`TVM_INITIALIZING`; finalized and promoted TVMs are rejected with
+`SBI_ERR_INVALID_PARAM`. The CSR number and XLEN rules are the same as for
+<<sbi_covh_get_tvm_isa_config>>.
+
+`value` must contain no set bits outside `mask`. For the old effective
+configuration `old`, the candidate value is `(old & ~mask) | value`.
+All bits in `mask` must belong to supported policy fields, even if the
+update would leave those bits unchanged. Changing a bit outside the writable
+mask returned by <<sbi_covh_get_tvm_isa_config_writable_mask>> is denied;
+selecting a supported bit without changing its value is permitted.
+A zero mask with a zero value is a successful no-op for an otherwise valid
+request.
+
+The TSM must validate each affected field's complete candidate encoding,
+including bits preserved by the mask. Reserved or malformed field encodings
+are invalid arguments. Architecturally valid encodings that the TSM cannot
+support exactly are unsupported, including values that hardware would coerce
+under WARL rules. The TSM must not silently substitute a supported value.
+Cross-field dependencies, including dependencies across RV32 low and high
+halves, are validated at finalization as specified in
+<<sbi_covh_finalize_tvm>>.
+
+A successful setter atomically installs the candidate value. A failed setter
+must preserve the entire TVM ISA configuration, including other CSRs and all
+vCPUs. The update must be serialized with queries, other setters, vCPU
+creation, and finalization so none observes a partial update. This function
+does not extend the initial measurement.
+
+*Returns* zero in `sbiret.value` on success.
+
+[#table_sbi_covh_set_tvm_isa_config_errors]
+.COVE Host Set TVM ISA Configuration Errors
+[cols="2,3", width=90%, options="header,unbreakable"]
+|===
+| Error code | Description
+| SBI_SUCCESS | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM | Invalid `tvm_guest_id` or CSR number encoding;
+the TVM is not in `TVM_INITIALIZING`; `value` has bits outside `mask`; or a
+candidate field encoding is reserved or malformed.
+| SBI_ERR_NOT_SUPPORTED | The interface or CSR is unsupported; `mask`
+selects an unsupported policy field; or a valid candidate encoding cannot
+be supported exactly.
+| SBI_ERR_DENIED | The update would change a setting fixed by TSM policy.
+|===
+
+[#sbi_covh_get_tvm_isa_config_writable_mask]
+=== Function: COVE Host Get TVM ISA Configuration Writable Mask (FID #23)
+[source, C, options="unbreakable"]
+-----
+struct sbiret sbi_covh_get_tvm_isa_config_writable_mask(
+    unsigned long tvm_guest_id, unsigned long csr_id);
+-----
+
+Queries the TVM-wide writable mask for `csr_id`, as defined in
+<<tvm-isa-config>>. This function requires `COVE_TSM_CAP_TVM_ISA_CONFIG`.
+The TVM must have been created by `sbi_covh_create_tvm()` and be in
+`TVM_INITIALIZING` or `TVM_RUNNABLE`. The CSR number and XLEN rules are the
+same as for <<sbi_covh_get_tvm_isa_config>>.
+
+The returned mask is an XLEN-wide bit pattern. A set bit identifies a
+supported policy bit that the host may change through
+<<sbi_covh_set_tvm_isa_config>> during initialization. Fixed settings and
+bits outside supported policy fields have zero bits in the mask. A CSR
+with supported policy fields but no writable bits returns a zero mask
+successfully; a CSR with no supported policy fields is unsupported.
+
+The mask is captured at TVM creation and remains unchanged after
+finalization. Querying it in `TVM_RUNNABLE` does not permit further updates.
+Set bits do not guarantee support for every architectural field encoding
+or combination of settings; setter and finalization validation still apply.
+This query does not extend the initial measurement.
+
+*Returns* the writable mask in `sbiret.value` on success.
+
+[#table_sbi_covh_get_tvm_isa_config_writable_mask_errors]
+.COVE Host Get TVM ISA Configuration Writable Mask Errors
+[cols="2,3", width=90%, options="header,unbreakable"]
+|===
+| Error code | Description
+| SBI_SUCCESS | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM | Invalid `tvm_guest_id`, CSR number encoding,
+or TVM lifecycle state.
+| SBI_ERR_NOT_SUPPORTED | The interface or CSR is unsupported, or the TVM
+was created by single-step promotion.
 |===
 
 == COVE Interrupt Extension (EID #0x434F5649 "COVI")
@@ -2743,6 +3048,21 @@ the VMM to finalize the measurement of a TVM (initial). The TSM enforces that
 the TVM virtual harts cannot be entered unless the TVM measurement is committed
 via this operation.
 
+| <<sbi_covh_get_tvm_isa_config, sbi_covh_get_tvm_isa_config>> | COVH FID 21.
+Queries a CSR's effective TVM-wide configuration during staged creation and
+after finalization. Advertised by TSM capability bit 6.
+
+| <<sbi_covh_set_tvm_isa_config, sbi_covh_set_tvm_isa_config>> | COVH FID 22.
+Atomically updates selected architectural CSR policy fields for all TVM
+vCPUs while initializing. Finalization validates dependencies, measures the
+complete effective configuration including defaults and fixed
+fields, and freezes it. Advertised by TSM capability bit 6.
+
+| <<sbi_covh_get_tvm_isa_config_writable_mask, sbi_covh_get_tvm_isa_config_writable_mask>> | COVH FID 23.
+Queries a CSR's TVM-wide writable mask during staged creation and after
+finalization. The mask describes permitted changes during initialization
+and remains fixed for the TVM's lifetime. Advertised by TSM capability bit 6.
+
 | <<sbi_covh_set_tvm_sbi_policy, sbi_covh_set_tvm_sbi_policy>> | Configures an
 exact SBI EID/FID pair as disabled, TSM-handled (with or without permission
 for specified host communication), or VMM-forwarded for all TVM vCPUs during
@@ -3014,4 +3334,3 @@ state save and restore of the performance monitoring inhibit and trigger
 controls). The specification of this interface is TBD.
 
 |===
-

@@ -96,7 +96,7 @@ TVM initial measurements are generated from the CoVE workload TCB elements
 involved in the TVM construction. Any TCB element that directly or indirectly
 supports a TVM must be measured into the TVM initial measurement registers. Once
 a TVM is finalized, i.e., after the `sbi_covh_finalize_tvm()` COVH-ABI is
-called, the TVM initial measurements must no longer be extended.
+successfully completed, the TVM initial measurements must no longer be extended.
 
 For staged TVM creation, the measured TVM configuration includes the effective
 SBI ECALL policy configured through <<sbi_covh_set_tvm_sbi_policy>>. At
@@ -111,6 +111,26 @@ requirements do not change single-step promotion behavior.
 The measured handler value distinguishes TSM handling that permits specified
 host communication (`COVE_TVM_SBI_TSM`) from TSM handling that prohibits it
 (`COVE_TVM_SBI_TSM_LOCAL`).
+
+For staged TVMs on a TSM advertising `COVE_TSM_CAP_TVM_ISA_CONFIG`, the
+initial measurement also includes the complete effective ISA configuration
+described in <<tvm-isa-config-measurement>>. Before committing finalization
+measurements, the TSM validates the configuration and its dependencies;
+failure leaves the TVM initializing with its initial measurement uncommitted.
+The TSM measures a distinct configuration record containing XLEN and
+ascending `(CSR number, field mask, effective value)` entries for all
+CSRs with supported policy fields, including RV32 high-half CSRs. Each mask
+identifies all supported policy fields for that CSR; effective values have
+bits outside those fields zero. Defaults and fixed fields are included even
+if no setter was called. The encoding is implementation-specific but must be
+deterministic and unambiguous.
+
+Leaving defaults unchanged, explicitly writing the same defaults, and
+restoring defaults after intermediate updates yield identical configuration
+contributions. Changing an effective policy control changes the record;
+setter order and redundant writes do not. The configuration is immutable
+after successful finalization and remains queryable. These requirements do
+not change single-step promotion measurements.
 
 Each TVM's initial measurements are stored in dedicated measurement registers
 and a CoVE implementation must provide at least 1 and at most 8 of them. The
