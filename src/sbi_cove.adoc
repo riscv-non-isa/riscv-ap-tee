@@ -208,6 +208,10 @@ The NACL shared memory interface is between TSM and the host and TSM is
 responsible for writing any trap-related CSRs and GPRs needed by the host to
 handle the exception. The TSM is also responsible for reading the returned
 results from NACL shared memory and forwarding it to the TVM.
+For staged TVMs with disclosure configuration, all TVM outputs and returned
+results are subject to <<tvm-disclosure-config>>. Unused output slots must
+be cleared and host-visible trap metadata sanitized on every host return,
+as specified in <<tvm-disclosure-enforcement>>.
 For single-step TVM creation, OS/VMM also uses NACL shared memory to reflect the
 VM's state to the TSM. Further details about which CSRs and GPRs are used by the
 TSM and the host can be found in <<table_tsm_csr_updates_in_nacl>>.
@@ -280,22 +284,26 @@ when it has the read permission.
 [cols="2,1,1,12", width=100%, align="center", options="header"]
 |===
 | *CSRs*     | *TSM* | *Host* | *Purpose*
-| htinst     |  W    |  R     | TSM writes the faulting instruction into htinst
-                                to allow the host to emulate the MMIO.
-| htval      |  W    |  R     | In case of a guest page-fault, TSM writes the
-                                guest's physical address that faulted into
-                                htval CSR.
+| htinst     |  W    |  R     | Required trapped instruction encoding for
+MMIO or virtual-instruction emulation; requires information bit 2 when
+disclosure configuration applies.
+| htval      |  W    |  R     | Fault GPA shifted right by two; requires
+information bit 0 for confidential regions or bit 1 for shared/MMIO regions
+when disclosure configuration applies. Only necessary low `stval` bits may
+accompany it in host-visible trap state.
 | htimedelta |  W    |  R     | TSM writes the guest htimedelta in this CSR.
                                 This is to allow a host to schedule an internal
                                 software timer for the guest to keep the timer
-interrupt ticking.
+interrupt ticking. Requires information bit 4 when disclosure configuration applies.
 | vstimecmp  |  W    |  R     | TSM writes the guest's vstimecmp to allow the
                                 host to schedule an internal software timer for
-                                the guest.
+                                the guest. Requires information bit 5 when
+disclosure configuration applies.
 | vsie       |  W    |  R     | TSM writes the guest's vsie to allow the host
                                 to check which interrupts are enabled. This is
                                 useful in waking up a guest's vcpu when it is
-                                sleeping due to a `WFI` instruction.
+                                sleeping due to a `WFI` instruction. Requires
+information bit 6 when disclosure configuration applies, including on interrupt exits.
 | hgatp      |   R   |  W     | Host reflects the address of the page directory
                                 to the TSM during the single-step TVM creation.
 | vs*        |   R   |  W     | Host reflects the vCPU state to the TSM during
@@ -317,10 +325,11 @@ interrupt ticking.
                                 forwarded to the host.
 | a7         |  W    |  R     | Used for passing an argument for ECALLs
                                 forwarded to the host.
-| x0-x31     |  RW   |  RW    | Any of the GPR used in load/store instruction
-                                trapped for MMIO emulation. All GPRs are
-                                reflected from the host to the TSM during the
-                                single-step TVM creation.
+| x0-x31     |  RW   |  RW    | Only the required store operand is output
+for MMIO emulation (information bit 3 when disclosure configuration applies).
+Only the pending load's result slot is input on resume. When disclosure
+configuration applies, other TVM-output GPR slots are cleared. All GPRs are reflected from the host to the TSM during
+single-step TVM creation, which is outside disclosure configuration.
 |===
 
 [TIP]
@@ -471,7 +480,9 @@ exception. It may complete before that bound, and the implementation may
 trap immediately. `VTW=0` removes this trapping condition, but does not
 guarantee that WFI waits or that no other architectural trapping condition
 applies. A resulting virtual-instruction exit uses the existing
-`VIRTUAL_INSTRUCTION` exit and NACL protocol in <<sbi_covh_run_tvm_vcpu>>.
+`VIRTUAL_INSTRUCTION` exit and NACL protocol in <<sbi_covh_run_tvm_vcpu>>,
+subject to <<tvm-disclosure-config>> when supported. If disclosure is blocked,
+the TSM must handle the trap locally as specified there.
 
 WFI traps originating in VU-mode are handled by the TSM. When
 `mstatus.TW=0`, executing WFI in VU-mode raises a virtual-instruction
@@ -494,6 +505,144 @@ single-step promotion behavior or its measurement rules. Promoted TVMs are
 already runnable and cannot use the setter; queries for promoted TVMs are
 not supported by this interface.
 
+[#tvm-disclosure-config]
+===== TVM exception and information disclosure configuration
+
+When `COVE_TSM_CAP_TVM_DISCLOSURE_CONFIG` is advertised, a TVM created by
+`sbi_covh_create_tvm()` has a host-configured, TVM-wide disclosure policy.
+Creation initializes both selector values to zero and captures a supported
+mask for each selector. These masks remain fixed for the TVM's lifetime.
+The policy applies to every existing and subsequently created vCPU.
+The host can query values and masks in `TVM_INITIALIZING` and `TVM_RUNNABLE`,
+and atomically replace one selector's value only in `TVM_INITIALIZING`.
+Finalization validates, measures, and freezes the policy.
+
+Selectors, masks, and values are unsigned XLEN-wide quantities, where XLEN
+is the COVH caller's register width. This interface does not change the TVM's
+execution width. Both selectors are defined even when their supported mask
+is zero. All bits not defined below are reserved and must be zero in values
+and supported masks.
+
+[#table_tvm_disclosure_selectors]
+.TVM Disclosure Selectors
+[cols="1,2,6", width=100%, options="header"]
+|===
+| Selector | Name | Defined permissions
+| 0 | Exceptions | Bit positions are architectural exception cause numbers:
+0-7, 12, 13, 15, and 20-23, as listed in <<sbi_covh_run_tvm_vcpu>>.
+ECALL causes 8-11 are excluded. A set bit permits an otherwise valid VMM
+exception exit with that cause; it does not redirect an exception that
+must be delivered to the guest.
+| 1 | Information | Bits 0-6 authorize the payload categories in
+<<table_tvm_disclosure_information>> independently of exception permissions.
+|===
+
+[#table_tvm_disclosure_information]
+.TVM Information Disclosure Permissions (Selector 1)
+[cols="1,3,6", width=100%, options="header,unbreakable"]
+|===
+| Bit | Information | Permitted payload
+| 0 | Confidential-region fault GPA | The fault GPA in `htval` and only the
+low `stval` bits necessary to reconstruct that GPA.
+| 1 | Shared/MMIO-region fault GPA | The same GPA representation for a fault
+in a registered shared or MMIO region.
+| 2 | Trapped instruction encoding | The instruction encoding in `htinst`
+needed by the existing exit protocol, including an architecturally permitted
+transformed encoding. No adjacent instructions or unrelated instruction data.
+| 3 | MMIO store operand | Only the operand bits required for the pending
+MMIO store, in the GPR slot used by the emulation protocol; unused bits are zero.
+| 4 | `htimedelta` | The virtual time offset needed for host timer handling.
+| 5 | `vstimecmp` | The virtual timer compare value needed for host timer handling.
+| 6 | `vsie` | The guest interrupt-enable state needed for host wakeup handling.
+|===
+
+These permissions are maximum disclosure allowances, not requirements to
+publish state. A non-ECALL exception may be reported to the VMM only if its
+exception bit and every information bit required by the existing exit
+protocol are enabled. Omitting a required payload to force an otherwise
+blocked exit is not permitted. An exception permission alone does not
+permit disclosure of its instruction, address, or register state.
+No permission authorizes disclosure of a guest PC, full guest virtual
+address, or arbitrary GPRs. For GPA disclosure, the host reconstructs the
+address as `(htval << 2) | (stval & 0x3)`; all other `stval` bits must be zero,
+and unnecessary low bits must also be zero. For MMIO, the TSM publishes only
+the required instruction encoding and, for a store, the required store
+operand, in addition to the permitted fault GPA. A load does not publish
+the previous destination-register value.
+
+SBI ECALL routing and the payload defined for each ECALL exit remain governed
+exclusively by <<tvm-sbi-policy>> and the existing per-function protocol.
+Neither selector enables, disables, or changes that ECALL payload. In
+particular, this policy cannot override disabled calls or the restrictions
+on TSM handlers, including `COVE_TVM_SBI_TSM_LOCAL` confidentiality.
+Ancillary timer and interrupt-enable state is not part of the ECALL payload
+and remains subject to information bits 4-6 on such returns.
+
+[[tvm-disclosure-enforcement,Disclosure enforcement]]
+The TSM must enforce information bits 4-6 on every applicable return to the
+host, including interrupt exits, independently of the exception selector.
+It must protect both NACL copies and any hardware CSR state readable by the
+host. Before returning, it must clear every unused TVM-output CSR and GPR
+slot in NACL, including stale data from a previous exit, vCPU, or TVM.
+It must also sanitize host-visible trap metadata, including `scause`,
+`stval`, `htval`, `htinst`, and any guest PC in trap state, to expose only
+the current authorized exit and payload. A later interrupt must not expose
+metadata from an earlier blocked trap. This does not require clearing
+host-input or reserved slots that have never held TVM output.
+On resume the TSM accepts host-provided results only for the pending,
+authorized operation, using only its defined result slots and operand width;
+it ignores unrelated, stale, or unsolicited results.
+
+A trap blocked by either selector must be handled locally by TSM emulation
+or architecturally valid delivery of an exception to the guest. The TSM
+must not substitute a generic fatal exit, mark the TVM dead merely because
+disclosure is blocked, or expose the blocked cause to the host. Guest
+exception delivery must establish architectural trap state and must itself
+be supportable without prohibited host assistance. The mandatory VU-mode
+WFI injection rules in <<tvm-isa-config>> apply regardless of permission
+bits. A VS-mode WFI virtual-instruction trap may exit only with cause 22
+and the instruction permission enabled; otherwise the TSM must handle it locally with valid WFI semantics.
+
+[[tvm-disclosure-recovery,Disclosure recovery guarantees]]
+Before finalization, the TSM must validate the complete effective policy
+against ISA controls, memory configuration, demand paging, MMIO, and timer
+virtualization. If any reachable blocked trap cannot be recovered locally,
+finalization must fail with `SBI_ERR_INVALID_PARAM`. This validation includes:
+
+* Traps induced by configured ISA controls, such as `hstatus.VTW`, `VTVM`,
+  `VTSR`, and `henvcfg` controls, including their local emulation or guest
+  exception-delivery requirements.
+* Confidential demand faults and shared-region faults: host resolution
+  requires the appropriate exception and GPA permissions. Otherwise local
+  recovery must remain possible, including access to guest trap-handler
+  code and page tables. A currently mapped page alone does not establish
+  recoverability after host invalidation or removal.
+* MMIO loads require cause 21, shared/MMIO GPA, and instruction permissions;
+  stores require cause 23 and those same information permissions plus the
+  store-operand permission. If any is denied, the TSM must be able to
+  emulate locally or deliver an architecturally valid guest exception.
+* Timer and wakeup operation when any of `htimedelta`, `vstimecmp`, or
+  `vsie` cannot be disclosed, including while the vCPU is descheduled.
+  The TSM must provide hardware or trusted local handling where the host
+  cannot perform the required operation with permitted information.
+
+These guarantees must hold across vCPU creation, entry, resume, and hart
+scheduling. The TSM must not run a vCPU on a hart that cannot enforce them.
+After finalization, configuration and memory-management operations,
+including MMIO registration, sharing, invalidation, and removal, must be
+rejected before effects if they would invalidate these guarantees. Such
+operations return `SBI_ERR_INVALID_PARAM`; this error condition also applies
+to the individual interfaces described below. They must not silently widen
+the frozen permissions or change the supported masks. During initialization,
+setters may leave cross-selector or other configuration dependencies to
+finalization validation.
+
+Interrupt routing, debug, performance monitoring, and timing side channels
+are outside these controls; interrupt exits still obey the information
+permissions. When the capability is absent, existing behavior applies.
+Single-step promotion is outside this interface and retains its existing
+behavior and measurement rules.
+
 ===== Finalization of TVM creation
 The OS/VMM that finishes the assembly of a TVM, i.e., assignment of memory and
 vCPU resources to a TVM, transitions the guest into a `TVM_RUNNABLE` state by
@@ -507,8 +656,12 @@ Base function for TSM handling. Finalization validates these entries, measures
 the effective SBI policy, and makes it immutable. When ISA configuration is
 supported, finalization also validates the complete effective CSR configuration
 and its dependencies, measures it including defaults and fixed fields,
-and freezes it, as specified in <<sbi_covh_finalize_tvm>>. Validation failure
-leaves the TVM initializing and its initial measurement uncommitted.
+and freezes it. When disclosure configuration is supported, finalization
+also validates local recovery and all dependencies, measures both selectors
+including untouched zero defaults and supported masks, and freezes them as
+specified in <<sbi_covh_finalize_tvm>>. All validation precedes measurement
+commitment. Failure leaves the TVM initializing with its measurement unchanged
+from before the call, allowing retry without partial finalization records.
 
 [NOTE]
 ====
@@ -522,7 +675,9 @@ time of promotion to a TVM.
 The host can then call `sbi_covh_run_tvm_vcpu()` to begin execution. The host
 must run the TVM Boot vCPU first otherwise `sbi_covh_run_tvm_vcpu()` call will
 fail. TVM execution continues until there is an event like an interrupt, or
-fault that cannot be serviced by the TSM. Some interrupts and exceptions are
+fault requiring an authorized host exit. With disclosure configuration,
+blocked traps must be serviced locally under <<tvm-disclosure-enforcement>>.
+Some interrupts and exceptions are
 resumable, and the host can determine specific reason by examining the `scause`
 CSR. The host can then examine the NACL shared memory if needed to determine
 further course of action. This may involve servicing exits caused by TVM-ECALLs
@@ -530,7 +685,9 @@ that require host action (like adding MMIO region or share memory with the host)
 , TVM page-faults, virtual instructions, etc.
 
 ===== Mapping confidential demand-zero pages and non-confidential shared pages
-The host can handle TVM page-faults by determining whether it was caused by
+When the exception and required GPA permissions allow a host exit under
+<<tvm-disclosure-config>>, the host can handle TVM page-faults by determining
+whether it was caused by
 access to a confidential or non-confidential region. In the former case, it can
 use `sbi_covh_add_tvm_zero_pages()` to populate the region with a previously
 converted confidential page. The TSM verifies that the confidential
@@ -545,12 +702,17 @@ defined by the TVM using the EXT_COVG extension.
 ===== Handling MMIO faults
 TVMs can define MMIO regions using the EXT_COVG extension, and a runtime access
 to such a region causes
-a resumable exit from the TVM. The host can examine the exit code from `scause`
+a resumable exit from the TVM only when the exception and all required
+payload permissions allow host emulation under <<tvm-disclosure-config>>.
+Otherwise the TSM must recover locally; registration must be rejected if
+it would invalidate the frozen policy's recovery guarantees. The host can
+examine the exit code from `scause`
 CSR, and when the exception
 is a guest load/store page fault, the host will check if the fault address
 belongs to any of the registered MMIO
 emulation regions. The fault address information comes from `stval` and `htval`
-CSRs. After emulation, the host
+CSRs, restricted to the permitted GPA representation when disclosure
+configuration applies. After emulation, the host
 updates the NACL shared memory region as appropriate and resumes TVM execution.
 This process also involves instruction
 decoding using the `htinst` CSR from the NACL shared memory region.
@@ -561,7 +723,9 @@ decoding the contents of the
 NACL shared memory region.
 
 Virtual-instruction traps caused by configured CSR controls, including
-VS-mode WFI traps under `hstatus.VTW`, use this same protocol. VU-mode WFI
+VS-mode WFI traps under `hstatus.VTW`, use this same protocol only when the
+exception and instruction permissions allow it under <<tvm-disclosure-config>>;
+otherwise they require local handling. VU-mode WFI
 traps are instead injected into the TVM's VS-mode as illegal-instruction
 exceptions and must not be reported to the VMM. See <<tvm-isa-config>> for
 the WFI trapping and injection rules.
@@ -669,6 +833,7 @@ Host -> TSM: create TVM
 TSM -> TSM: set TVM state to "TVM_INITIALIZING"
 TSM -> TSM: Initialize SBI policy with all ECALLs disabled
 TSM -> TSM: Capture ISA configuration defaults and masks, if supported
+TSM -> TSM: Zero disclosure values and capture supported masks, if supported
 TSM -> Host: TVM "guest_id"
 
 Host -> TSM: Assign converted confidential memory for TVM page-table pool
@@ -691,15 +856,23 @@ loop [For each SBI EID/FID pair to enable]
 Host -> TSM: Set TVM SBI policy entry (including mandatory Base functions)
 end
 
-opt [ISA configuration supported]
+opt ISA configuration supported
 Host -> TSM: Query effective ISA configuration and writable masks
 Host -> TSM: Set requested CSR policy fields for all TVM vcpus
 end
 
+opt Disclosure configuration supported
+Host -> TSM: Query disclosure values and supported masks
+Host -> TSM: Set exception and information permissions for all TVM vcpus
+end
+
 Host -> TSM: Finalize TVM with boot vcpu entry point and argument
 TSM -> TSM: Validate mandatory SBI Base entries
-opt [ISA configuration supported]
+opt ISA configuration supported
 TSM -> TSM: Validate complete ISA configuration and dependencies
+end
+opt Disclosure configuration supported
+TSM -> TSM: Validate disclosure dependencies and local recovery guarantees
 end
 note right of TSM
   On validation failure, return an error without
@@ -707,8 +880,11 @@ note right of TSM
   The following steps occur only on success.
 end note
 TSM -> TSM: Measure entry point, argument, and effective SBI policy
-opt [ISA configuration supported]
+opt ISA configuration supported
 TSM -> TSM: Measure distinct ISA configuration record and freeze configuration
+end
+opt Disclosure configuration supported
+TSM -> TSM: Measure distinct disclosure record and freeze configuration
 end
 TSM -> TSM: Freeze SBI policy
 TSM -> TSM: Finalize TVM measurements and make TVM state "TVM_RUNNABLE"
@@ -816,15 +992,22 @@ note over TSM
   Disabled calls return NOT_SUPPORTED locally. TSM handlers do not
   fall back to the host. Only non-local TSM handlers may perform
   specified host exits.
+  With disclosure configuration, non-ECALL exits require cause and
+  payload permissions. Blocked traps require local recovery;
+  permission denial must not produce a fatal exit.
 end note
 
 alt TVM trap that can be handled by the TSM (case 1)
 
 TSM -> TSM: Handle local event for TVM vcpu e.g. attestation request
 
-else TVM trap that cannot be handled by the TSM (case 2)
+else Authorized host exit (case 2)
 
-TSM -> Host: if TVM not resumable, mark TVM dead; update NACL vcpu & notify host
+opt Disclosure configuration supported for this staged TVM
+TSM -> TSM: Gate timer and interrupt-enable outputs on every host return
+TSM -> TSM: Clear unused NACL outputs and sanitize host-visible trap metadata
+end
+TSM -> Host: Report authorized exit; fatal handling only for independent fatal events
 
 note over Host
   Host may resume TVM vcpu for resumable events, or,
@@ -854,6 +1037,7 @@ Host -> Host: initiate TVM tear down (see flow for TVM termination)
 end ` inner alt TVM trap serviced by Host (end case 2)
 
 Host -> TSM: resume/stop TVM vcpu execution
+TSM -> TSM: Accept results only for the pending authorized operation
 
 end ` outer alt TVM trap (end case 1)
 
@@ -970,6 +1154,7 @@ enum tsm_state : uint32_t {
 #define COVE_TSM_CAP_MRIF                0x4
 #define COVE_TSM_CAP_MEMORY_ALLOCATION   0x5
 #define COVE_TSM_CAP_TVM_ISA_CONFIG      0x6
+#define COVE_TSM_CAP_TVM_DISCLOSURE_CONFIG 0x7
 
 struct tsm_info {
     /*
@@ -1018,7 +1203,7 @@ struct tsm_info {
 
 [#table_sbi_covh_get_tsm_info_capabilities]
 .COVE TSM Capabilities
-[cols="4", width=90%, align="center", options="header"]
+[cols="1,5,1,8", width=100%, align="center", options="header"]
 |===
 | Bit   | Name                               | Value              | Definition
 | 0     | COVE_TSM_CAP_PROMOTE_TVM           | `0`                | TSM supports multi-step TVM creation.
@@ -1035,7 +1220,9 @@ struct tsm_info {
 | 5     | COVE_TSM_CAP_MEMORY_ALLOCATION     | `1`                | TSM supports dynamic memory allocation.
 | 6     | COVE_TSM_CAP_TVM_ISA_CONFIG        | `0`                | TSM does not support the TVM ISA configuration interfaces.
 | 6     | COVE_TSM_CAP_TVM_ISA_CONFIG        | `1`                | TSM supports staged TVM ISA configuration queries and updates (COVH FIDs 21, 22, and 23), validation, measurement, and freezing as specified in <<tvm-isa-config>>.
-| 7..63 | RESERVED     |                 |
+| 7     | COVE_TSM_CAP_TVM_DISCLOSURE_CONFIG | `0`                | TSM does not support the TVM disclosure configuration interfaces; existing disclosure behavior applies.
+| 7     | COVE_TSM_CAP_TVM_DISCLOSURE_CONFIG | `1`                | TSM supports staged TVM disclosure configuration (COVH FIDs 24, 25, and 26), enforcement, validation, measurement, and freezing as specified in <<tvm-disclosure-config>>.
+| 8..63 | RESERVED     |                 |
 |===
 
 [#table_sbi_covh_get_tsm_implementation_ids]
@@ -1230,6 +1417,11 @@ TSM-defined ISA configuration defaults and masks described in
 <<tvm-isa-config>>. These defaults are queryable immediately, before any vCPU
 has been created, and may be updated while the TVM is initializing.
 
+If `COVE_TSM_CAP_TVM_DISCLOSURE_CONFIG` is advertised, creation initializes
+both disclosure selector values to zero and captures their lifetime-fixed
+supported masks as specified in <<tvm-disclosure-config>>. Values and masks
+are queryable immediately, before any vCPU has been created.
+
 The list of possible TVM states appears below.
 
 [#table_sbi_tvm_states]
@@ -1325,6 +1517,17 @@ The TSM must not coerce settings to make the combination valid. The VMM may
 correct the configuration and retry; a failed attempt must not contribute
 any finalization records to the initial measurement.
 
+If `COVE_TSM_CAP_TVM_DISCLOSURE_CONFIG` is advertised, finalization must also
+validate the disclosure policy and local-recovery guarantees in
+<<tvm-disclosure-recovery>>, including dependencies on the effective ISA,
+SBI, memory, MMIO, and timer configurations. An invalid combination or an
+inability to guarantee local recovery returns `SBI_ERR_INVALID_PARAM`.
+All finalization inputs and dependencies must be validated before committing
+any finalization measurement records. On any failure the TVM remains in
+`TVM_INITIALIZING`, configuration is preserved, and the initial measurement
+is unchanged from before the call. A corrected retry must not include any
+partial records from the failed attempt.
+
 At finalization, the TSM must include the effective enabled SBI policy entries
 in the TVM's initial measurement using the existing implementation-specific
 measurement mechanism. Each measured entry consists of `(EID, FID, handler)`.
@@ -1361,10 +1564,32 @@ records. Changing an effective policy control changes the record. With all
 other measured inputs unchanged, equivalent final configurations must produce
 identical initial measurements. Setters and queries do not extend measurements.
 
+[[tvm-disclosure-config-measurement,Disclosure configuration measurement]]
+When disclosure configuration is supported, the TSM must include a distinct
+disclosure configuration record in the initial measurement, distinguishable
+from ISA configuration, SBI policy, page, and other records. The record
+contains format version 1, XLEN, and `(selector, supported mask, effective
+value)` entries for selectors 0 and 1 in ascending numerical order. Both
+entries are mandatory, including zero supported masks and untouched zero
+defaults. Effective values have all bits outside the supported mask zero.
+
+The encoding is implementation-specific but must be deterministic and
+unambiguous, including record type, format version, integer widths, byte
+order, and entry boundaries. Changing XLEN, a supported mask, or an effective
+value changes the record. Under the same measurement mechanism, equivalent
+final configurations contribute identically regardless of setter order,
+intermediate values, or redundant writes. Leaving zero defaults untouched,
+explicitly writing zero, and restoring zero after updates yield the same
+record. With all other measured inputs unchanged, equivalent configurations
+produce identical initial measurements. Queries and setters do not extend
+measurements.
+
 On successful finalization, the SBI policy becomes immutable for the lifetime
 of the TVM. Subsequent calls to `sbi_covh_set_tvm_sbi_policy()` are rejected.
 The effective ISA configuration is likewise frozen for the TVM's lifetime;
 queries remain available, but `sbi_covh_set_tvm_isa_config()` is rejected.
+The disclosure configuration is likewise frozen; both value and supported-mask
+queries remain available, but `sbi_covh_set_tvm_disclosure_config()` is rejected.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -1379,7 +1604,10 @@ The possible error codes returned in `sbiret.error` are shown below.
                           a mandatory SBI Base function lacked an explicit
                           `COVE_TVM_SBI_TSM` or `COVE_TVM_SBI_TSM_LOCAL`
                           policy entry, or the effective ISA configuration
-                          had invalid dependencies or combinations.
+                          had invalid dependencies or combinations, or disclosure
+                          configuration
+                          dependencies or local-recovery guarantees could not
+                          be satisfied.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
 
@@ -1672,6 +1900,8 @@ calling `sbi_covh_finalize_tvm()`.
 
 The new vCPU inherits the TVM-wide effective ISA configuration, including any
 changes made before its creation, as specified in <<tvm-isa-config>>.
+It also inherits the TVM-wide disclosure configuration when supported,
+including changes made before its creation; see <<tvm-disclosure-config>>.
 
 The possible error codes returned in `sbiret.error` are shown below.
 
@@ -1697,7 +1927,9 @@ struct sbiret sbi_covh_run_tvm_vcpu(unsigned long tvm_guest_id,
 Runs the vCPU specified by `tvm_vcpu_id` in the TVM specified by `tvm_guest_id`.
 The `tvm_guest_id` must be in a "runnable" state (requires a prior call
 to `sbi_covh_finalize_tvm()`). The function does not return unless the TVM
-exits with a trap that cannot be handled by the TSM.
+exits with a trap requiring a host exit. For staged TVMs with disclosure
+configuration, the exit must be authorized by <<tvm-disclosure-config>>;
+blocked traps must be recovered locally and must not cause a fatal return.
 
 *Returns* SBI_SUCCESS in sbiret.value if the TVM exited with a resumable vCPU
 interrupt or exception, and non-zero otherwise. In the latter case, attempts to
@@ -1718,7 +1950,15 @@ The possible error codes returned in `sbiret.error` are shown below.
 | SBI_ERR_FAILED        | The operation failed for unknown reasons.
 |===
 
-The TSM updates the host's `scause` CSR. The host should use the `scause` field
+For staged TVMs with disclosure configuration, non-ECALL exception exits
+require the corresponding selector-0 bit and all selector-1 bits needed by
+the protocol. Interrupt routing is unchanged, but timer and interrupt-enable
+disclosures are gated on interrupt exits as on other host returns. The TSM
+must clear unused NACL outputs, sanitize host-visible metadata, and accept
+only pending authorized results as specified in <<tvm-disclosure-enforcement>>.
+
+The TSM updates the host's `scause` CSR for an authorized exit. The host
+should use the `scause` field
 to determine whether the exit was caused by an interrupt or exception, and then
 use the additional information in the NACL shared memory region to determine
 further course of action (if sbiret.value is 0).
@@ -1764,7 +2004,10 @@ enum tvm_interrupt_exit {
 [source, C]
 -------
 enum Exception {
-    /* Refer to the privileged spec for details. */
+    /* Refer to the privileged spec for details. With disclosure configuration,
+     * non-ECALL exits require both cause and required payload permissions.
+     * ECALL exits retain their SBI policy and per-function payload rules.
+     */
     INSTRUCTION_MISALIGNED = 0,
     INSTRUCTION_FAULT = 1,
     ILLEGAL_INSTRUCTION = 2,
@@ -1786,6 +2029,10 @@ enum Exception {
     INSTRUCTION_PAGE_FAULT = 12,
     LOAD_PAGE_FAULT = 13,
     STORE_PAGE_FAULT = 15,
+    /* Host fault resolution requires cause 20 and the applicable GPA
+     * permission when disclosure configuration applies. Only the permitted
+     * htval and low stval representation may be published.
+     */
     GUEST_INSTRUCTION_PAGE_FAULT = 20,
     /*
      * The TVM encountered a load fault in a confidential, MMIO, or shared
@@ -1795,7 +2042,11 @@ enum Exception {
      * determine the type of memory region, and making the appropriate call
      * (example: sbi_covh_add_tvm_zero_pages() to add a demand-zero confidential
      * page if applicable), and then calling sbi_covh_run_tvm_vcpu() to resume
-     * execution at the following instruction.
+     * execution. After mapping memory, retry the faulting instruction;
+     * after completed MMIO emulation, advance past the emulated instruction.
+     * Disclosure configuration requires cause 21 and the applicable GPA bit;
+     * MMIO also requires the instruction bit. Only necessary low stval bits
+     * may be published, never a full guest virtual address.
      */
     GUEST_LOAD_PAGE_FAULT = 21,
     /*
@@ -1803,7 +2054,10 @@ enum Exception {
      * The host should decode the instruction by examining `htinst` CSR and
      * determine the further course of action, and then calling
      * sbi_covh_run_tvm_vcpu() if appropriate to resume execution at the
-     * following instruction.
+     * following instruction after emulation completes. Disclosure
+     * configuration requires cause 22 and the instruction permission.
+     * VU-mode WFI must instead be injected into guest VS-mode as an
+     * illegal-instruction exception, regardless of these permissions.
      */
     VIRTUAL_INSTRUCTION = 22,
     /*
@@ -1814,8 +2068,12 @@ enum Exception {
      * used to determine the type of memory region, and making the appropriate
      * call (example: sbi_covh_add_tvm_zero_pages() to add a demand-zero
      * confidential page if applicable), and then calling
-     * `sbi_covh_run_tvm_vcpu()` to resume execution at the following
-     * instruction.
+     * `sbi_covh_run_tvm_vcpu()` to resume execution. After mapping memory,
+     * retry the faulting instruction; after completed MMIO emulation,
+     * advance past the emulated instruction. Disclosure configuration
+     * requires cause 23 and the applicable GPA bit; MMIO also requires
+     * instruction and store-operand permissions. Only necessary low stval
+     * bits may be published, never a full guest virtual address.
      */
     GUEST_STORE_PAGE_FAULT = 23,
 };
@@ -1872,7 +2130,11 @@ pages. The host must complete a TVM TLB invalidation sequence, initiated by
 `sbi_covh_tvm_fence()`, in order to complete the invalidation.
 
 Guest page faults taken by the TVM on invalidated pages continue to be reported
-to the host.
+to the host only if permitted by <<tvm-disclosure-config>> when applicable.
+Invalidation must fail with `SBI_ERR_INVALID_PARAM` before changing mappings
+if it would invalidate the recovery guarantees in <<tvm-disclosure-recovery>>.
+The presence of the mapping before this call is not sufficient proof that
+recovery will remain possible.
 The pages remain invalid until the mappings are validated (marked present),
 removed, or become part of a huge page by promotion/demotion operation.
 
@@ -1885,6 +2147,8 @@ The possible error codes returned in `sbiret.error` are shown below.
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
 | SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `length` were invalid.
+Also returned if the operation would invalidate disclosure recovery
+guarantees (<<tvm-disclosure-recovery>>).
 | SBI_ERR_INVALID_ADDRESS | `gpa` was invalid.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
@@ -1946,6 +2210,8 @@ The possible error codes returned in `sbiret.error` are shown below.
 | Error code              | Description
 | SBI_SUCCESS             | The operation completed successfully.
 | SBI_ERR_INVALID_PARAM   | `tvm_guest_id` or `length` were invalid.
+Also returned if the operation would invalidate disclosure recovery
+guarantees (<<tvm-disclosure-recovery>>).
 | SBI_ERR_INVALID_ADDRESS | `gpa` was invalid.
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
@@ -2166,6 +2432,116 @@ This query does not extend the initial measurement.
 or TVM lifecycle state.
 | SBI_ERR_NOT_SUPPORTED | The interface or CSR is unsupported, or the TVM
 was created by single-step promotion.
+|===
+
+[#sbi_covh_get_tvm_disclosure_config]
+=== Function: COVE Host Get TVM Disclosure Configuration (FID #24)
+[source, C, options="unbreakable"]
+-----
+struct sbiret sbi_covh_get_tvm_disclosure_config(
+    unsigned long tvm_guest_id, unsigned long selector);
+-----
+
+This function requires `COVE_TSM_CAP_TVM_DISCLOSURE_CONFIG`. `selector`
+must be 0 (exceptions) or 1 (information); all other selector encodings are
+invalid. Failed calls preserve configuration and measurements.
+
+Queries the effective TVM-wide value for `selector` in
+<<tvm-disclosure-config>>. The TVM must have been created by
+`sbi_covh_create_tvm()` and be in `TVM_INITIALIZING` or `TVM_RUNNABLE`.
+Before any setter, each value is zero. This query returns configuration,
+not live guest state, and does not change configuration or measurements.
+
+*Returns* the unsigned XLEN-wide effective bit pattern in `sbiret.value`
+on success, with all reserved and unsupported bits zero.
+
+[#table_sbi_covh_get_tvm_disclosure_config_errors]
+.COVE Host Get TVM Disclosure Configuration Errors
+[cols="2,3", width=90%, options="header,unbreakable"]
+|===
+| Error code | Description
+| SBI_SUCCESS | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM | Invalid `tvm_guest_id`, selector, or TVM lifecycle state.
+| SBI_ERR_NOT_SUPPORTED | The capability is absent, or the TVM was created
+by single-step promotion.
+|===
+
+[#sbi_covh_set_tvm_disclosure_config]
+=== Function: COVE Host Set TVM Disclosure Configuration (FID #25)
+[source, C, options="unbreakable"]
+-----
+struct sbiret sbi_covh_set_tvm_disclosure_config(
+    unsigned long tvm_guest_id, unsigned long selector,
+    unsigned long value);
+-----
+
+This function requires `COVE_TSM_CAP_TVM_DISCLOSURE_CONFIG`. `selector`
+must be 0 (exceptions) or 1 (information); all other selector encodings are
+invalid. Failed calls preserve configuration and measurements.
+
+Atomically replaces the entire effective value of one selector for all TVM
+vCPUs. The TVM must be in `TVM_INITIALIZING`; finalized and promoted TVMs
+are rejected with `SBI_ERR_INVALID_PARAM`. `value` must have reserved bits
+zero and must be a subset of the selector's captured supported mask.
+Setting a defined but unsupported permission returns `SBI_ERR_NOT_SUPPORTED`.
+Writing zero or the current value is permitted for an otherwise valid call,
+including when the supported mask is zero.
+
+The TSM must serialize the update with queries, other configuration setters,
+vCPU creation, and finalization so that none observes a partial update.
+Failure preserves both selectors, their masks, and all vCPU configuration.
+The setter must not silently coerce values, change the other selector, or
+extend measurements. Cross-configuration dependencies are validated at
+finalization as specified in <<tvm-disclosure-recovery>>.
+
+*Returns* zero in `sbiret.value` on success.
+
+[#table_sbi_covh_set_tvm_disclosure_config_errors]
+.COVE Host Set TVM Disclosure Configuration Errors
+[cols="2,3", width=90%, options="header,unbreakable"]
+|===
+| Error code | Description
+| SBI_SUCCESS | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM | Invalid `tvm_guest_id` or selector; the TVM is not
+in `TVM_INITIALIZING`; or `value` has reserved bits set.
+| SBI_ERR_NOT_SUPPORTED | The capability is absent, or `value` sets a defined
+permission outside the captured supported mask.
+|===
+
+[#sbi_covh_get_tvm_disclosure_config_supported_mask]
+=== Function: COVE Host Get TVM Disclosure Configuration Supported Mask (FID #26)
+[source, C, options="unbreakable"]
+-----
+struct sbiret sbi_covh_get_tvm_disclosure_config_supported_mask(
+    unsigned long tvm_guest_id, unsigned long selector);
+-----
+
+This function requires `COVE_TSM_CAP_TVM_DISCLOSURE_CONFIG`. `selector`
+must be 0 (exceptions) or 1 (information); all other selector encodings are
+invalid. Failed calls preserve configuration and measurements.
+
+Queries the captured supported mask for `selector` in
+<<tvm-disclosure-config>>. The TVM must have been created by
+`sbi_covh_create_tvm()` and be in `TVM_INITIALIZING` or `TVM_RUNNABLE`.
+A set bit identifies a defined permission that the TSM supports enabling.
+The mask is fixed at creation and remains unchanged after finalization.
+A zero mask is a successful result, not an unsupported selector.
+Supported bits do not guarantee that all combinations satisfy finalization
+validation or that every trap with a permitted cause may exit to the VMM.
+This query does not change configuration or measurements.
+
+*Returns* the unsigned XLEN-wide supported mask in `sbiret.value` on success,
+with reserved bits zero.
+
+[#table_sbi_covh_get_tvm_disclosure_config_supported_mask_errors]
+.COVE Host Get TVM Disclosure Configuration Supported Mask Errors
+[cols="2,3", width=90%, options="header,unbreakable"]
+|===
+| Error code | Description
+| SBI_SUCCESS | The operation completed successfully.
+| SBI_ERR_INVALID_PARAM | Invalid `tvm_guest_id`, selector, or TVM lifecycle state.
+| SBI_ERR_NOT_SUPPORTED | The capability is absent, or the TVM was created
+by single-step promotion.
 |===
 
 == COVE Interrupt Extension (EID #0x434F5649 "COVI")
@@ -2539,6 +2915,12 @@ Marks the specified range of TVM physical address space starting at
 `tvm_gpa_addr` as used for emulated MMIO. Upon return, all accesses by the TVM
 within the range are trapped and may be emulated by the host.
 
+When disclosure configuration applies, the TSM must reject registration before
+any effects if future accesses could require a blocked exit without guaranteed
+local recovery; see <<tvm-disclosure-recovery>>. Successful registration does
+not grant exception or information permissions. The registration ECALL's own
+routing and payload remain governed exclusively by <<tvm-sbi-policy>>.
+
 Both `tvm_gpa_addr` and `region_len` must be 4 KiB-aligned, and the region must
 not overlap with a previously defined region. This call will result in an exit
 to the host on success.
@@ -2552,6 +2934,8 @@ to the host on success.
                             This implies an exit to the host and a subsequent
 resume of execution.
 | SBI_ERR_INVALID_ADDRESS | `tvm_gpa_addr` was invalid.
+| SBI_ERR_INVALID_PARAM | The operation would invalidate disclosure recovery
+guarantees (<<tvm-disclosure-recovery>>).
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
@@ -2579,6 +2963,8 @@ in an exit to the host on success.
                             This implies an exit to the host and a subsequent
 resume of execution.
 | SBI_ERR_INVALID_ADDRESS | `tvm_gpa_addr` was invalid.
+| SBI_ERR_INVALID_PARAM | The operation would invalidate disclosure recovery
+guarantees (<<tvm-disclosure-recovery>>).
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
@@ -2600,7 +2986,8 @@ region and inserts non-confidential pages on page-faults.
 The calling TVM vCPU is considered blocked until the assignment-change is
 completed. Attempts to run it with `sbi_covh_run_tvm_vcpu()` will fail. Any
 guest page faults taken by other TVM vCPUs in the invalidated pages continue to
-be reported to the host.
+be reported to the host only when permitted by <<tvm-disclosure-config>>,
+where applicable. Otherwise local recovery is required.
 
 In CoVE implementations that do not support dynamic page conversion between
 confidential and non-confidential memory, the TSM reflects this call to the
@@ -2629,6 +3016,8 @@ resume of execution.
 | SBI_ERR_INVALID_ADDRESS | `tvm_gpa_addr` was invalid.
 | SBI_ERR_INVALID_PARAM   | `region_len` was invalid, or the entire range does
                             not map to a confidential region.
+Also returned if the operation would invalidate disclosure recovery
+guarantees (<<tvm-disclosure-recovery>>).
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
@@ -2670,6 +3059,8 @@ resume of execution.
 | SBI_ERR_INVALID_PARAM   | `region_len` was invalid, or the entire range
 doesn't
                             span a `SHARED_MEMORY_REGION`
+Also returned if the operation would invalidate disclosure recovery
+guarantees (<<tvm-disclosure-recovery>>).
 | SBI_ERR_FAILED          | The operation failed for unknown reasons.
 |===
 
@@ -3062,6 +3453,19 @@ fields, and freezes it. Advertised by TSM capability bit 6.
 Queries a CSR's TVM-wide writable mask during staged creation and after
 finalization. The mask describes permitted changes during initialization
 and remains fixed for the TVM's lifetime. Advertised by TSM capability bit 6.
+
+| <<sbi_covh_get_tvm_disclosure_config, sbi_covh_get_tvm_disclosure_config>> | COVH FID 24.
+Queries the TVM-wide exception or information permissions during staged
+initialization and after finalization. Advertised by TSM capability bit 7.
+
+| <<sbi_covh_set_tvm_disclosure_config, sbi_covh_set_tvm_disclosure_config>> | COVH FID 25.
+Atomically replaces one selector's permissions during initialization.
+Both start at zero; finalization validates recovery, measures, and freezes
+them. Advertised by TSM capability bit 7.
+
+| <<sbi_covh_get_tvm_disclosure_config_supported_mask, sbi_covh_get_tvm_disclosure_config_supported_mask>> | COVH FID 26.
+Queries one selector's lifetime-fixed supported mask during initialization
+and after finalization. Advertised by TSM capability bit 7.
 
 | <<sbi_covh_set_tvm_sbi_policy, sbi_covh_set_tvm_sbi_policy>> | Configures an
 exact SBI EID/FID pair as disabled, TSM-handled (with or without permission

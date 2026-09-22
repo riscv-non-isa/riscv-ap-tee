@@ -59,6 +59,13 @@ with <<sbi_covh_get_tvm_isa_config_writable_mask>>, and request updates with
 and subsequently created vCPU. ISA extensions without architectural CSR
 availability controls are outside this interface; see <<tvm-isa-config>>.
 
+When `COVE_TSM_CAP_TVM_DISCLOSURE_CONFIG` is advertised, creation also
+initializes both TVM-wide disclosure selectors to zero and captures their
+lifetime-fixed supported masks. During initialization, the VMM can query
+values and masks and atomically replace one selector's value using COVH
+FIDs 24-26. Exception causes and information categories are independently
+controlled as specified in <<tvm-disclosure-config>>.
+
 All SBI ECALLs are initially disabled. While the TVM is in
 `TVM_INITIALIZING`, the VMM configures individual SBI EID/FID pairs with
 <<sbi_covh_set_tvm_sbi_policy>>. Each pair may be handled by the TSM,
@@ -110,6 +117,19 @@ page additions, the order of ISA setters does not affect the measurement;
 only the final configuration is measured. Queries remain available after
 finalization.
 
+When disclosure configuration is supported, finalization validates the
+complete policy against ISA controls, demand paging, MMIO, and timer
+virtualization, including local recovery for every blocked trap. A mapped
+page alone does not guarantee recovery after host invalidation. Configurations
+without guaranteed local recovery are rejected with `SBI_ERR_INVALID_PARAM`.
+All finalization validation must precede commitment of any finalization
+measurement records. Failure preserves the initializing state, configuration,
+and pre-call measurement; a retry must not include partial records.
+Successful finalization measures a distinct, deterministic disclosure record
+containing format version, XLEN, and ordered selector/supported-mask/effective-value
+entries, including untouched zero defaults, then freezes the values. Queries
+remain available. See <<tvm-disclosure-config-measurement>>.
+
 ==== Single-step TVM Creation
 
 The OS/VMM can create a new TVM in a single operation by requesting the TSM to
@@ -124,10 +144,10 @@ creates a new TVM from the reflected VM state (VM data, page table configuration
 resources and begins interacting with the TVM through the TSM as described in
 the next sections.
 
-The staged-creation SBI policy and ISA configuration interfaces do not change
-single-step promotion behavior or its measurement rules. The
-`sbi_covh_set_tvm_sbi_policy()` and `sbi_covh_set_tvm_isa_config()` setters
-reject promoted TVMs because they are already in `TVM_RUNNABLE`.
+The staged-creation SBI policy, ISA configuration, and disclosure configuration
+interfaces do not change single-step promotion behavior or its measurement
+rules. Their setters reject promoted TVMs because they are already in
+`TVM_RUNNABLE`; ISA and disclosure queries are unsupported for promoted TVMs.
 
 [NOTE]
 ====
@@ -142,8 +162,13 @@ The VMM uses `sbi_covh_run_tvm_vcpu()` to (re)activate a virtual hart for a
 specific TVM (identified by the unique identifier). This TEECALL traps into
 the TSM-driver which affects the context switch to the TSM. The TSM then
 manages the activation of the virtual hart on the calling physical hart. During
-entry and resume, the TSM must preserve the frozen ISA configuration for
-every vCPU, including across scheduling on different physical harts. During
+entry and resume, the TSM must preserve the frozen ISA and disclosure
+configurations for every vCPU, including across scheduling on different
+physical harts. It must not execute a vCPU on an incompatible hart.
+Disclosure and local-recovery guarantees must also survive vCPU creation and
+later configuration or memory-management changes. Operations that would
+invalidate them must be rejected before effects under
+<<tvm-disclosure-recovery>>. During
 this activation the TCB's firmware can enforce that
 stale TLB entries that govern guest physical to system physical page access
 have been evicted across all hart TLBs. There may also be TLB flushes for
@@ -176,9 +201,13 @@ recommendations in <<TSM and TVM Isolation>>.
 For virtual-IO operations, the TVM code must register virtual-IO memory regions
 for trap and emulation by the host using `sbi_covg_add_mmio_region()`. Any
 read/write by the TVM from/to this memory region will result in a guest
-page-fault into TSM and TSM will forward the fault to the host. TSM will also
-communicate additional information such as faulting instruction, faulting
-address and the GPR value (in case of store instruction) to the host. When
+page-fault into TSM. When disclosure configuration applies, host emulation
+requires the appropriate exception permission, shared/MMIO GPA permission,
+instruction permission, and, for stores, store-operand permission. Only the
+required GPA, instruction, and store operand may be published. If any required
+permission is denied, the TSM must emulate locally or deliver an architecturally
+valid guest exception. Registration must fail if neither can be guaranteed.
+For other TVMs, the existing host emulation protocol applies. When
 direct device assignment is supported (which is expected to require IOMMU
 changes for CoVE), trusted devices may DMA directly into TVM confidential
 memory.
@@ -562,11 +591,24 @@ delivered to the TVM without OS/VMM involvement while the TVM is running. This
 is done by delegating (hideleg[6] = 1) and enabling (hie.VSTIE = 1) VS-level
 timers at VS level.
 
-While the OS/VMM should still be able to read a TVM's vstimecmp (for scheduling
-purposes), it must not be able to overwrite it. To support this the TSM and
+For TVMs outside the disclosure configuration interface, the OS/VMM should
+still be able to read a TVM's vstimecmp for scheduling purposes, but must not
+be able to overwrite it. To support this behavior the TSM and
 TSM-driver must leave the vstimecmp CSR intact when context-switching back
 to the OS/VMM, but must always restore the vstimecmp CSR from saved state
 when resuming.
+
+For staged TVMs with disclosure configuration, the host-readable timer-state
+behavior above is subject to information bits 4 (`htimedelta`) and 5
+(`vstimecmp`); bit 6 similarly gates `vsie`. These gates apply on every host
+return, including interrupt exits, to hardware CSRs and NACL outputs.
+The TSM saves guest state privately, clears unused NACL output slots, and
+sanitizes host-visible trap metadata before returning. It restores guest
+state from trusted storage on resume and accepts host results only for the
+pending authorized operation. If denied disclosures prevent host timer or
+wakeup handling, the TSM must provide hardware or trusted local handling,
+including while descheduled, or reject finalization. See
+<<tvm-disclosure-enforcement>> and <<tvm-disclosure-recovery>>.
 
 ==== TVM external interrupts
 

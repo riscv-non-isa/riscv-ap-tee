@@ -132,6 +132,28 @@ setter order and redundant writes do not. The configuration is immutable
 after successful finalization and remains queryable. These requirements do
 not change single-step promotion measurements.
 
+For staged TVMs on a TSM advertising `COVE_TSM_CAP_TVM_DISCLOSURE_CONFIG`,
+the initial measurement also includes the distinct disclosure record in
+<<tvm-disclosure-config-measurement>>. The record contains format version 1,
+XLEN, and `(selector, supported mask, effective value)` entries for selectors
+0 and 1 in ascending order. Both entries are included even when masks or
+values are zero. The encoding is implementation-specific, deterministic,
+and unambiguous, and distinct from ISA, SBI, page, and other records.
+
+All finalization inputs and dependencies, including local-recovery guarantees
+for blocked traps, must be validated before any finalization measurement
+records are committed. A failed finalization preserves the pre-call
+measurement, configuration, and initializing state; retry must not retain
+partial finalization records. Equivalent final configurations, including
+untouched defaults, explicit zero writes, and values restored to zero,
+contribute identically regardless of setter order or redundant writes.
+Changing XLEN, a supported mask, or an effective value changes the record.
+The measured permissions are maximum disclosure allowances enforced for all
+vCPUs, not promises that each permitted item is published. SBI ECALL payloads
+remain governed by the measured SBI policy. Values and supported masks remain
+queryable after finalization, and setters are frozen. These requirements do
+not change measurements for promoted TVMs or when the capability is absent.
+
 Each TVM's initial measurements are stored in dedicated measurement registers
 and a CoVE implementation must provide at least 1 and at most 8 of them. The
 initial measurement registers cover platform, TSM & TVM specific TCB element
@@ -182,8 +204,8 @@ CoVE implementation may look like the following table:
 
      | 5
      | TVM Configuration
-    <| TVM Entry Point, Initial Arguments, vCPU state, and SBI ECALL policy
-       (for staged creation)
+    <| TVM Entry Point, Initial Arguments, vCPU state, SBI ECALL policy,
+       and supported ISA and disclosure configurations (for staged creation)
      | TSM
 |===
 
