@@ -95,8 +95,64 @@ measurements and a runtime one.
 TVM initial measurements are generated from the CoVE workload TCB elements
 involved in the TVM construction. Any TCB element that directly or indirectly
 supports a TVM must be measured into the TVM initial measurement registers. Once
-a TVM is finalized, i.e., after the `sbi_tee_host_finalize_tvm()` TH-ABI is
-called, the TVM initial measurements must no longer be extended.
+a TVM is finalized, i.e., after the `sbi_covh_finalize_tvm()` COVH-ABI is
+successfully completed, the TVM initial measurements must no longer be extended.
+
+For staged TVM creation, the measured TVM configuration includes the effective
+SBI ECALL policy configured through <<sbi_covh_set_tvm_sbi_policy>>. At
+finalization, the TSM measures the enabled `(EID, FID, handler)` entries in
+ascending EID/FID order, including applicable CoVE domain-selector bits, using
+the implementation-specific measurement mechanism described below. Disabled
+and unspecified pairs are omitted. Equivalent final policies must contribute
+identically to the measurement regardless of setter order, overwritten
+entries, or explicit disabling of pairs, as specified in
+<<sbi_covh_finalize_tvm>>. This policy is immutable after finalization; these
+requirements do not change single-step promotion behavior.
+The measured handler value distinguishes TSM handling that permits specified
+host communication (`COVE_TVM_SBI_TSM`) from TSM handling that prohibits it
+(`COVE_TVM_SBI_TSM_LOCAL`).
+
+For staged TVMs on a TSM advertising `COVE_TSM_CAP_TVM_ISA_CONFIG`, the
+initial measurement also includes the complete effective ISA configuration
+described in <<tvm-isa-config-measurement>>. Before committing finalization
+measurements, the TSM validates the configuration and its dependencies;
+failure leaves the TVM initializing with its initial measurement uncommitted.
+The TSM measures a distinct configuration record containing XLEN and
+ascending `(CSR number, field mask, effective value)` entries for all
+CSRs with supported policy fields, including RV32 high-half CSRs. Each mask
+identifies all supported policy fields for that CSR; effective values have
+bits outside those fields zero. Defaults and fixed fields are included even
+if no setter was called. The encoding is implementation-specific but must be
+deterministic and unambiguous.
+
+Leaving defaults unchanged, explicitly writing the same defaults, and
+restoring defaults after intermediate updates yield identical configuration
+contributions. Changing an effective policy control changes the record;
+setter order and redundant writes do not. The configuration is immutable
+after successful finalization and remains queryable. These requirements do
+not change single-step promotion measurements.
+
+For staged TVMs on a TSM advertising `COVE_TSM_CAP_TVM_DISCLOSURE_CONFIG`,
+the initial measurement also includes the distinct disclosure record in
+<<tvm-disclosure-config-measurement>>. The record contains format version 1,
+XLEN, and `(selector, supported mask, effective value)` entries for selectors
+0 and 1 in ascending order. Both entries are included even when masks or
+values are zero. The encoding is implementation-specific, deterministic,
+and unambiguous, and distinct from ISA, SBI, page, and other records.
+
+All finalization inputs and dependencies, including local-recovery guarantees
+for blocked traps, must be validated before any finalization measurement
+records are committed. A failed finalization preserves the pre-call
+measurement, configuration, and initializing state; retry must not retain
+partial finalization records. Equivalent final configurations, including
+untouched defaults, explicit zero writes, and values restored to zero,
+contribute identically regardless of setter order or redundant writes.
+Changing XLEN, a supported mask, or an effective value changes the record.
+The measured permissions are maximum disclosure allowances enforced for all
+vCPUs, not promises that each permitted item is published. SBI ECALL payloads
+remain governed by the measured SBI policy. Values and supported masks remain
+queryable after finalization, and setters are frozen. These requirements do
+not change measurements for promoted TVMs or when the capability is absent.
 
 Each TVM's initial measurements are stored in dedicated measurement registers
 and a CoVE implementation must provide at least 1 and at most 8 of them. The
@@ -148,7 +204,8 @@ CoVE implementation may look like the following table:
 
      | 5
      | TVM Configuration
-    <| TVM Entry Point, Initial Arguments, and the vCPU state
+    <| TVM Entry Point, Initial Arguments, vCPU state, SBI ECALL policy,
+       and supported ISA and disclosure configurations (for staged creation)
      | TSM
 |===
 

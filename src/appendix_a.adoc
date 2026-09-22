@@ -50,13 +50,20 @@ post delegated-trap into the TSM from the TVM) and uses the dynamic memory
 assigned to the TEE VM. The control structure for the TVM virtual hart is 
 shown as the VHCS below. These guest control CSRs are restored by the TSM 
 when a TVM virtual hart is being entered and is configured on the required 
-state of that TVM.
+state of that TVM. For staged TVMs using <<tvm-isa-config>>, the supported
+policy fields come from the TVM-wide effective configuration. The TSM must
+preserve the configured architectural behavior on every vCPU entry and
+resume, including when scheduling on another physical hart. Configuration
+queries return policy values, not the live contents of these CSRs. All other
+CSR fields remain under TSM management according to the existing isolation
+requirements; this interface does not expose arbitrary VHCS access.
 
 Virtual Hart Control Structure (VHCS)
 
 |===
 | CSR         | Description 
-| hstatus     | Initialized by TSM
+| hstatus     | Initialized/restored by TSM; supported `VTW`, `VTVM`, and `VTSR`
+policy fields follow the TVM-wide ISA configuration.
 | hedeleg     | Initialized by TSM to enforce events that are to always be 
 handled by the TSM (default all)
 | hideleg     | Initialized by TSM to enforce events that are to 
@@ -67,7 +74,10 @@ always be handled by the TSM (default all)
 handled by the TSM (default all)
 | hgeip       | Initialized (cleared) by the TSM
 | hgeie       | Initialized (cleared) by the TSM
-| henvcfg     | Initialized by TSM
+| henvcfg     | Initialized/restored by TSM; supported extension and environment
+policy fields follow the TVM-wide ISA configuration.
+| henvcfgh    | RV32 high half of `henvcfg`; supported policy fields follow the
+same TVM-wide ISA configuration. On RV64 these fields are in `henvcfg`.
 | hvenvcfg    | Initialized by TSM
 | hcounteren  | Initialized by TSM per TVM configuration
 | htimedelta  | Initialized by TSM per TVM configuration
@@ -84,4 +94,3 @@ clear page offset) by the TSM on a TEERET when reporting a guest page
 fault_The vs* and x/v/f registers are not listed here but are maintained by
 the TSM per virtual hart for TVMs.
 ====
-
