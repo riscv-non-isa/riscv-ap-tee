@@ -347,7 +347,7 @@ memory pages will fault (including implicit accesses).
 
 ==== Global and per-TVM TLB management
 
-[caption="Figure {counter:image}: ", reftext="Figure {counter:image}"]
+[caption="Figure {counter:image}: ", reftext="Figure {image}"]
 [title= "TLB management for memory conversion"]
 [plantuml]
 ....
